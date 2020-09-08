@@ -1,0 +1,15 @@
+--index-url http://dst.us.cray.com/dstpiprepo/simple
+--trusted-host dst.us.cray.com
+-c constraints.txt
+-r lib/server/requirements.txt
+
+kubernetes
+requests
+cray-cfs-k8s
+redis
+
+# The purpose of this file is to contain python runtime requirements
+# for controller code, e.g., code authored by developers, as opposed to
+# automatically generated code. Requirements from automatically generated
+# code are stored in lib/server/requirements.txt (within the associated
+# docker image), and are referenced above.

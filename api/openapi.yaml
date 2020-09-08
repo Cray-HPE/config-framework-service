@@ -1,0 +1,858 @@
+# Cray Configuration Framework Service API Specification
+# Copyright 2019-2020, Cray Inc. All Rights Reserved.
+openapi: "3.0.2"
+
+info:
+  title: "Configuration Framework Service"
+  version: "0.8.0"
+  description: >
+    The Configuration Framework Service (CFS) manages the launch of Ansible Execution Environments
+    for image customization, node personalization, and node reconfiguration. CFS manages
+    the Ansible staging container that pulls Ansible play/role content and inventory (optional)
+    from the git server and launches the Ansible Execution Environment.
+
+
+    CFS includes the following components:
+
+      * CFS REST API
+      * A Kubernetes operator running on the management services infrastructure to handle
+      the lifecycle and reporting of configuration sessions.
+      * Pre-packaged Ansible Execution Environment(s) (AEE) with values tuned for performant
+      configuration for executing Ansible playbooks against Cray compute and user access nodes.
+
+
+    CFS uses a Git version control server running in the management services infrastructure
+    for management of the configuration manifest lifecycle.
+
+
+      The CFS API allows an administrator to customize the compute and user access nodes
+      in the following ways:
+    * Customize the bootable images prior to their use on the system. This process is called
+      image customization. CFS uses IMS to stage images in an ssh container and then modifies
+      one or more images using Ansible.
+
+    * Customize live nodes during boot or post-boot. This process is called node personalization.
+      Node personalization involves applying software and/or configuration that differentiates
+      a node or a group of nodes from all other groups of nodes.
+      This should be used in scenarios where configuration cannot be applied prior to booting
+      a node. It is typically best to make changes pre-boot via image customization. This ensures
+      Ansible only has to run once against an image, rather than against every individual booted node.
+      The BOS and IMS APIs support CFS to customize live nodes during boot time.
+
+    ## Resources
+
+    /healthz - Check service health
+
+
+    /options - Updates service options.
+
+
+    /sessions - Create, retrieve, or delete configuration sessions.
+
+
+    /components - Add, update, retrieve, or delete component configurations.
+
+    ## Workflows
+
+    ### Image Customization
+
+     #### GET /images
+
+     Identify the IMS image that you want to customize. Note the id of the image that you want to customize.
+
+     #### POST /sessions
+
+     Create a configuration session and push the configuration to the specific image in IMS.
+     You must specify the target definition as image and provide id of the image that you want to customize.
+     This step customizes the image as per Ansible playbook and saves the image in the IMS.
+
+
+    ### Node Personalization
+
+     #### POST /sessions
+     Create a configuration framework session to push configuration to nodes that have already
+     been booted, specifying the target (optional), the git repository location, inventory (optional),
+     and gives the session a unique name.
+
+     #### GET /sessions/{session_name}
+     View details and status for the specific session_name.
+
+     #### DELETE /sessions/{session_name}
+     Delete all session history for session_name (as needed).
+
+    The default content type for the CFS API is `application/json`. Unsuccessful
+    API calls return a content type of `application/problem+json` as per RFC 7807.
+
+servers:
+- url: https://api-gw-service-nmn.local/apis/cfs
+  description: The production CFS API server
+
+components:
+  requestBodies:
+    ConfigFrameworkSessionCreateRequest:
+      description: A JSON object for creating Config Framework Sessions
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConfigFrameworkSessionCreate'
+    OptionsUpdateRequest:
+      description: Service-wide configuration options
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Options'
+    ComponentsUpdateRequest:
+      description: The configuration/state for an array of components
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ComponentConfigurationArray'
+    ComponentUpdateRequest:
+      description: The configuration/state for a single component
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ComponentConfiguration'
+  responses:
+    # Success
+    Healthz:
+      description: Status information for the service
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Healthz'
+    Options:
+      description: A collection of service-wide configuration options
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Options'
+    SessionDetails:
+      description: A single configuration session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConfigFrameworkSession'
+    SessionDetailsArray:
+      description: A collection of configuration sessions
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ConfigFrameworkSession'
+    ComponentDetails:
+      description: A single component state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ComponentConfiguration'
+    ComponentDetailsArray:
+      description: A collection of component states
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ComponentConfiguration'
+    ResourceDeleted:
+      description: The resource was deleted.
+    # Errors
+    BadRequest:
+      description: Bad Request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    ResourceNotFound:
+      description: The resource was not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    ConflictingSessionName:
+      description: A session with the same name already exists.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+  schemas:
+    Link:
+      description: Link to other resources
+      type: object
+      properties:
+        rel:
+          type: string
+          example: /apis/cfs/sessions/session-20190728032600
+        href:
+          type: string
+      additionalProperties: false
+    Healthz:
+      description: Service health status
+      type: object
+      properties:
+        dbStatus:
+          type: string
+        crdStatus:
+          type: string
+      additionalProperties: false
+    Options:
+      description: |
+        Configuration options for the configuration service.
+      type: object
+      properties:
+        hardwareSyncInterval:
+          type: integer
+          description: How frequently the CFS hardware-sync-agent checks with the Hardware State Manager to update it's known hardware (in seconds)
+          example: 5
+        batcherCheckInterval:
+          type: integer
+          description: How frequently the batcher checks the configuration states to see if work needs to be done (in seconds)
+          example: 5
+        batchSize:
+          type: integer
+          description: The maximum number of nodes the batcher will run a single CFS session against.
+          example: 120
+        batchWindow:
+          type: integer
+          description: The maximum number of seconds the batcher will wait to run a CFS session once a node has been detected that needs configuration.
+          example: 120
+        defaultBatcherRetryPolicy:
+          type: integer
+          description: The default maximum number retries per node when configuration fails.
+          example: 1
+        defaultCloneUrl:
+          type: string
+          description: The default clone URL of the configuration content repository to be used if not specified in a nodes desired state.
+          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+        defaultPlaybook:
+          type: string
+          description: The default playbook to be used if not specified in a node's desired state.
+          example: site.yml
+        defaultAnsibleConfig:
+          type: string
+          default: cfs-default-ansible-cfg
+          description: The Kubernetes ConfigMap which holds the default ansible.cfg for a given CFS session. This ConfigMap must be present in the same Kubernetes namespace as the CFS service.
+          example: cfs-default-ansible-cfg
+    TargetSpecSection:
+      type: object
+      description: >
+           A target lets you define the nodes or images that you want to customize and consists
+           of two sub-parameters - Definition and groups.
+           By default, Configuration Framework Sessions use dynamic inventory definition
+           to target hosts. When using a session to customize an image, or if a static inventory
+           is required, use this optional section to specify entities (whether images or nodes)
+           for the session to target.
+      properties:
+        definition:
+          type: string
+          description: |
+            Source of inventory definition to be used in the configuration session.
+
+            'image' denotes that the session will target an image root through the Image
+            Management Service (IMS). Group members should be a single image identifier known by IMS.
+
+            'spec' denotes inventory that is specified directly via CFS in the target
+            groups/members of this object. You can include a node name (a DNS resolvable name),
+            or a group name and a list of nodes. The command line inventory can be a quick
+            and simple way to run Ansible against a small subset of nodes. However, if more
+            customization of the inventory is needed, specifically customization of host and
+            groups variables, the repo target definition should be used.
+
+            'repo' denotes the inventory will be used from the git repository
+            specified for this session (via `cloneUrl`, and `branch` or `commit`). The inventory
+            must be located in the "hosts" file at the root of the repository.
+
+            'dynamic' (default) will use the CFS-provided dynamic inventory plugin to define
+            the inventory. The hosts file is automatically generated by CFS with data from
+            the Hardware State Manager (HSM), which includes groups and hardware roles.
+          enum: ['image', 'spec', 'repo', 'dynamic']
+          default: 'dynamic'
+          example: spec
+        groups:
+          type: array
+          description: Specification of the groups and group members per the inventory definition. This list is not valid for the 'repo' and 'dynamic' inventory definition types. Multiple groups can be specified for 'image' and 'spec' inventory definition types.
+          items:
+            type: object
+            required: ['name', 'members']
+            properties:
+              name:
+                description: Group name
+                example: test-computes
+                type: string
+              members:
+                description: |
+                  Group members for the inventory.
+                type: array
+                example: ['nid000001', 'nid000002', 'nid000003']
+                items:
+                  type: string
+    ConfigFrameworkSession:
+      description: |
+        An execution session for the Configuration Framework.
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique id of the session
+          example: "46a2731e-a1d0-4f98-ba92-4f78c756bb12"
+        name:
+          type: string
+          description: Name of the session. The length of the name is restricted to 45 characters.
+          example: "session-20190728032600"
+          # These validation parameters are restricted by Kubernetes naming conventions.
+          minLength: 1
+          maxLength: 45
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        repo:
+          type: object
+          description: The git repository information which holds the configuration content that will be used by the session.
+          properties:
+            cloneUrl:
+              type: string
+              format: url
+              description: The clone URL of the configuration content repository
+              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+            branch:
+              type: string
+              description: The branch of the repository at the `clone_url` to check out
+              example: master
+            commit:
+              type: string
+              description: The commit of the repository at the `clone_url` to check out
+              example: 531952e90b1a61ac00f2ca11057d3145529904e5
+        ansible:
+          type: object
+          description: Additional options that will be used when invoking Ansible.
+          properties:
+            config:
+              type: string
+              default: cfs-default-ansible-cfg
+              description: >-
+                The Kubernetes ConfigMap which holds the ansible.cfg for a given CFS
+                session. This ConfigMap must be present in the same Kubernetes namespace as
+                the CFS service. If no value is given, the value of the defaultAnsibleConfig
+                field in the /options endpoint will be used.
+              example: cfs-default-ansible-cfg
+            limit:
+              type: string
+              description: >-
+                Additional filtering of hosts or groups from the inventory to run against. This is
+                especially useful when running with dynamic inventory and when you want to run on a
+                subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
+                can be used to specify nodes or groups.
+              example: host1
+            playbook:
+              type: string
+              description: >-
+                The Ansible playbook to run. The file path must be specified relative to the
+                base directory of the config repo. Cray provides the site.yml playbook. However,
+                it is possible to run a configuration session using an alternate playbook.
+                The alternate playbook needs to be added to the configuration repository before it is used.
+                See *Change the Configuration Manifest* section in the Cray Administration Guide.
+              default: site.yml
+              example: site.yml
+            verbosity:
+              type: integer
+              default: 0
+              minimum: 0
+              maximum: 4
+              description: >-
+                The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
+                2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
+                for more information.
+        target:
+          $ref: '#/components/schemas/TargetSpecSection'
+        status:
+          type: object
+          description: Status of artifacts, session, and targets. Lists details like session status, session start and completion time, number of successful, failed, or running targets. If the target definition is an image, it also lists the image_id, result_id, and type of image under Artifacts.
+          properties:
+            artifacts:
+              type: array
+              items:
+                type: object
+                properties:
+                  image_id:
+                    example: "f34ff35e-d782-4a65-a1b8-243a3cd740af"
+                    description: The IMS id of the original image to be customized via a configuration session.
+                    format: uuid
+                    type: string
+                  result_id:
+                    example: "8b782ccd-8706-4145-a6a1-724e29ed5522"
+                    description: The IMS id of the image that was customized via a configuration session. This is the resultant image of the customization.
+                    format: uuid
+                    type: string
+                  type:
+                    example: 'ims_customized_image'
+                    type: string
+                    enum: ['ims_customized_image']
+                    default: 'ims_customized_image'
+            targets:
+              type: object
+              properties:
+                failed:
+                  description: The number of target hosts that failed configuration.
+                  example: 1
+                  readOnly: true
+                  type: integer
+                success:
+                  description: The number of target hosts that succeeded in configuration.
+                  example: 1
+                  readOnly: true
+                  type: integer
+                running:
+                  description: The number of target hosts that are currently running configuration.
+                  example: 1
+                  readOnly: true
+                  type: integer
+            session:
+              type: object
+              properties:
+                job:
+                  description: The name of the configuration execution environment associated with this session.
+                  example: cray-cfs-job-session-20190728032600
+                  readOnly: true
+                  type: string
+                completionTime:
+                  description: The date/time when the session completed execution in RFC 3339 format.
+                  example: '2019-07-28T03:26:00Z'
+                  format: date-time
+                  readOnly: true
+                  type: string
+                startTime:
+                  description: The date/time when the session started execution in RFC 3339 format.
+                  example: '2019-07-28T03:26:00Z'
+                  format: date-time
+                  readOnly: true
+                  type: string
+                status:
+                  description: The execution status of the session.
+                  enum: ['pending', 'running', 'complete']
+                  readOnly: true
+                  type: string
+                succeeded:
+                  description: |
+                    Whether the session executed successfully or not. A 'none'
+                    value denotes that the execution has not completed. This
+                    field has context when the `status` field is 'complete'.
+                    A session may successfully execute even if the underlying
+                    tasks do not.
+                  enum: ['none', 'true', 'false']
+                  readOnly: true
+                  type: string
+      additionalProperties: false
+    ConfigFrameworkSessionCreate:
+      description: |
+        The information required to create a Config Framework Session.
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the session. The length of the name is restricted to 45 characters.
+          example: "session-20190728032600"
+          # These validation parameters are restricted by Kubernetes naming conventions.
+          minLength: 1
+          maxLength: 45
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+        cloneUrl:
+          type: string
+          format: url
+          description: The clone URL of the configuration content repository
+          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+        branch:
+          type: string
+          description: The branch of the repository at the `clone_url` to check out
+          example: master
+        commit:
+          type: string
+          description: The commit of the repository at the `clone_url` to check out
+          example: 531952e90b1a61ac00f2ca11057d3145529904e5
+        ansiblePlaybook:
+          type: string
+          description: >-
+            The Ansible playbook to run. The file path must be specified relative to the
+            base directory of the config repo. Cray provides the site.yml playbook. However,
+            it is possible to run a configuration session using an alternate playbook.
+            The alternate playbook needs to be added to the configuration repository before it is used.
+            See *Change the Configuration Manifest* section in the Cray Administration Guide.
+          default: site.yml
+          example: site.yml
+        ansibleLimit:
+          type: string
+          description: >-
+            Additional filtering of hosts or groups from the inventory to run against. This is
+            especially useful when running with dynamic inventory and when you want to run on a
+            subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
+            can be used to specify nodes or groups.
+          example: host1
+        ansibleConfig:
+          type: string
+          description: >-
+            The Kubernetes ConfigMap which holds the ansible.cfg for a given CFS
+            session. This ConfigMap must be present in the same Kubernetes namespace as
+            the CFS service. If no value is given, the value of the defaultAnsibleConfig
+            field in the /options endpoint will be used.
+          example: cfs-default-ansible-cfg
+        ansibleVerbosity:
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 4
+          description: >-
+            The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
+            2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
+            for more information.
+        target:
+          $ref: '#/components/schemas/TargetSpecSection'
+      required: [name]
+      additionalProperties: false
+    ComponentState:
+      description: |
+        The configuration state for a component.
+      type: object
+      properties:
+        lastUpdated:
+          description: The date/time when the state was last updated in RFC 3339 format.
+          example: '2019-07-28T03:26:00Z'
+          format: date-time
+          readOnly: true
+          type: string
+        cloneUrl:
+          type: string
+          description: The clone URL of the configuration content repository.
+          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+        playbook:
+          type: string
+          description: The Ansible playbook to run.
+          example: site.yml
+        commit:
+          type: string
+          description: The commit hash of the configuration repository when the state is set.
+    ComponentConfiguration:
+      description: |
+        The configuration state and desired state for a component.
+      type: object
+      properties:
+        id:
+          type: string
+          description: The component's id. e.g. xname for hardware components
+        state:
+          $ref: '#/components/schemas/ComponentState'
+        desiredState:
+          $ref: '#/components/schemas/ComponentState'
+        errorCount:
+          type: integer
+          description: The count of failed configuration attempts.
+        retryPolicy:
+          type: integer
+          description: The maximum number retries per component when configuration fails.
+        sessionName:
+          type: string
+          description: The name of the CFS session that last configured the component.
+        enabled:
+          type: boolean
+          description: A flag indicating if the component should be scheduled for configuration.
+        configurationStatus:
+          type: string
+          description: A summary of the component's configuration state.
+          enum: ['unconfigured', 'pending', 'failed', 'configured', ]
+          readOnly: true
+    ComponentConfigurationArray:
+      description: An array of component configurations.
+      type: array
+      items:
+        $ref: '#/components/schemas/ComponentConfiguration'
+    ProblemDetails:
+      description: An error response for RFC 7807 problem details.
+      type: object
+      properties:
+        type:
+          description:
+            Relative URI reference to the type of problem which includes human
+            readable documentation.
+          type: string
+          format: uri
+          default: "about:blank"
+        title:
+          description:
+            Short, human-readable summary of the problem, should not change by
+            occurrence.
+          type: string
+        status:
+          description: HTTP status code
+          type: integer
+          example: 400
+        instance:
+          description: A relative URI reference that identifies the specific
+            occurrence of the problem
+          format: uri
+          type: string
+        detail:
+          description:
+            A human-readable explanation specific to this occurrence of the
+            problem. Focus on helping correct the problem, rather than giving
+            debugging information.
+          type: string
+
+paths:
+  /healthz:
+    get:
+      summary: Get service health details
+      tags:
+        - healthz
+      x-openapi-router-controller: cray.cfs.api.controllers.healthz
+      operationId: get_healthz
+      description: Get cfs-api health details.
+      responses:
+        200:
+          $ref: '#/components/responses/Healthz'
+        503:
+          $ref: '#/components/responses/Healthz'
+  /options:
+    get:
+      summary: Retrieve the configuration service options
+      tags:
+        - options
+      x-openapi-router-controller: cray.cfs.api.controllers.options
+      description: Retrieve the list of configuration service options.
+      operationId: get_options
+      responses:
+        200:
+          $ref: '#/components/responses/Options'
+    patch:
+      summary: Update configuration service options
+      tags:
+        - options
+      x-openapi-router-controller: cray.cfs.api.controllers.options
+      operationId: patch_options
+      description: Update one or more of the configuration service options.
+      requestBody:
+        $ref: '#/components/requestBodies/OptionsUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/Options'
+        400:
+          $ref: '#/components/responses/BadRequest'
+  /sessions:
+    get:
+      summary: Retrieve configuration framework sessions
+      tags:
+        - sessions
+      x-openapi-router-controller: cray.cfs.api.controllers.sessions
+      description:
+        Retrieve all the configuration framework sessions on the system.
+      operationId: get_sessions
+      responses:
+        200:
+          $ref: '#/components/responses/SessionDetailsArray'
+    post:
+      summary: Create a configuration framework session
+      tags:
+        - sessions
+      x-openapi-router-controller: cray.cfs.api.controllers.sessions
+      operationId: create_session
+      description:
+        Create a new configuration session. A configuration session stages Ansible inventory,
+        launches one or more Ansible Execution Environments (AEE) as containers in the management
+        services infrastructure, and tears down the environments as required. When a session is
+        targeted for image customization, the inventory staging involves using IMS to expose the requested
+        image roots, tearing down the image roots, and generating new boot artifacts afterwards.
+        The session will checkout the prescribed branch or commit of the configuration repository
+        and populate the configuration manifest to the AEE. The Ansible execution begins with an
+        inventory prescribed by the user through CFS. A configuration session also tracks the
+        status of the different stages of the operation and reports information on
+        the success of its execution.
+      requestBody:
+        $ref: '#/components/requestBodies/ConfigFrameworkSessionCreateRequest'
+      responses:
+        201:
+          $ref: '#/components/responses/SessionDetails'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        409:
+          $ref: '#/components/responses/ConflictingSessionName'
+
+  /sessions/{session_name}:
+    get:
+      summary: Retrieve a configuration framework session by session_name
+      tags:
+        - sessions
+      x-openapi-router-controller: cray.cfs.api.controllers.sessions
+      operationId: get_session
+      description: >-
+        View details about a specific configuration session. This allows you to
+        track the status of the session and the Ansible execution through the session.
+      responses:
+        200:
+          $ref: '#/components/responses/SessionDetails'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    delete:
+      summary: Delete a configuration framework session
+      tags:
+        - sessions
+      x-openapi-router-controller: cray.cfs.api.controllers.sessions
+      operationId: delete_session
+      description: >-
+        Deleting a configuration session deletes the Kubernetes objects associated
+        with the session and also deletes the session history. The operation cannot be undone.
+      responses:
+        204:
+          $ref: '#/components/responses/ResourceDeleted'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    parameters:
+      - name: session_name
+        in: path
+        description: Config Framework Session name
+        required: true
+        schema:
+          type: string
+  /components:
+    get:
+      summary: Retrieve the state of a collection of components
+      tags:
+        - components
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: >-
+        Retrieve the full collection of components in the form of a
+        ComponentArray. Full results can also be filtered by query
+        parameters. Only the first filter parameter of each type is
+        used and the parameters are applied in an AND fashion.
+        If the collection is empty or the filters have no match, an
+        empty array is returned.
+      operationId: get_components
+      parameters:
+        - name: ids
+          schema:
+            type: string
+          in: query
+          description: >-
+            Retrieve the components with the given id
+            (e.g. xname for hardward components). Can be chained
+            for selecting groups of components.
+        - name: status
+          schema:
+            type: string
+          in: query
+          description: >-
+            Retrieve the components with the status. Multiple statuses can be specified
+            in a comma-separated list.
+        - name: enabled
+          schema:
+            type: boolean
+          in: query
+          description: >-
+            Retrieve the components with the "enabled" state.
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetailsArray'
+        400:
+          $ref: '#/components/responses/BadRequest'
+    put:
+      summary: Add or Replace a collection of components
+      tags:
+        - components
+        - cli_ignore
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Update the state for a collection of components in the cfs database
+      operationId: put_components
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentsUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetailsArray'
+        400:
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      summary: Update a collection of components
+      tags:
+        - components
+        - cli_ignore
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Update the state for a collection of components in the cfs database
+      operationId: patch_components
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentsUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetailsArray'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+  /components/{component_id}:
+    get:
+      summary: Retrieve the state of a single component
+      tags:
+        - components
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Retrieve the configuration and current state of a single component
+      operationId: get_component
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetails'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    put:
+      summary: Add or Replace a single component
+      tags:
+        - components
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Update the state for a given component in the cfs database
+      operationId: put_component
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetails'
+        400:
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      summary: Update a single component
+      tags:
+        - components
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Update the state for a given component in the cfs database
+      operationId: patch_component
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/ComponentDetails'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    delete:
+      tags:
+        - components
+        - cli_ignore
+      summary: Delete a single component
+      x-openapi-router-controller: cray.cfs.api.controllers.components
+      description: Delete the given component
+      operationId: delete_component
+      responses:
+        204:
+          $ref: '#/components/responses/ResourceDeleted'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    parameters:
+      - name: component_id
+        in: path
+        description: Component id. e.g. xname for hardware components
+        required: true
+        schema:
+          type: string
+
