@@ -1,0 +1,27 @@
+ansible.cfg
+*.code-workspace
+.vscode
+*/*.retry
+*/*.pyc
+src/server/cray/cfs/api/controllers/default_controller.py
+src/server/cray/cfs/api/controllers/sessions_controller.py
+src/server/cray/cfs/api/controllers/security_controller_.py
+
+# Ignore generated code
+src/server/cray/cfs/api/models/*
+src/server/cray/cfs/api/util.py
+src/server/cray/cfs/api/typing_utils.py
+src/server/cray/cfs/api/openapi/openapi.yaml
+src/server/cray/cfs/api/encoder.py
+src/server/cray/cfs/api/__init__.py
+src/server/README.md
+src/server/test-requirements.txt
+src/server/requirements.txt
+src/server/.gitignore
+src/server/Dockerfile
+src/server/.dockerignore
+src/server/setup.py
+src/server/tox.ini
+src/server/git_push.sh
+src/server/.travis.yml
+src/server/.openapi-generator/VERSION

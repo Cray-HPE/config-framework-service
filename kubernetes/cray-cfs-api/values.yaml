@@ -1,0 +1,50 @@
+# Please refer to https://stash.us.cray.com/projects/CLOUD/repos/cray-charts/browse/stable/cray-service/values.yaml?at=refs%2Fheads%2Fmaster
+# for more info on values you can set/override
+# Note that cray-service.containers[*].image and cray-service.initContainers[*].image map values are one of the only structures that
+# differ from the standard kubernetes container spec:
+# image:
+#   repository: ""
+#   tag: "" (default = "latest")
+#   pullPolicy: "" (default = "IfNotPresent")
+
+cray-service:
+  type: Deployment
+  nameOverride: cray-cfs-api
+  serviceAccountName: cray-cfs
+  containers:
+    cray-cfs-api:
+      name: cray-cfs-api
+      image:
+        repository: cray/cray-cfs
+      ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+      readinessProbe:
+        httpGet:
+          path: /healthz
+          port: 80
+          scheme: HTTP
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 5
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 80
+          scheme: HTTP
+        initialDelaySeconds: 60
+        periodSeconds: 20
+        timeoutSeconds: 20
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "5m"
+        limits:
+          memory: "250Mi"
+          cpu: "50m"
+  ingress:
+    ui: false
+    enabled: true
+    prefix: /apis/cfs/
+    uri: /

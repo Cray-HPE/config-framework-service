@@ -1,0 +1,108 @@
+{{- $baseChartValues := index .Values "cray-service" -}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cfs-db
+  namespace: services
+spec:
+  storageClassName: ceph-cephfs-external
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ include "cray-service.name" . }}-db"
+  labels:
+    app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+  template:
+    metadata:
+      name: "{{ include "cray-service.name" . }}-db"
+      labels:
+        app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+    spec:
+      containers:
+      - name: "{{ include "cray-service.name" . }}-db"
+        image: "{{ $baseChartValues.imagesHost }}/library/redis:5.0-alpine"
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'save 10 1' >> /etc/redis.conf && sleep 1 && redis-server /etc/redis.conf"]
+        volumeMounts:
+        - mountPath: /data
+          name: cfs-db
+        ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        livenessProbe:
+          exec:
+            command:
+            - ash
+            - -c
+            - redis-cli -h localhost ping
+          failureThreshold: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - ash
+            - -c
+            - redis-cli -h localhost ping
+          failureThreshold: 5
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+      volumes:
+      - name: cfs-db
+        persistentVolumeClaim:
+          claimName: cfs-db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "cray-service.name" . }}-db"
+  labels:
+    app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+spec:
+  ports:
+  - name: redis
+    port: 6379
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: "{{ include "cray-service.name" . }}-db"
+  labels:
+    app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: {{ include "cray-service.name" . }}
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cray-cfs-aee
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cray-cfs-operator
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
