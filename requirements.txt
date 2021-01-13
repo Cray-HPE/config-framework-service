@@ -1,0 +1,14 @@
+--index-url https://arti.dev.cray.com:443/artifactory/api/pypi/pypi-remote/simple
+-c constraints.txt
+-r lib/server/requirements.txt
+
+kubernetes
+requests
+redis
+kafka-python
+
+# The purpose of this file is to contain python runtime requirements
+# for controller code, e.g., code authored by developers, as opposed to
+# automatically generated code. Requirements from automatically generated
+# code are stored in lib/server/requirements.txt (within the associated
+# docker image), and are referenced above.
