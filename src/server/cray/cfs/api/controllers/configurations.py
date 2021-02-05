@@ -15,6 +15,18 @@ DB = dbutils.get_wrapper(db='configurations')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
+def _init():
+    """ Initialize the credentials field of the git config """
+    credentials_command = 'git config --global credential.helper store'.split()
+    try:
+        subprocess.check_call(credentials_command,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        LOGGER.info('Set git credential.helper store')
+    except subprocess.CalledProcessError as e:
+        LOGGER.error('Failed setting git credential.helper store')
+        raise
+
+
 @dbutils.redis_error_handler
 def get_configurations(in_use=None):
     """Used by the GET /configurations API operation"""
@@ -151,11 +163,21 @@ def _get_commit_id(repo_url, branch):
         repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
 
+        split_url = repo_url.split('/')
+        username = os.environ['VCS_USERNAME']
+        password = os.environ['VCS_PASSWORD']
+        creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
+        creds_file_name = os.path.join(tmp_dir, '.git-credentials')
+        with open(creds_file_name, 'w') as creds_file:
+            creds_file.write(creds_url)
+
         clone_command = 'git clone {}'.format(repo_url).split()
         checkout_command = 'git checkout {}'.format(branch).split()
         parse_command = 'git rev-parse HEAD'.split()
         try:
-            subprocess.check_call(clone_command, cwd=tmp_dir,
+            # Setting HOME lets us keep the .git-credentials file in the temp directory rather than the
+            # HOME shared by all threads/calls.
+            subprocess.check_call(clone_command, cwd=tmp_dir, env={'HOME': tmp_dir},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.check_call(checkout_command, cwd=repo_dir,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
