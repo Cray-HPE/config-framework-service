@@ -1,24 +1,7 @@
 # Cray Configuration Framework Service
 
 # License
-Copyright 2019, Cray Inc. All rights reserved.
-
-
-## Testing
-
-### CT Tests
-CFS CT tests can be found in /ct-tests
-
-On a physical system, CMS tests can be found in /opt/cray/tests/crayctl-stage{NUMBER}/cms.
-Please see https://connect.us.cray.com/confluence/display/DST/Stage+Tests+Guidelines for more details.
-
-example: run CT test for CFS at crayctl stage 4
-```
-# /opt/cray/tests/crayctl-stage4/cms/cfs_stage4_ct_tests.sh or
-# cmsdev test cfs --ct
-```
-
-Tests return 0 for success, 1 otherwise
+Copyright 2019-2021 Hewlett Packard Enterprise Development LP
 
 ## Generating the server
 
@@ -38,3 +21,7 @@ To manually update the server code into your local checkout, run the following c
 $ cd $REPO
 $ ./regenerate-server.sh
 ```
+
+## Testing
+
+See cms-tools repo for details on running CT tests for this service.
