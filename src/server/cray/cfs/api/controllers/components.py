@@ -1,4 +1,4 @@
-# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 
 import connexion
 from datetime import datetime
@@ -71,7 +71,7 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
                         config_details=False, tag_list=[], v2=False):
     """Used by the GET /components API operation=
 
-    Allows filtering using a comma seperated list of ids.
+    Allows filtering using a comma separated list of ids.
     """
     response = []
     if id_list:
@@ -264,6 +264,8 @@ def _get_status(data, options, configs, config_details, v2):
             return STATUS_UNCONFIGURED
         else:
             return STATUS_CONFIGURED
+    else:
+        desiredState = desiredState.copy()
 
     status = STATUS_CONFIGURED
     for layer in desiredState['layers']:
@@ -345,8 +347,7 @@ def _state_append_handler(data):
         # If this configuration was previously applied, update the layer rather than just appending
         for layer in data['state']:
             if not (layer['cloneUrl'] == stateAppend['cloneUrl'] and
-                    layer['playbook'] == stateAppend['playbook'] and
-                    stateAppend['commit'] in layer['commit']):
+                    layer['playbook'] == stateAppend['playbook']):
                 newState.append(layer)
         newState.append(stateAppend)
         data['state'] = newState
