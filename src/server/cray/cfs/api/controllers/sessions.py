@@ -1,4 +1,4 @@
-# Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# Copyright 2019-2021 Hewlett Packard Enterprise Development LP
 
 import datetime
 import dateutil
@@ -517,7 +517,7 @@ def _get_filtered_sessions(age, status, name_contains, succeeded, tag_list):
         except Exception as e:
             LOGGER.warning('Unable to parse age: {}'.format(age))
             raise ParsingException(e) from e
-    if any([max_age, status, name_contains, succeeded]):
+    if any([max_age, status, name_contains, succeeded, tag_list]):
         response = [r for r in response if _matches_filter(r, max_age, status, name_contains,
                                                            succeeded, tag_list)]
     return response

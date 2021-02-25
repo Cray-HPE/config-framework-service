@@ -23,6 +23,16 @@ cray-service:
       env:
         - name: GIT_SSL_CAINFO
           value: /etc/cray/ca/certificate_authority.crt
+        - name: VCS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: vcs-user-credentials
+              key: vcs_username
+        - name: VCS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vcs-user-credentials
+              key: vcs_password
       ports:
         - name: http
           containerPort: 80

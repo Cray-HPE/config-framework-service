@@ -8,6 +8,7 @@ import connexion
 from cray.cfs.api import encoder
 from cray.cfs.api.controllers import options
 from cray.cfs.api.controllers import sessions
+from cray.cfs.api.controllers import configurations
 
 log_level = os.environ.get('LOG_LEVEL', 'WARN')
 LOG_FORMAT = "%(asctime)-15s - %(levelname)-7s - %(name)s - %(message)s"
@@ -19,6 +20,7 @@ def create_app():
     logging.basicConfig(level=logging.INFO)
     sessions._init()
     options._init()
+    configurations._init()
 
     LOGGER.info("Starting Configuration Framework Service API server")
     app = connexion.App(__name__, specification_dir='./openapi/')
