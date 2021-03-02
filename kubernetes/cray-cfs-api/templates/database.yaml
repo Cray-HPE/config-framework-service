@@ -63,6 +63,9 @@ spec:
           periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
+      strategy:
+        type: Recreate
+        rollingUpdate: null
       volumes:
       - name: cfs-db
         persistentVolumeClaim:
