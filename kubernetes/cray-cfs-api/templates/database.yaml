@@ -8,7 +8,7 @@ metadata:
 spec:
   storageClassName: ceph-cephfs-external
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 3Gi
@@ -20,6 +20,9 @@ metadata:
   labels:
     app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
 spec:
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
