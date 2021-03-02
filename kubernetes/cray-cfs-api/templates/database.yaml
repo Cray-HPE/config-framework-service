@@ -20,6 +20,9 @@ metadata:
   labels:
     app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
 spec:
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
@@ -63,9 +66,6 @@ spec:
           periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
-      strategy:
-        type: Recreate
-        rollingUpdate: null
       volumes:
       - name: cfs-db
         persistentVolumeClaim:
