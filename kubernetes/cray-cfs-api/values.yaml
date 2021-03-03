@@ -56,10 +56,10 @@ cray-service:
       resources:
         requests:
           memory: "100Mi"
-          cpu: "5m"
+          cpu: "150m"
         limits:
           memory: "250Mi"
-          cpu: "50m"
+          cpu: "500m"
   ingress:
     ui: false
     enabled: true
