@@ -223,13 +223,18 @@ def _delete_session(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
-def delete_sessions(age=None, status=None, name_contains=None, succeeded=None):  # noqa: E501
+def delete_sessions(age=None, min_age=None, max_age=None,
+                    status=None, name_contains=None, succeeded=None):  # noqa: E501
     """Delete Config Framework Sessions
 
      # noqa: E501
 
     :param age: An age filter in the form 1d.
     :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
     :param status: A session status filter
     :type status: str
     :param name_contains: A filter on session names
@@ -240,18 +245,22 @@ def delete_sessions(age=None, status=None, name_contains=None, succeeded=None): 
     :rtype: None
     """
     LOGGER.debug("DELETE /sessions invoked delete_sessions")
-    _delete_sessions(age, status, name_contains, succeeded)
+    _delete_sessions(age, min_age, max_age, status, name_contains, succeeded)
 
 
 @dbutils.redis_error_handler
-def delete_sessions_v2(age=None, status=None, name_contains=None,
-                       succeeded=None, tags=None):  # noqa: E501
+def delete_sessions_v2(age=None,  min_age=None, max_age=None,
+                       status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
 
      # noqa: E501
 
     :param age: An age filter in the form 1d.
     :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
     :param status: A session status filter
     :type status: str
     :param name_contains: A filter on session names
@@ -264,10 +273,10 @@ def delete_sessions_v2(age=None, status=None, name_contains=None,
     :rtype: None
     """
     LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
-    _delete_sessions(age, status, name_contains, succeeded, tags)
+    _delete_sessions(age, min_age, max_age, status, name_contains, succeeded, tags)
 
 
-def _delete_sessions(age=None, status=None, name_contains=None,
+def _delete_sessions(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                      succeeded=None, tags=None):  # noqa: E501
     tag_list = []
     if tags:
@@ -280,7 +289,8 @@ def _delete_sessions(age=None, status=None, name_contains=None,
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
     try:
-        sessions = _get_filtered_sessions(age=age, status=status, name_contains=name_contains,
+        sessions = _get_filtered_sessions(age=age, min_age=min_age, max_age=max_age,
+                                          status=status, name_contains=name_contains,
                                           succeeded=succeeded, tag_list=tag_list)
         for session in sessions:
             session_name = session['name']
@@ -334,7 +344,8 @@ def _get_session(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
-def get_sessions(age=None, status=None, name_contains=None, succeeded=None):  # noqa: E501
+def get_sessions(age=None, min_age=None, max_age=None,
+                 status=None, name_contains=None, succeeded=None):  # noqa: E501
     """List Config Framework Sessions
 
      # noqa: E501
@@ -342,11 +353,11 @@ def get_sessions(age=None, status=None, name_contains=None, succeeded=None):  # 
     :rtype: List[V1Session]
     """
     LOGGER.debug("GET /sessions invoked get_sessions")
-    return _get_sessions(age, status, name_contains, succeeded)
+    return _get_sessions(age, min_age, max_age, status, name_contains, succeeded)
 
 
 @dbutils.redis_error_handler
-def get_sessions_v2(age=None, status=None, name_contains=None,
+def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
 
@@ -365,12 +376,13 @@ def get_sessions_v2(age=None, status=None, name_contains=None,
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
-    return _get_sessions(age, status, name_contains, succeeded, tag_list)
+    return _get_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list)
 
 
-def _get_sessions(age=None, status=None, name_contains=None,
+def _get_sessions(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                   succeeded=None, tag_list=None):  # noqa: E501
-    return _get_filtered_sessions(age, status, name_contains, succeeded, tag_list), 200
+    return _get_filtered_sessions(age, min_age, max_age, status,
+                                  name_contains, succeeded, tag_list), 200
 
 
 @dbutils.redis_error_handler
@@ -508,22 +520,35 @@ def _validate_session_target(target):
     return None
 
 
-def _get_filtered_sessions(age, status, name_contains, succeeded, tag_list):
+def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list):
     response = DB.get_all()
-    max_age = None
+    min_start = None
+    max_start = None
     if age:
         try:
-            max_age = _age_to_timestamp(age)
+            max_start = _age_to_timestamp(age)
         except Exception as e:
             LOGGER.warning('Unable to parse age: {}'.format(age))
             raise ParsingException(e) from e
-    if any([max_age, status, name_contains, succeeded, tag_list]):
-        response = [r for r in response if _matches_filter(r, max_age, status, name_contains,
-                                                           succeeded, tag_list)]
+    if min_age:
+        try:
+            max_start = _age_to_timestamp(min_age)
+        except Exception as e:
+            LOGGER.warning('Unable to parse age: {}'.format(age))
+            raise ParsingException(e) from e
+    if max_age:
+        try:
+            min_start = _age_to_timestamp(max_age)
+        except Exception as e:
+            LOGGER.warning('Unable to parse age: {}'.format(age))
+            raise ParsingException(e) from e
+    if any([min_start, max_start, status, name_contains, succeeded, tag_list]):
+        response = [r for r in response if _matches_filter(r, min_start, max_start, status,
+                                                           name_contains, succeeded, tag_list)]
     return response
 
 
-def _matches_filter(data, max_age, status, name_contains, succeeded, tags):
+def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags):
     session_name = data['name']
     if name_contains and name_contains not in session_name:
         return False
@@ -535,8 +560,10 @@ def _matches_filter(data, max_age, status, name_contains, succeeded, tags):
     start_time = session_status['startTime']
     if not start_time:
         return False
-    session_age = dateutil.parser.parse(start_time).replace(tzinfo=None)
-    if max_age and session_age >= max_age:
+    session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
+    if min_start and session_start < min_start:
+        return False
+    if max_start and session_start > max_start:
         return False
     if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
         return False
