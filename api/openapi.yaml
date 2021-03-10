@@ -1429,6 +1429,19 @@ paths:
           in: query
           description: >-
             Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            DEPRECATED: This field has been replaced by min_age and max_age
+        - name: min_age
+          schema:
+            type: string
+          in: query
+          description: >-
+            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+        - name: max_age
+          schema:
+            type: string
+          in: query
+          description: >-
+            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
         - name: status
           schema:
             type: string
@@ -1499,6 +1512,19 @@ paths:
           in: query
           description: >-
             Deletes only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            DEPRECATED: This field has been replaced by min_age and max_age
+        - name: min_age
+          schema:
+            type: string
+          in: query
+          description: >-
+            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+        - name: max_age
+          schema:
+            type: string
+          in: query
+          description: >-
+            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
         - name: status
           schema:
             type: string
