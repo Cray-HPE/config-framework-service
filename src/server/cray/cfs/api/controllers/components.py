@@ -303,6 +303,9 @@ def _get_layer_status(desiredState, currentStateLayers, maxRetries, options, v2)
                     return STATUS_FAILED
                 else:
                     return STATUS_PENDING
+            if '_incomplete' in currentCommit:
+                # Set for successful nodes when any_errors_fatal causes a playbook to exit early.
+                return STATUS_PENDING
             return STATUS_CONFIGURED
     return STATUS_PENDING
 
