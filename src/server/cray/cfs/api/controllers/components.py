@@ -1,6 +1,7 @@
 # Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 
 import connexion
+from copy import deepcopy
 from datetime import datetime
 import logging
 
@@ -265,7 +266,7 @@ def _get_status(data, options, configs, config_details, v2):
         else:
             return STATUS_CONFIGURED
     else:
-        desiredState = desiredState.copy()
+        desiredState = deepcopy(desiredState)
 
     status = STATUS_CONFIGURED
     for layer in desiredState['layers']:
