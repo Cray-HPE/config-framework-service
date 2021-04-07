@@ -2,7 +2,8 @@ apiVersion: v1
 description: "Kubernetes resources for config-framework-service"
 name: "cray-cfs-api"
 home: "scms/config-framework-service"
-version: 1.6.9
+version: @VERSION@
+appVersion: @VERSION@
 keywords:
   - config-framework-service
   - cfs-api
@@ -12,5 +13,5 @@ sources:
 maintainers:
   - name: rbak
     email: rbak@cray.com
-  - name: tcuthbert
-    email: tcuthbert@cray.com
+  - name: rkleinman
+    email: randy.kleinman@hpe.com

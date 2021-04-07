@@ -25,3 +25,8 @@ $ ./regenerate-server.sh
 ## Testing
 
 See cms-tools repo for details on running CT tests for this service.
+
+## Contributing
+
+When making contributions, please update the `.version` file with the
+appropriate SemVer version for the changes.
