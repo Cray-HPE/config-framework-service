@@ -3,7 +3,7 @@ openapi: "3.0.2"
 
 info:
   title: "Configuration Framework Service"
-  version: "0.8.0"
+  version: "@VERSION@"
   description: >
     The Configuration Framework Service (CFS) manages the launch of Ansible Execution Environments
     for image customization, node personalization, and node reconfiguration. CFS manages
@@ -831,6 +831,29 @@ components:
       required: [name, configurationName]
       additionalProperties: false
     ## CONFIGURATIONS ENDPOINT ##
+    AdditionalInventoryLayer:
+      description: |
+        An inventory reference to include in a set of configurations.
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the inventory layer.
+          example: sample-inventory
+        cloneUrl:
+          type: string
+          description: The clone URL of the configuration content repository.
+          example: https://vcs.domain/vcs/org/inventory.git
+        commit:
+          type: string
+          description: The commit hash of the configuration repository when the state is set.
+        branch:
+          type: string
+          description: |
+            The repository branch to use. This will automatically set `commit` to master on the branch
+            when the configuration is added.
+      required: [cloneUrl]
+      additionalProperties: false
     ConfigurationLayer:
       description: |
         A single desired configuration state for a component.
@@ -875,9 +898,11 @@ components:
           readOnly: true
         layers:
           type: array
-          description: A list of ConfigurationLayers.
+          description: A list of ConfigurationLayer(s).
           items:
             $ref: '#/components/schemas/ConfigurationLayer'
+        additional_inventory:
+          $ref: '#/components/schemas/AdditionalInventoryLayer'
     ConfigurationArray:
       description: An array of configurations.
       type: array
@@ -1874,3 +1899,4 @@ paths:
         required: true
         schema:
           type: string
+
