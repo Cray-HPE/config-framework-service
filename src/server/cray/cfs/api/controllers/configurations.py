@@ -80,12 +80,23 @@ def put_configuration(configuration_id):
             return connexion.problem(
                 status=400, title="Error handling error branches",
                 detail='Only branch or commit should be specified for each layer, not both.')
+
     try:
         data = _set_auto_fields(data)
     except subprocess.CalledProcessError as e:
         return connexion.problem(
             status=400, title="Error converting branch name to commit.",
             detail=str(e))
+    
+    layer_keys = set()
+    for layer in data.get('layers'):
+        layer_key = (layer.get('cloneUrl'), layer.get('playbook'))
+        if layer_key in layer_keys:
+            return connexion.problem(
+                status=400, title="Error with conflicting layers",
+                detail='Two or more layers apply the same playbook from the same repo, '
+                       'but have different commit ids.')
+        layer_keys.add(layer_key)
 
     data['name'] = configuration_id
     return DB.put(configuration_id, data), 200
