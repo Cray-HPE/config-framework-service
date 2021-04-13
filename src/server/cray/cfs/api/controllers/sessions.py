@@ -154,6 +154,7 @@ def create_session_v2():  # noqa: E501
     session = session.to_dict()
     data = dbutils.snake_to_camel_json(session)
     data['tags'] = session['tags']  # Don't alter these, they are user defined
+    data['status']['session']['startTime'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce('CREATE', data=data)
     response = DB.put(data['name'], data)
 
