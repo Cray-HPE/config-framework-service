@@ -18,6 +18,7 @@ from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
+CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
 _kafka = None
 
@@ -133,6 +134,13 @@ def create_session_v2():  # noqa: E501
             title="Conflicting session name"
         )
 
+    if session_create.configuration_name not in CONFIG_DB:
+        return connexion.problem(
+            detail="No configurations exist named {}".format(session_create.configuration_name),
+            status=400,
+            title="Invalid configuration"
+        )
+
     # Additional target section data validation
     validation_err = _validate_session_target(session_create.target)
     if validation_err:
@@ -146,6 +154,7 @@ def create_session_v2():  # noqa: E501
     session = session.to_dict()
     data = dbutils.snake_to_camel_json(session)
     data['tags'] = session['tags']  # Don't alter these, they are user defined
+    data['status']['session']['startTime'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce('CREATE', data=data)
     response = DB.put(data['name'], data)
 
@@ -558,12 +567,12 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
     if succeeded and succeeded != session_status.get('succeeded'):
         return False
     start_time = session_status['startTime']
-    if not start_time:
+    session_start = None
+    if start_time:
+        session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
+    if min_start and (not session_start or session_start < min_start):
         return False
-    session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
-    if min_start and session_start < min_start:
-        return False
-    if max_start and session_start > max_start:
+    if max_start and (not session_start or session_start > max_start):
         return False
     if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
         return False
