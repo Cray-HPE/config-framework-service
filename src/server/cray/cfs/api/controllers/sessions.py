@@ -18,6 +18,7 @@ from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
+CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
 _kafka = None
 
@@ -131,6 +132,13 @@ def create_session_v2():  # noqa: E501
             detail="A session with the name {} already exists".format(session_create.name),
             status=409,
             title="Conflicting session name"
+        )
+
+    if session_create.configuration_name not in CONFIG_DB:
+        return connexion.problem(
+            detail="No configurations exist named {}".format(session_create.configuration_name),
+            status=400,
+            title="Invalid configuration"
         )
 
     # Additional target section data validation
