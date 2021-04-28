@@ -365,6 +365,11 @@ components:
           description: >
             The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
+        batcherMaxBackoff:
+          type: integer
+          description: >
+            The maximum number of seconds that batcher will backoff from session creation if problems are detected.
+          example: 3600
       additionalProperties: false
     TargetSpecSection:
       type: object
