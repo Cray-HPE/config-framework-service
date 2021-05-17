@@ -1,7 +1,8 @@
-# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 
 import json
 import logging
+import os
 import time
 
 from kafka import KafkaProducer
@@ -20,7 +21,7 @@ except ConfigException:  # pragma: no cover
 _api_client = client.ApiClient()
 k8ssvcs = client.CoreV1Api(_api_client)
 KAFKA_PORT = '9092'
-KAFKA_TIMEOUT = 0.5
+KAFKA_TIMEOUT = os.getenv('KAFKA_PRODUCER_TIMEOUT', default=1)
 
 
 class ProducerWrapper:
