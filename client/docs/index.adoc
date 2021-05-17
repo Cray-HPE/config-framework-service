@@ -1,7 +1,7 @@
 :toc: left
 :toclevels: 2 
 :sectnums:
-:last-update-label: Copyright Cray Inc.
+:last-update-label: Copyright Hewlett Packard Enterprise Development LP
 
 include::./overview.adoc[]
 include::./paths.adoc[]
