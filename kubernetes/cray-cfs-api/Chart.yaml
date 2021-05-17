@@ -2,7 +2,7 @@ apiVersion: v1
 description: "Kubernetes resources for config-framework-service"
 name: "cray-cfs-api"
 home: "scms/config-framework-service"
-version: 1.5.12
+version: 1.5.13
 keywords:
   - config-framework-service
   - cfs-api
