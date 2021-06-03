@@ -202,12 +202,15 @@ def _get_commit_id(repo_url, branch):
         with open(creds_file_name, 'w') as creds_file:
             creds_file.write(creds_url)
 
+        config_command = 'git config --file .gitconfig credential.helper store'.split()
         clone_command = 'git clone {}'.format(repo_url).split()
         checkout_command = 'git checkout {}'.format(branch).split()
         parse_command = 'git rev-parse HEAD'.split()
         try:
             # Setting HOME lets us keep the .git-credentials file in the temp directory rather than the
             # HOME shared by all threads/calls.
+            subprocess.check_call(config_command, cwd=tmp_dir, env={'HOME': tmp_dir},
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.check_call(clone_command, cwd=tmp_dir, env={'HOME': tmp_dir},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.check_call(checkout_command, cwd=repo_dir,
