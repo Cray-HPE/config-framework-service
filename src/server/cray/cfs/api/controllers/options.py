@@ -125,26 +125,34 @@ patch_options_v2 = patch_options
 
 class Options():
     """Helper class for other endpoints that need access to options"""
-    def get_option(self, key, type):
+    def get_option(self, key, type, default=None):
         if not hasattr(self, 'options'):
             self.options = get_options_data()
-        return type(self.options[key])
+        try:
+            return type(self.options[key])
+        except KeyError as e:
+            if default is not None:
+                LOGGER.warning(
+                    'Option {} has not been initialized.  Defaulting to {}'.format(key, default))
+            else:
+                LOGGER.error('Option {} has not been initialized.'.format(key))
+                raise e
 
     @property
     def batcher_check_interval(self):
-        return self.get_option('batcherCheckInterval', int)
+        return self.get_option('batcherCheckInterval', int, default=60)
 
     @property
     def batch_size(self):
-        return self.get_option('batchSize', int)
+        return self.get_option('batchSize', int, default=100)
 
     @property
     def batch_window(self):
-        return self.get_option('batchWindow', int)
+        return self.get_option('batchWindow', int, default=60)
 
     @property
     def default_batcher_retry_policy(self):
-        return self.get_option('defaultBatcherRetryPolicy', int)
+        return self.get_option('defaultBatcherRetryPolicy', int, default=1)
 
     @property
     def default_clone_url(self):
