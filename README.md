@@ -23,10 +23,20 @@ $ ./regenerate-server.sh
 
 See cms-tools repo for details on running CT tests for this service.
 
+## Build Helpers
+This repo uses some build helper scripts from the 
+[cms-meta-tools ](https://github.com/Cray-HPE/cms-meta-tools) repo.
+
 ## Versioning
-Use [SemVer](http://semver.org/). The version is located in the [.version](.version) file. Other files either
-read the version string from this file or have this version string written to them at build time
-based on the information in the [update_versions.conf](update_versions.conf) file.
+We use [SemVer](http://semver.org/). The version is generated at build time by the
+version.py script in the [cms-meta-tools ](https://github.com/Cray-HPE/cms-meta-tools) repo,
+and then written to the .version file.
+
+All other files either read from that file or have the version string written to them at
+build time based on the information in the [update_versions.conf](update_versions.conf) file. 
+
+Since the migration to github, there is also some additional version massaging that takes place
+in [Jenkinsfile.github](Jenkinsfile.github).
 
 ## Copyright and License
 This project is copyrighted by Hewlett Packard Enterprise Development LP and is under the MIT
