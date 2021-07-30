@@ -20,6 +20,9 @@
 #
 # (MIT License)
 
+# If you wish to perform a local build, you will need to clone or copy the contents of the
+# cms-meta-tools repo to ./cms_meta_tools
+
 DOCKER_NAME ?= cray-cfs
 CHART_NAME ?= cray-cfs-api
 CHART_PATH ?= kubernetes
