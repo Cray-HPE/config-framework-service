@@ -38,6 +38,12 @@ build time based on the information in the [update_versions.conf](update_version
 Since the migration to github, there is also some additional version massaging that takes place
 in [Jenkinsfile.github](Jenkinsfile.github).
 
+In order to make it easier to go from a version number back to the source code that produced that version,
+some information about the most recent git commit is added at build time to build artifacts.
+For RPMs, it is added to the changelog. For Helm charts, it is added as annotations metadata. And for
+Docker images, it is written to gitInfo.txt in the root of the container. This is done using the
+git_info tool in cms-meta-tools, which is called automatically by the runBuildPrep script.
+
 ## Copyright and License
 This project is copyrighted by Hewlett Packard Enterprise Development LP and is under the MIT
 license. See the [LICENSE](LICENSE) file for details.
