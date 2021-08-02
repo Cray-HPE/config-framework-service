@@ -34,7 +34,7 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.5 as base
+FROM artifactory.algol60.net/docker.io/alpine:latest as base
 WORKDIR /app
 COPY --from=codegen /app .
 COPY constraints.txt requirements.txt ./
