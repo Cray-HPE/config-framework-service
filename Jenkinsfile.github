@@ -31,21 +31,21 @@ pipeline {
                     // Get version from version.py
                     def ver = sh(returnStdout: true, script: "./cms_meta_tools/version.py").trim()
                     echo "Base version is ${ver}"
-                    
+
                     // Write base version to .version
                     writeFile(file: ".version", text: ver)
-                
+
                     // Generate docker version string
                     def dockerver = getDockerBuildVersion(isStable: env.IS_STABLE)
                     echo "Docker version is ${dockerver}"
-                
+
                     // Write docker version string to .docker_version
                     writeFile(file: ".docker_version", text: dockerver)
-                
+
                     // Generate chart version string
                     def chartver = dockerver.replaceAll("_", "+")
                     echo "Chart version is ${chartver}"
-                
+
                     // Write chart version to .chart_version
                     writeFile(file: ".chart_version", text: chartver)
                 }
@@ -78,7 +78,12 @@ pipeline {
                 }
 
                 stage('Chart') {
+                    environment {
+                        DOCKER_VERSION = sh(returnStdout: true, script: "head -1 .docker_version").trim()
+                    }
+
                     steps {
+                        updateCsmHelmChartAppVersion(chartPath: "${WORKSPACE}/kubernetes/${NAME}", appVersion:  env.DOCKER_VERSION)
                         sh "make chart"
                     }
                 }
