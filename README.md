@@ -24,25 +24,35 @@ $ ./regenerate-server.sh
 See cms-tools repo for details on running CT tests for this service.
 
 ## Build Helpers
-This repo uses some build helper scripts from the 
-[cms-meta-tools ](https://github.com/Cray-HPE/cms-meta-tools) repo.
+This repo uses some build helpers from the 
+[cms-meta-tools](https://github.com/Cray-HPE/cms-meta-tools) repo. See that repo for more details.
+
+## Local Builds
+If you wish to perform a local build, you will first need to clone or copy the contents of the
+cms-meta-tools repo to `./cms_meta_tools` in the same directory as the `Makefile`. When building
+on github, the cloneCMSMetaTools() function clones the cms-meta-tools repo into that directory.
+
+For a local build, you will also need to manually write the .version, .docker_version (if this repo
+builds a docker image), and .chart_version (if this repo builds a helm chart) files. When building
+on github, this is done by the setVersionFiles() function.
 
 ## Versioning
-We use [SemVer](http://semver.org/). The version is generated at build time by the
-version.py script in the [cms-meta-tools ](https://github.com/Cray-HPE/cms-meta-tools) repo,
-and then written to the .version file.
+The version of this repo is generated dynamically at build time by running the version.py script in 
+cms-meta-tools. The version is included near the very beginning of the github build output. 
 
-All other files either read from that file or have the version string written to them at
-build time based on the information in the [update_versions.conf](update_versions.conf) file. 
+In order to make it easier to go from an artifact back to the source code that produced that artifact,
+a text file named gitInfo.txt is added to Docker images built from this repo. For Docker images,
+it can be found in the / folder. This file contains the branch from which it was built and the most
+recent commits to that branch. 
 
-Since the migration to github, there is also some additional version massaging that takes place
-in [Jenkinsfile.github](Jenkinsfile.github).
+For helm charts, a few annotation metadata fields are appended which contain similar information.
 
-In order to make it easier to go from a version number back to the source code that produced that version,
-some information about the most recent git commit is added at build time to build artifacts.
-For RPMs, it is added to the changelog. For Helm charts, it is added as annotations metadata. And for
-Docker images, it is written to gitInfo.txt in the root of the container. This is done using the
-git_info tool in cms-meta-tools, which is called automatically by the runBuildPrep script.
+For RPMs, a changelog entry is added with similar information.
+
+## New Release Branches
+When making a new release branch:
+    * Be sure to set the `.x` and `.y` files to the desired major and minor version number for this repo for this release. 
+    * If an `update_external_versions.conf` file exists in this repo, be sure to update that as well, if needed.
 
 ## Copyright and License
 This project is copyrighted by Hewlett Packard Enterprise Development LP and is under the MIT
