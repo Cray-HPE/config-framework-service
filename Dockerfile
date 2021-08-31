@@ -34,11 +34,14 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.5 as base
+FROM artifactory.algol60.net/docker.io/alpine:3.13 as base
 WORKDIR /app
 COPY --from=codegen /app .
 COPY constraints.txt requirements.txt ./
-RUN apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
+RUN apk add --upgrade --no-cache apk-tools &&  \
+	apk update && \
+	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
+	apk -U upgrade --no-cache && \
     PIP_INDEX_URL=https://arti.dev.cray.com:443/artifactory/api/pypi/pypi-remote/simple \
     pip3 install --no-cache-dir -U pip && \
     pip3 install --no-cache-dir -U 'setuptools<46.0.0' && \
