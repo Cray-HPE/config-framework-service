@@ -35,12 +35,12 @@ cray-service:
               key: vcs_password
       ports:
         - name: http
-          containerPort: 80
+          containerPort: 9000
           protocol: TCP
       readinessProbe:
         httpGet:
           path: /healthz
-          port: 80
+          port: 9000
           scheme: HTTP
         initialDelaySeconds: 60
         periodSeconds: 10
@@ -48,7 +48,7 @@ cray-service:
       livenessProbe:
         httpGet:
           path: /healthz
-          port: 80
+          port: 9000
           scheme: HTTP
         initialDelaySeconds: 60
         periodSeconds: 20
