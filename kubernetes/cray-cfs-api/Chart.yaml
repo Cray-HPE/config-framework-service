@@ -9,7 +9,7 @@ keywords:
   - cfs-api
   - cfs
 sources:
-  - "https://stash.us.cray.com/projects/SCMS/repos/config-framework-service/browse"
+  - "https://github.com/Cray-HPE/config-framework-service"
 maintainers:
   - name: rbak
     email: rbak@cray.com
