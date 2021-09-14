@@ -41,7 +41,6 @@ def create_app():
     logging.basicConfig(level=logging.INFO)
     sessions._init()
     options._init()
-    configurations._init()
 
     LOGGER.info("Starting Configuration Framework Service API server")
     app = connexion.App(__name__, specification_dir='./openapi/')

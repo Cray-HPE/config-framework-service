@@ -35,18 +35,6 @@ DB = dbutils.get_wrapper(db='configurations')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-def _init():
-    """ Initialize the credentials field of the git config """
-    credentials_command = 'git config --global credential.helper store'.split()
-    try:
-        subprocess.check_call(credentials_command,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        LOGGER.info('Set git credential.helper store')
-    except subprocess.CalledProcessError as e:
-        LOGGER.error('Failed setting git credential.helper store')
-        raise
-
-
 @dbutils.redis_error_handler
 def get_configurations(in_use=None):
     """Used by the GET /configurations API operation"""
@@ -194,6 +182,8 @@ def _get_commit_id(repo_url, branch):
         repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
 
+        if 'https://api-gw-service-nmn.local/vcs' in repo_url:
+            repo_url = repo_url.replace('https://api-gw-service-nmn.local/vcs', 'http://gitea-vcs')
         split_url = repo_url.split('/')
         username = os.environ['VCS_USERNAME']
         password = os.environ['VCS_PASSWORD']

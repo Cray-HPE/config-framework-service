@@ -57,7 +57,8 @@ COPY src/server/cray/cfs/api/__main__.py \
 FROM base as application
 ENV PYTHONPATH "/app/lib/server"
 WORKDIR /app/
-EXPOSE 80
+EXPOSE 9000
 RUN apk add --no-cache uwsgi-python3
 COPY config/uwsgi.ini ./
+USER nobody:nobody
 ENTRYPOINT ["uwsgi", "--ini", "/app/uwsgi.ini"]

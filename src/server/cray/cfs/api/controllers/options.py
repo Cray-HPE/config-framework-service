@@ -134,6 +134,7 @@ class Options():
             if default is not None:
                 LOGGER.warning(
                     'Option {} has not been initialized.  Defaulting to {}'.format(key, default))
+                return default
             else:
                 LOGGER.error('Option {} has not been initialized.'.format(key))
                 raise e
