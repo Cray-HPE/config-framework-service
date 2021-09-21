@@ -1,4 +1,4 @@
 dependencies:
 - name: cray-service
-  version: "^2.4.0"
+  version: "^5.0.0"
   repository: "@cray-algol60"
