@@ -232,7 +232,8 @@ def delete_component(component_id):
 
 def _set_auto_fields(data):
     data = _set_last_updated(data)
-    if ('desiredState' in data or 'desiredConfig' in data) and 'errorCount' not in data:
+    if ('desiredState' in data or 'desiredConfig' in data or data.get('state') == [])\
+            and 'errorCount' not in data:
         data['errorCount'] = 0
     return data
 
