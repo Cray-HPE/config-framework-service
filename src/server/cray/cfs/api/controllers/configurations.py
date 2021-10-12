@@ -182,11 +182,10 @@ def _get_commit_id(repo_url, branch):
         repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
 
-        if 'https://api-gw-service-nmn.local/vcs' in repo_url:
-            repo_url = repo_url.replace('https://api-gw-service-nmn.local/vcs', 'http://gitea-vcs')
         split_url = repo_url.split('/')
         username = os.environ['VCS_USERNAME']
         password = os.environ['VCS_PASSWORD']
+        ssl_info = os.environ['GIT_SSL_CAINFO']
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
         creds_file_name = os.path.join(tmp_dir, '.git-credentials')
         with open(creds_file_name, 'w') as creds_file:
@@ -199,9 +198,11 @@ def _get_commit_id(repo_url, branch):
         try:
             # Setting HOME lets us keep the .git-credentials file in the temp directory rather than the
             # HOME shared by all threads/calls.
-            subprocess.check_call(config_command, cwd=tmp_dir, env={'HOME': tmp_dir},
+            subprocess.check_call(config_command, cwd=tmp_dir,
+                                  env={'HOME': tmp_dir, 'GIT_SSL_CAINFO': ssl_info},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.check_call(clone_command, cwd=tmp_dir, env={'HOME': tmp_dir},
+            subprocess.check_call(clone_command, cwd=tmp_dir,
+                                  env={'HOME': tmp_dir, 'GIT_SSL_CAINFO': ssl_info},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.check_call(checkout_command, cwd=repo_dir,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
