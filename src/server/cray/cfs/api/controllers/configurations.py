@@ -183,8 +183,8 @@ def _get_commit_id(repo_url, branch):
         repo_dir = os.path.join(tmp_dir, repo_name)
 
         split_url = repo_url.split('/')
-        username = os.environ['VCS_USERNAME']
-        password = os.environ['VCS_PASSWORD']
+        username = os.environ['VCS_USERNAME'].strip()
+        password = os.environ['VCS_PASSWORD'].strip()
         ssl_info = os.environ['GIT_SSL_CAINFO']
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
         creds_file_name = os.path.join(tmp_dir, '.git-credentials')
