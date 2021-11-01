@@ -1,17 +1,28 @@
-apiVersion: v1
-description: "Kubernetes resources for config-framework-service"
-name: "cray-cfs-api"
-home: "scms/config-framework-service"
+apiVersion: v2
+name: cray-cfs-api
 version: 0.0.0
-appVersion: 0.0.0
+description: Kubernetes resources for config-framework-service
 keywords:
-  - config-framework-service
-  - cfs-api
-  - cfs
+- config-framework-service
+- cfs-api
+- cfs
+home: https://github.com/Cray-HPE/config-framework-service
 sources:
-  - "https://github.com/Cray-HPE/config-framework-service"
+- https://github.com/Cray-HPE/config-framework-service
+dependencies:
+- name: cray-service
+  version: ^7.0.0
+  repository: https://artifactory.algol60.net/artifactory/csm-helm-charts/
 maintainers:
-  - name: rbak
-    email: rbak@cray.com
-  - name: rkleinman
-    email: randy.kleinman@hpe.com
+- name: rbak-hpe
+  email: ryan.bak@hpe.com
+- name: rkleinman-hpe
+  email: randy.kleinman@hpe.com
+appVersion: 0.0.0
+annotations:
+  artifacthub.io/images: |
+    - name: cray-cfs
+      image: artifactory.algol60.net/csm-docker/stable/cray-cfs:0.0.0
+    - name: redis
+      image: docker.io/library/redis:5.0-alpine3.14
+  artifacthub.io/license: MIT
