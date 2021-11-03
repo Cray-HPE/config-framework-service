@@ -2,7 +2,7 @@ openapi: "3.0.2"
 
 info:
   title: "Configuration Framework Service"
-  version: "@VERSION@"
+  version: "0.0.0"
   description: >
     The Configuration Framework Service (CFS) manages the launch of Ansible Execution Environments
     for image customization, node personalization, and node reconfiguration. CFS manages
