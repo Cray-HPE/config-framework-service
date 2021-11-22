@@ -34,9 +34,9 @@ spec:
     spec:
       containers:
       - name: "{{ include "cray-service.name" . }}-db"
-        image: "{{ $baseChartValues.imagesHost }}/library/redis:5.0-alpine3.12"
+        image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
         command: ["/bin/sh"]
-        args: ["-c", "echo 'save 10 1' >> /etc/redis.conf && sleep 1 && redis-server /etc/redis.conf"]
+        args: ["-c", "echo 'save 10 1' >> ~/redis.conf && sleep 1 && redis-server ~/redis.conf"]
         volumeMounts:
         - mountPath: /data
           name: cfs-db
@@ -66,6 +66,9 @@ spec:
           periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
       volumes:
       - name: cfs-db
         persistentVolumeClaim:
