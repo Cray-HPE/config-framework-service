@@ -286,8 +286,8 @@ def _get_status(data, options, configs, config_details, v2):
             return STATUS_UNCONFIGURED
         else:
             return STATUS_CONFIGURED
-    else:
-        desiredState = deepcopy(desiredState)
+
+    desiredState = deepcopy(desiredState)
 
     status = STATUS_CONFIGURED
     for layer in desiredState['layers']:
