@@ -103,7 +103,6 @@ class DBWrapper():
         """Put data in to the database, replacing any old data."""
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
-        datastr = self.client.get(key)
         return self.get(key)
 
     def patch(self, key, new_data, data_handler=None):
