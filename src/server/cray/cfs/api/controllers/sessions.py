@@ -1,4 +1,7 @@
-# Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -12,18 +15,18 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# (MIT License)
 
+import argparse
 import datetime
 import dateutil
 import logging
 import re
+import shlex
 from uuid import UUID
 
 import connexion
@@ -166,6 +169,12 @@ def create_session_v2():  # noqa: E501
     if validation_err:
         return validation_err
 
+    # Additional ansible passthrough data validation
+    if session_create.ansible_passthrough:
+        validation_err = _validate_ansible_passthrough(session_create.ansible_passthrough)
+        if validation_err:
+            return validation_err
+
     # If the following fields aren't set, use their configured default values.
     if not session_create.ansible_config:
         session_create.ansible_config = get_options_data()['defaultAnsibleConfig']
@@ -202,6 +211,7 @@ def _create_session_v2(session_create):
             'limit': session_create.ansible_limit,
             'config': session_create.ansible_config,
             'verbosity': session_create.ansible_verbosity,
+            'passthrough': session_create.ansible_passthrough
         },
         'target': session_create.target.to_dict(),
         'status': initial_status,
@@ -546,6 +556,42 @@ def _validate_session_target(target):
         # Model validation will handle this case
         pass
 
+    return None
+
+
+class ArgumentParserError(Exception):
+    pass
+
+
+class ThrowingArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise ArgumentParserError(message)
+
+
+def _validate_ansible_passthrough(passthrough):
+    """Validate the ansible_passthrough
+
+    :param passthrough: Config Framework Session Ansible passthrough
+    :type passthrough: string
+
+    :rtype: None or connexion.problem if errors occur
+    """
+
+    parser = ThrowingArgumentParser()
+    parser.add_argument('-e', '--extra-vars', type=str)
+    parser.add_argument('-f', '--forks', type=int)
+    parser.add_argument('--skip-tags', type=str)
+    parser.add_argument('--start-at-task', type=str)
+    parser.add_argument('-t', '--tags', type=str)
+    passthrough_arguments = shlex.split(passthrough, posix=False)
+    try:
+        parser.parse_args(passthrough_arguments)
+    except Exception as e:
+        return connexion.problem(
+            detail="Error validating ansible-passthrough: {}".format(e),  # noqa: E501
+            status=400,
+            title='Bad Request'
+        )
     return None
 
 

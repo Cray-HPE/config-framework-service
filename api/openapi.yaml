@@ -705,6 +705,14 @@ components:
                 The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
                 2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
                 for more information.
+            passthrough:
+              type: string
+              description: >-
+                Additional parameters that are added to all Ansible calls for the session. This field is
+                currently limited to the following Ansible parameters: "--extra-vars", "--forks",
+                "--skip-tags", "--start-at-task", and "--tags". WARNING: Parameters passed to Ansible in
+                this way should be used with caution.  State will not be recorded for components when
+                using these flags to avoid incorrect reporting of partial playbook runs.
         target:
           $ref: '#/components/schemas/TargetSpecSection'
         status:
@@ -823,6 +831,14 @@ components:
             The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
             2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
             for more information.
+        ansiblePassthrough:
+          type: string
+          description: >-
+            Additional parameters that are added to all Ansible calls for the session. This field is
+            currently limited to the following Ansible parameters: "--extra-vars", "--forks",
+            "--skip-tags", "--start-at-task", and "--tags". WARNING: Parameters passed to Ansible in
+            this way should be used with caution.  State will not be recorded for components when
+            using these flags to avoid incorrect reporting of partial playbook runs.
         target:
           $ref: '#/components/schemas/TargetSpecSection'
         tags:
