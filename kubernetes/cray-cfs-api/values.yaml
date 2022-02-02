@@ -61,6 +61,18 @@ cray-service:
         limits:
           memory: "250Mi"
           cpu: "500m"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - cray-cfs-api
   ingress:
     ui: false
     enabled: true
