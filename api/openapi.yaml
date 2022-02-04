@@ -1,3 +1,26 @@
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 openapi: "3.0.2"
 
 info:
@@ -247,6 +270,7 @@ components:
           type: string
           description: The default playbook to be used if not specified in a node's desired state.
           example: site.yml
+          pattern: '^[^\s;]*$'
         defaultAnsibleConfig:
           type: string
           description: The Kubernetes ConfigMap which holds the default ansible.cfg for a given CFS session. This ConfigMap must be present in the same Kubernetes namespace as the CFS service.
@@ -260,6 +284,7 @@ components:
           description: >
             The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
+          pattern: '^[^\s;]*$'
         batcherMaxBackoff:
           type: integer
           description: >
@@ -486,6 +511,7 @@ components:
             subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
             can be used to specify nodes or groups.
           example: host1
+          pattern: '^[^\s;]*$'
         ansibleConfig:
           type: string
           description: >-
@@ -536,14 +562,17 @@ components:
           type: string
           description: The clone URL of the configuration content repository.
           example: https://vcs.domain/vcs/org/inventory.git
+          pattern: '^[^\s;]*$'
         commit:
           type: string
           description: The commit hash of the configuration repository when the state is set.
+          pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The repository branch to use. This will automatically set `commit` to master on the branch
             when the configuration is added.
+          pattern: '^[^\s;]*$'
       required: [cloneUrl]
       additionalProperties: false
     ConfigurationLayer:
@@ -559,18 +588,22 @@ components:
           type: string
           description: The clone URL of the configuration content repository.
           example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+          pattern: '^[^\s;]*$'
         playbook:
           type: string
           description: The Ansible playbook to run.
           example: site.yml
+          pattern: '^[^\s;]*$'
         commit:
           type: string
           description: The commit hash of the configuration repository when the state is set.
+          pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The configuration branch to use.  This will automatically set commit to master on the branch
             when the configuration is added.
+          pattern: '^[^\s;]*$'
       required: [cloneUrl]
       additionalProperties: false
     Configuration:
