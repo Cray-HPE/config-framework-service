@@ -90,13 +90,6 @@ servers:
 
 components:
   requestBodies:
-    V1SessionCreateRequest:
-      description: A JSON object for creating Config Framework Sessions
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1SessionCreate'
     V2SessionCreateRequest:
       description: A JSON object for creating Config Framework Sessions
       required: true
@@ -104,13 +97,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V2SessionCreate'
-    V1OptionsUpdateRequest:
-      description: Service-wide configuration options
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1Options'
     V2OptionsUpdateRequest:
       description: Service-wide configuration options
       required: true
@@ -118,20 +104,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V2Options'
-    V1ComponentsUpdateRequest:
-      description: The configuration/state for an array of components
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1ComponentStateArray'
-    V1ComponentUpdateRequest:
-      description: The configuration/state for a single component
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1ComponentState'
     V2ComponentsUpdateRequest:
       description: The configuration/state for an array of components
       required: true
@@ -161,32 +133,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Healthz'
-    V1Options:
-      description: A collection of service-wide configuration options
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1Options'
     V2Options:
       description: A collection of service-wide configuration options
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/V2Options'
-    V1SessionDetails:
-      description: A single configuration session
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1Session'
-    V1SessionDetailsArray:
-      description: A collection of configuration sessions
-      content:
-        application/json:
-          schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/V1Session'
     V2SessionDetails:
       description: A single configuration session
       content:
@@ -201,18 +153,6 @@ components:
             type: array
             items:
               $ref: '#/components/schemas/V2Session'
-    V1ComponentDetails:
-      description: A single component state
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1ComponentState'
-    V1ComponentDetailsArray:
-      description: A collection of component states
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/V1ComponentStateArray'
     V2ComponentDetails:
       description: A single component state
       content:
@@ -277,50 +217,6 @@ components:
           type: string
         kafkaStatus:
           type: string
-      additionalProperties: false
-    V1Options:
-      description: |
-        Configuration options for the configuration service.
-      type: object
-      properties:
-        hardwareSyncInterval:
-          type: integer
-          description: How frequently the CFS hardware-sync-agent checks with the Hardware State Manager to update it's known hardware (in seconds)
-          example: 5
-        batcherCheckInterval:
-          type: integer
-          description: How frequently the batcher checks the configuration states to see if work needs to be done (in seconds)
-          example: 5
-        batchSize:
-          type: integer
-          description: The maximum number of nodes the batcher will run a single CFS session against.
-          example: 120
-        batchWindow:
-          type: integer
-          description: The maximum number of seconds the batcher will wait to run a CFS session once a node has been detected that needs configuration.
-          example: 120
-        defaultBatcherRetryPolicy:
-          type: integer
-          description: The default maximum number retries per node when configuration fails.
-          example: 1
-        defaultCloneUrl:
-          type: string
-          description: >
-            The default clone URL of the configuration content repository to be used if not specified in a nodes desired state.
-            (DEPRECATED - This has been disabled for component state base configuration)
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-        defaultPlaybook:
-          type: string
-          description: The default playbook to be used if not specified in a node's desired state.
-          example: site.yml
-        defaultAnsibleConfig:
-          type: string
-          description: The Kubernetes ConfigMap which holds the default ansible.cfg for a given CFS session. This ConfigMap must be present in the same Kubernetes namespace as the CFS service.
-          example: cfs-default-ansible-cfg
-        sessionTTL:
-          type: string
-          description: A time-to-live applied to all completed CFS sessions.  Specified in hours or days. e.g. 3d or 24h.  Set to an empty string to disable.
-          example: 24h
       additionalProperties: false
     V2Options:
       description: |
@@ -424,230 +320,6 @@ components:
                 items:
                   type: string
     ## SESSIONS ENDPOINT ##
-    V1Session:
-      description: |
-        An execution session for the Configuration Framework.
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique id of the session
-          example: "46a2731e-a1d0-4f98-ba92-4f78c756bb12"
-        name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
-        links:
-          type: array
-          items:
-            $ref: '#/components/schemas/Link'
-        repo:
-          type: object
-          description: The git repository information which holds the configuration content that will be used by the session.
-          properties:
-            cloneUrl:
-              type: string
-              format: url
-              description: The clone URL of the configuration content repository
-              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-            branch:
-              type: string
-              description: The branch of the repository at the `clone_url` to check out
-              example: master
-            commit:
-              type: string
-              description: The commit of the repository at the `clone_url` to check out
-              example: 531952e90b1a61ac00f2ca11057d3145529904e5
-        ansible:
-          type: object
-          description: Additional options that will be used when invoking Ansible.
-          properties:
-            config:
-              type: string
-              default: cfs-default-ansible-cfg
-              description: >-
-                The Kubernetes ConfigMap which holds the ansible.cfg for a given CFS
-                session. This ConfigMap must be present in the same Kubernetes namespace as
-                the CFS service. If no value is given, the value of the defaultAnsibleConfig
-                field in the /options endpoint will be used.
-              example: cfs-default-ansible-cfg
-            limit:
-              type: string
-              description: >-
-                Additional filtering of hosts or groups from the inventory to run against. This is
-                especially useful when running with dynamic inventory and when you want to run on a
-                subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
-                can be used to specify nodes or groups.
-              example: host1
-            playbook:
-              type: string
-              description: >-
-                The Ansible playbook to run. The file path must be specified relative to the
-                base directory of the config repo. Cray provides the site.yml playbook. However,
-                it is possible to run a configuration session using an alternate playbook.
-                The alternate playbook needs to be added to the configuration repository before it is used.
-                See *Change the Configuration Manifest* section in the Cray Administration Guide.
-              default: site.yml
-              example: site.yml
-            verbosity:
-              type: integer
-              default: 0
-              minimum: 0
-              maximum: 4
-              description: >-
-                The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
-                2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
-                for more information.
-        target:
-          $ref: '#/components/schemas/TargetSpecSection'
-        status:
-          type: object
-          description: Status of artifacts, session, and targets. Lists details like session status, session start and completion time, number of successful, failed, or running targets. If the target definition is an image, it also lists the image_id, result_id, and type of image under Artifacts.
-          properties:
-            artifacts:
-              type: array
-              items:
-                type: object
-                properties:
-                  image_id:
-                    example: "f34ff35e-d782-4a65-a1b8-243a3cd740af"
-                    description: The IMS id of the original image to be customized via a configuration session.
-                    format: uuid
-                    type: string
-                  result_id:
-                    example: "8b782ccd-8706-4145-a6a1-724e29ed5522"
-                    description: The IMS id of the image that was customized via a configuration session. This is the resultant image of the customization.
-                    format: uuid
-                    type: string
-                  type:
-                    example: 'ims_customized_image'
-                    type: string
-                    enum: ['ims_customized_image']
-                    default: 'ims_customized_image'
-            targets:
-              type: object
-              properties:
-                failed:
-                  description: The number of target hosts that failed configuration.
-                  example: 1
-                  readOnly: true
-                  type: integer
-                success:
-                  description: The number of target hosts that succeeded in configuration.
-                  example: 1
-                  readOnly: true
-                  type: integer
-                running:
-                  description: The number of target hosts that are currently running configuration.
-                  example: 1
-                  readOnly: true
-                  type: integer
-            session:
-              type: object
-              properties:
-                job:
-                  description: The name of the configuration execution environment associated with this session.
-                  example: cray-cfs-job-session-20190728032600
-                  readOnly: true
-                  type: string
-                completionTime:
-                  description: The date/time when the session completed execution in RFC 3339 format.
-                  example: '2019-07-28T03:26:00Z'
-                  format: date-time
-                  readOnly: true
-                  type: string
-                startTime:
-                  description: The date/time when the session started execution in RFC 3339 format.
-                  example: '2019-07-28T03:26:00Z'
-                  format: date-time
-                  readOnly: true
-                  type: string
-                status:
-                  description: The execution status of the session.
-                  enum: ['pending', 'running', 'complete']
-                  readOnly: true
-                  type: string
-                succeeded:
-                  description: |
-                    Whether the session executed successfully or not. A 'none'
-                    value denotes that the execution has not completed. This
-                    field has context when the `status` field is 'complete'.
-                    A session may successfully execute even if the underlying
-                    tasks do not.
-                  enum: ['none', 'true', 'false']
-                  readOnly: true
-                  type: string
-      additionalProperties: false
-    V1SessionCreate:
-      description: |
-        The information required to create a Config Framework Session.
-      type: object
-      properties:
-        name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
-        cloneUrl:
-          type: string
-          format: url
-          description: The clone URL of the configuration content repository
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-        branch:
-          type: string
-          description: The branch of the repository at the `clone_url` to check out
-          example: master
-        commit:
-          type: string
-          description: The commit of the repository at the `clone_url` to check out
-          example: 531952e90b1a61ac00f2ca11057d3145529904e5
-        ansiblePlaybook:
-          type: string
-          description: >-
-            The Ansible playbook to run. The file path must be specified relative to the
-            base directory of the config repo. Cray provides the site.yml playbook. However,
-            it is possible to run a configuration session using an alternate playbook.
-            The alternate playbook needs to be added to the configuration repository before it is used.
-            See *Change the Configuration Manifest* section in the Cray Administration Guide.
-          default: site.yml
-          example: site.yml
-        ansibleLimit:
-          type: string
-          description: >-
-            Additional filtering of hosts or groups from the inventory to run against. This is
-            especially useful when running with dynamic inventory and when you want to run on a
-            subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
-            can be used to specify nodes or groups.
-          example: host1
-        ansibleConfig:
-          type: string
-          description: >-
-            The Kubernetes ConfigMap which holds the ansible.cfg for a given CFS
-            session. This ConfigMap must be present in the same Kubernetes namespace as
-            the CFS service. If no value is given, the value of the defaultAnsibleConfig
-            field in the /options endpoint will be used.
-          example: cfs-default-ansible-cfg
-        ansibleVerbosity:
-          type: integer
-          default: 0
-          minimum: 0
-          maximum: 4
-          description: >-
-            The verbose mode to use in the call to the ansible-playbook command. 1 = -v,
-            2 = -vv, etc. Valid values range from 0 to 4. See the ansible-playbook help
-            for more information.
-        target:
-          $ref: '#/components/schemas/TargetSpecSection'
-      required: [name]
-      additionalProperties: false
     V2Session:
       description: |
         An execution session for the Configuration Framework.
@@ -929,63 +601,6 @@ components:
       items:
         $ref: '#/components/schemas/Configuration'
     ## COMPONENTS ENDPOINT ##
-    # V1 #
-    V1ConfigurationState:
-      description: |
-        The configuration state for a component.
-      type: object
-      properties:
-        cloneUrl:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-        playbook:
-          type: string
-          description: The Ansible playbook to run.
-          example: site.yml
-        commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
-        lastUpdated:
-          type: string
-          description: The date/time when the state was last updated in RFC 3339 format.
-          example: '2019-07-28T03:26:00Z'
-          format: date-time
-          readOnly: true
-    V1ComponentState:
-      description: |
-        The configuration state and desired state for a component.
-      type: object
-      properties:
-        id:
-          type: string
-          description: The component's id. e.g. xname for hardware components
-        state:
-          $ref: '#/components/schemas/V1ConfigurationState'
-        desiredState:
-          $ref: '#/components/schemas/V1ConfigurationState'
-        errorCount:
-          type: integer
-          description: The count of failed configuration attempts.
-        retryPolicy:
-          type: integer
-          description: The maximum number retries per component when configuration fails.
-        sessionName:
-          type: string
-          description: The name of the CFS session that last configured the component.
-        enabled:
-          type: boolean
-          description: A flag indicating if the component should be scheduled for configuration.
-        configurationStatus:
-          type: string
-          description: A summary of the component's configuration state.
-          enum: ['unconfigured', 'pending', 'failed', 'configured', ]
-          readOnly: true
-    V1ComponentStateArray:
-      description: An array of component configurations.
-      type: array
-      items:
-        $ref: '#/components/schemas/V1ComponentState'
     # V2 #
     ConfigurationStateLayer:
       description: |
@@ -1112,323 +727,6 @@ paths:
           $ref: '#/components/responses/Healthz'
         503:
           $ref: '#/components/responses/Healthz'
-  /options:
-    get:
-      summary: Retrieve the configuration service options (DEPRECATED)
-      tags:
-        - options
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.options
-      description: Retrieve the list of configuration service options.
-      operationId: get_options
-      responses:
-        200:
-          $ref: '#/components/responses/V1Options'
-    patch:
-      summary: Update configuration service options (DEPRECATED)
-      tags:
-        - options
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.options
-      operationId: patch_options
-      description: Update one or more of the configuration service options.
-      requestBody:
-        $ref: '#/components/requestBodies/V1OptionsUpdateRequest'
-      responses:
-        200:
-          $ref: '#/components/responses/V1Options'
-        400:
-          $ref: '#/components/responses/BadRequest'
-  /sessions:
-    get:
-      summary: Retrieve configuration framework sessions (DEPRECATED)
-      tags:
-        - sessions
-      x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      description:
-        Retrieve all the configuration framework sessions on the system.
-      operationId: get_sessions
-      parameters:
-        - name: age
-          schema:
-            type: string
-          in: query
-          description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
-        - name: status
-          schema:
-            type: string
-          in: query
-          description: >-
-            Return only sessions with the given status.
-        - name: name_contains
-          schema:
-            type: string
-          in: query
-          description: >-
-            Return only sessions whose session name contains the given string.
-        - name: succeeded
-          schema:
-            type: string
-            enum: ['none', 'true', 'false', 'unknown']
-          in: query
-          description: >-
-            Return only sessions that have succeeded/failed.
-      responses:
-        200:
-          $ref: '#/components/responses/V1SessionDetailsArray'
-    post:
-      summary: Create a configuration framework session (DEPRECATED)
-      tags:
-        - sessions
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: create_session
-      description:
-        Create a new configuration session. A configuration session stages Ansible inventory,
-        launches one or more Ansible Execution Environments (AEE) as containers in the management
-        services infrastructure, and tears down the environments as required. When a session is
-        targeted for image customization, the inventory staging involves using IMS to expose the requested
-        image roots, tearing down the image roots, and generating new boot artifacts afterwards.
-        The session will checkout the prescribed branch or commit of the configuration repository
-        and populate the configuration manifest to the AEE. The Ansible execution begins with an
-        inventory prescribed by the user through CFS. A configuration session also tracks the
-        status of the different stages of the operation and reports information on
-        the success of its execution.
-      requestBody:
-        $ref: '#/components/requestBodies/V1SessionCreateRequest'
-      responses:
-        201:
-          $ref: '#/components/responses/V1SessionDetails'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        409:
-          $ref: '#/components/responses/ConflictingSessionName'
-    delete:
-      summary: Delete multiple configuration framework sessions (DEPRECATED)
-      tags:
-        - sessions
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: delete_sessions
-      parameters:
-        - name: age
-          schema:
-            type: string
-          in: query
-          description: >-
-            Deletes only sessions older than the given age.  Age is given in the format "1d" or "6h"
-        - name: status
-          schema:
-            type: string
-            default: complete
-          in: query
-          description: >-
-            Deletes only sessions with the given status.
-        - name: name_contains
-          schema:
-            type: string
-          in: query
-          description: >-
-            Delete only sessions whose session name contains the given string.
-        - name: succeeded
-          schema:
-            type: string
-            enum: ['none', 'true', 'false', 'unknown']
-          in: query
-          description: >-
-            Delete only sessions that have succeeded/failed.
-      description:
-        Delete multiple configuration sessions.  If filters are provided, only sessions matching
-        all filters will be deleted.  By default only completed sessions will be deleted.
-      responses:
-        204:
-          $ref: '#/components/responses/ResourceDeleted'
-        400:
-          $ref: '#/components/responses/BadRequest'
-  /sessions/{session_name}:
-    get:
-      summary: Retrieve a configuration framework session by session_name (DEPRECATED)
-      tags:
-        - sessions
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: get_session
-      description: >-
-        View details about a specific configuration session. This allows you to
-        track the status of the session and the Ansible execution through the session.
-      responses:
-        200:
-          $ref: '#/components/responses/V1SessionDetails'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-    delete:
-      summary: Delete a configuration framework session (DEPRECATED)
-      tags:
-        - sessions
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: delete_session
-      description: >-
-        Deleting a configuration session deletes the Kubernetes objects associated
-        with the session and also deletes the session history. The operation cannot be undone.
-      responses:
-        204:
-          $ref: '#/components/responses/ResourceDeleted'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-    parameters:
-      - name: session_name
-        in: path
-        description: Config Framework Session name
-        required: true
-        schema:
-          type: string
-  /components:
-    get:
-      summary: Retrieve the state of a collection of components (DEPRECATED)
-      tags:
-        - components
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: >-
-        Retrieve the full collection of components in the form of a
-        ComponentArray. Full results can also be filtered by query
-        parameters. Only the first filter parameter of each type is
-        used and the parameters are applied in an AND fashion.
-        If the collection is empty or the filters have no match, an
-        empty array is returned.
-      operationId: get_components
-      parameters:
-        - name: ids
-          schema:
-            type: string
-          in: query
-          description: >-
-            Retrieve the components with the given id
-            (e.g. xname for hardward components). Can be chained
-            for selecting groups of components.
-        - name: status
-          schema:
-            type: string
-          in: query
-          description: >-
-            Retrieve the components with the status. Multiple statuses can be specified
-            in a comma-separated list.
-        - name: enabled
-          schema:
-            type: boolean
-          in: query
-          description: >-
-            Retrieve the components with the "enabled" state.
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetailsArray'
-        400:
-          $ref: '#/components/responses/BadRequest'
-    put:
-      summary: Add or Replace a collection of components (DEPRECATED)
-      tags:
-        - components
-        - v1
-        - cli_ignore
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Update the state for a collection of components in the cfs database
-      operationId: put_components
-      requestBody:
-        $ref: '#/components/requestBodies/V1ComponentsUpdateRequest'
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetailsArray'
-        400:
-          $ref: '#/components/responses/BadRequest'
-    patch:
-      summary: Update a collection of components (DEPRECATED)
-      tags:
-        - components
-        - v1
-        - cli_ignore
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Update the state for a collection of components in the cfs database
-      operationId: patch_components
-      requestBody:
-        $ref: '#/components/requestBodies/V1ComponentsUpdateRequest'
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetailsArray'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-  /components/{component_id}:
-    get:
-      summary: Retrieve the state of a single component (DEPRECATED)
-      tags:
-        - components
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Retrieve the configuration and current state of a single component
-      operationId: get_component
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetails'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-    put:
-      summary: Add or Replace a single component (DEPRECATED)
-      tags:
-        - components
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Update the state for a given component in the cfs database
-      operationId: put_component
-      requestBody:
-        $ref: '#/components/requestBodies/V1ComponentUpdateRequest'
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetails'
-        400:
-          $ref: '#/components/responses/BadRequest'
-    patch:
-      summary: Update a single component (DEPRECATED)
-      tags:
-        - components
-        - v1
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Update the state for a given component in the cfs database
-      operationId: patch_component
-      requestBody:
-        $ref: '#/components/requestBodies/V1ComponentUpdateRequest'
-      responses:
-        200:
-          $ref: '#/components/responses/V1ComponentDetails'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-    delete:
-      tags:
-        - components
-        - v1
-        - cli_ignore
-      summary: Delete a single component (DEPRECATED)
-      x-openapi-router-controller: cray.cfs.api.controllers.components
-      description: Delete the given component
-      operationId: delete_component
-      responses:
-        204:
-          $ref: '#/components/responses/ResourceDeleted'
-        404:
-          $ref: '#/components/responses/ResourceNotFound'
-    parameters:
-      - name: component_id
-        in: path
-        description: Component id. e.g. xname for hardware components
-        required: true
-        schema:
-          type: string
   # V2 #
   /v2/options:
     get:
@@ -1438,7 +736,7 @@ paths:
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.options
       description: Retrieve the list of configuration service options.
-      operationId: get_options_v2
+      operationId: get_options
       responses:
         200:
           $ref: '#/components/responses/V2Options'
@@ -1448,7 +746,7 @@ paths:
         - options
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.options
-      operationId: patch_options_v2
+      operationId: patch_options
       description: Update one or more of the configuration service options.
       requestBody:
         $ref: '#/components/requestBodies/V2OptionsUpdateRequest'
@@ -1466,7 +764,7 @@ paths:
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
       description:
         Retrieve all the configuration framework sessions on the system.
-      operationId: get_sessions_v2
+      operationId: get_sessions
       parameters:
         - name: age
           schema:
@@ -1522,7 +820,7 @@ paths:
         - sessions
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: create_session_v2
+      operationId: create_session
       description:
         Create a new configuration session. A configuration session stages Ansible inventory,
         launches one or more Ansible Execution Environments (AEE) as containers in the management
@@ -1549,7 +847,7 @@ paths:
         - sessions
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: delete_sessions_v2
+      operationId: delete_sessions
       parameters:
         - name: age
           schema:
@@ -1612,7 +910,7 @@ paths:
         - sessions
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: get_session_v2
+      operationId: get_session
       description: >-
         View details about a specific configuration session. This allows you to
         track the status of the session and the Ansible execution through the session.
@@ -1627,7 +925,7 @@ paths:
         - sessions
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: patch_session_v2
+      operationId: patch_session
       description: >-
         Update the status of an existing configuration framework session
       responses:
@@ -1643,7 +941,7 @@ paths:
         - sessions
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.sessions
-      operationId: delete_session_v2
+      operationId: delete_session
       description: >-
         Deleting a configuration session deletes the Kubernetes objects associated
         with the session and also deletes the session history. The operation cannot be undone.
@@ -1673,7 +971,7 @@ paths:
         used and the parameters are applied in an AND fashion.
         If the collection is empty or the filters have no match, an
         empty array is returned.
-      operationId: get_components_v2
+      operationId: get_components
       parameters:
         - name: ids
           schema:
@@ -1728,7 +1026,7 @@ paths:
         - cli_ignore
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Update the state for a collection of components in the cfs database
-      operationId: put_components_v2
+      operationId: put_components
       requestBody:
         $ref: '#/components/requestBodies/V2ComponentsUpdateRequest'
       responses:
@@ -1744,7 +1042,7 @@ paths:
         - cli_ignore
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Update the state for a collection of components in the cfs database
-      operationId: patch_components_v2
+      operationId: patch_components
       requestBody:
         $ref: '#/components/requestBodies/V2ComponentsUpdateRequest'
       responses:
@@ -1762,7 +1060,7 @@ paths:
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Retrieve the configuration and current state of a single component
-      operationId: get_component_v2
+      operationId: get_component
       parameters:
         - name: configDetails
           schema:
@@ -1784,7 +1082,7 @@ paths:
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Update the state for a given component in the cfs database
-      operationId: put_component_v2
+      operationId: put_component
       requestBody:
         $ref: '#/components/requestBodies/V2ComponentUpdateRequest'
       responses:
@@ -1799,7 +1097,7 @@ paths:
         - v2
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Update the state for a given component in the cfs database
-      operationId: patch_component_v2
+      operationId: patch_component
       requestBody:
         $ref: '#/components/requestBodies/V2ComponentUpdateRequest'
       responses:
@@ -1817,7 +1115,7 @@ paths:
       summary: Delete a single component
       x-openapi-router-controller: cray.cfs.api.controllers.components
       description: Delete the given component
-      operationId: delete_component_v2
+      operationId: delete_component
       responses:
         204:
           $ref: '#/components/responses/ResourceDeleted'
@@ -1919,4 +1217,3 @@ paths:
         required: true
         schema:
           type: string
-
