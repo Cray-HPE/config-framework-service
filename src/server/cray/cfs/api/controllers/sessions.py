@@ -34,9 +34,7 @@ import connexion
 from cray.cfs.api import dbutils
 from cray.cfs.api import kafka_utils
 from cray.cfs.api.controllers.options import get_options_data
-from cray.cfs.api.models.v1_session import V1Session  # noqa: E501
 from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
-from cray.cfs.api.models.v1_session_create import V1SessionCreate  # noqa: E501
 from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
@@ -52,85 +50,8 @@ def _init(topic='cfs-session-events'):
     _kafka = kafka_utils.ProducerWrapper(topic)
 
 
-
-
 @dbutils.redis_error_handler
 def create_session():  # noqa: E501
-    """Create a Config Framework Session
-
-    Creates a new V1Session # noqa: E501
-
-    :rtype: V1Session
-    """
-    # Create the session object, do openapi field validation
-    LOGGER.debug("Create content: ", connexion.request.get_json())
-    try:
-        session_create = V1SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
-    except ValueError as err:
-        return connexion.problem(
-            detail=err,
-            status=400,
-            title="Bad Request"
-        )
-
-    if session_create.name in DB:
-        return connexion.problem(
-            detail="A session with the name {} already exists".format(session_create.name),
-            status=409,
-            title="Conflicting session name"
-        )
-
-    # Additional target section data validation
-    validation_err = _validate_session_target(session_create.target)
-    if validation_err:
-        return validation_err
-
-    # If the following fields aren't set, use their configured default values.
-    if not session_create.ansible_config:
-        session_create.ansible_config = get_options_data()['defaultAnsibleConfig']
-    if not session_create.ansible_playbook:
-        session_create.ansible_playbook = get_options_data()['defaultPlaybook']
-    if not session_create.clone_url:
-        session_create.clone_url = get_options_data()['defaultCloneUrl']
-
-    session = _create_session(session_create)
-    session = session.to_dict()
-    data = dbutils.snake_to_camel_json(session)
-    _kafka.produce('CREATE', data=data)
-    response = DB.put(data['name'], data)
-
-    return response, 200
-
-
-def _create_session(session_create):
-    initial_status = {
-        'session': {
-            'status': 'pending',
-            'succeeded': 'none',
-        },
-        'artifacts': []
-    }
-    body = {
-        'name': session_create.name,
-        'repo': {
-            "cloneUrl": session_create.clone_url,
-            "branch": session_create.branch,
-            "commit": session_create.commit,
-        },
-        'ansible': {
-            'playbook': session_create.ansible_playbook,
-            'limit': session_create.ansible_limit,
-            'config': session_create.ansible_config,
-            'verbosity': session_create.ansible_verbosity,
-        },
-        'target': session_create.target.to_dict(),
-        'status': initial_status,
-    }
-    return V1Session.from_dict(body)
-
-
-@dbutils.redis_error_handler
-def create_session_v2():  # noqa: E501
     """Create a Config Framework Session
 
     Creates a new V2Session # noqa: E501
@@ -138,7 +59,7 @@ def create_session_v2():  # noqa: E501
     :rtype: V2Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v2/sessions invoked create_session_v2")
+    LOGGER.debug("POST /v2/sessions invoked create_session")
     try:
         data = connexion.request.get_json()
         LOGGER.debug("Create content: ", data)
@@ -179,7 +100,7 @@ def create_session_v2():  # noqa: E501
     if not session_create.ansible_config:
         session_create.ansible_config = get_options_data()['defaultAnsibleConfig']
 
-    session = _create_session_v2(session_create)
+    session = _create_session(session_create)
     session = session.to_dict()
     data = dbutils.snake_to_camel_json(session)
     data['tags'] = session['tags']  # Don't alter these, they are user defined
@@ -190,7 +111,7 @@ def create_session_v2():  # noqa: E501
     return response, 200
 
 
-def _create_session_v2(session_create):
+def _create_session(session_create):
     initial_status = {
         'session': {
             'status': 'pending',
@@ -231,26 +152,7 @@ def delete_session(session_name):  # noqa: E501
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /sessions/id invoked delete_session")
-    return _delete_session(session_name)
-
-
-@dbutils.redis_error_handler
-def delete_session_v2(session_name):  # noqa: E501
-    """Delete Config Framework Session
-
-     # noqa: E501
-
-    :param session_name: Config Framework Session name
-    :type session_name: str
-
-    :rtype: None
-    """
-    LOGGER.debug("DELETE /v2/sessions/id invoked delete_session_v2")
-    return _delete_session(session_name)
-
-
-def _delete_session(session_name):  # noqa: E501
+    LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session could not found.",
@@ -262,33 +164,7 @@ def _delete_session(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
-def delete_sessions(age=None, min_age=None, max_age=None,
-                    status=None, name_contains=None, succeeded=None):  # noqa: E501
-    """Delete Config Framework Sessions
-
-     # noqa: E501
-
-    :param age: An age filter in the form 1d.
-    :type age: str
-    :param min_age: An age filter in the form 1d.
-    :type min_age: str
-    :param max_age: An age filter in the form 1d.
-    :type max_age: str
-    :param status: A session status filter
-    :type status: str
-    :param name_contains: A filter on session names
-    :type name_contains: str
-    :param succeeded: A filter on session success
-    :type succeeded: bool
-
-    :rtype: None
-    """
-    LOGGER.debug("DELETE /sessions invoked delete_sessions")
-    _delete_sessions(age, min_age, max_age, status, name_contains, succeeded)
-
-
-@dbutils.redis_error_handler
-def delete_sessions_v2(age=None,  min_age=None, max_age=None,
+def delete_sessions(age=None,  min_age=None, max_age=None,
                        status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
 
@@ -311,12 +187,7 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
-    _delete_sessions(age, min_age, max_age, status, name_contains, succeeded, tags)
-
-
-def _delete_sessions(age=None, min_age=None, max_age=None, status=None, name_contains=None,
-                     succeeded=None, tags=None):  # noqa: E501
+    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions")
     tag_list = []
     if tags:
         try:
@@ -353,28 +224,9 @@ def get_session(session_name):  # noqa: E501
     :param session_name: Config Framework Session name
     :type session_name: str
 
-    :rtype: V1Session
-    """
-    LOGGER.debug("GET /sessions/id invoked get_session")
-    return _get_session(session_name)
-
-
-@dbutils.redis_error_handler
-def get_session_v2(session_name):  # noqa: E501
-    """Config Framework Session Details
-
-     # noqa: E501
-
-    :param session_name: Config Framework Session name
-    :type session_name: str
-
     :rtype: V2Session
     """
-    LOGGER.debug("GET /v2/sessions/id invoked get_session_v2")
-    return _get_session(session_name)
-
-
-def _get_session(session_name):  # noqa: E501
+    LOGGER.debug("GET /v2/sessions/id invoked get_session")
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session could not found.",
@@ -383,20 +235,7 @@ def _get_session(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
-def get_sessions(age=None, min_age=None, max_age=None,
-                 status=None, name_contains=None, succeeded=None):  # noqa: E501
-    """List Config Framework Sessions
-
-     # noqa: E501
-
-    :rtype: List[V1Session]
-    """
-    LOGGER.debug("GET /sessions invoked get_sessions")
-    return _get_sessions(age, min_age, max_age, status, name_contains, succeeded)
-
-
-@dbutils.redis_error_handler
-def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
+def get_sessions(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
 
@@ -404,7 +243,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 
     :rtype: List[V2Session]
     """
-    LOGGER.debug("GET /v2/sessions invoked get_sessions_v2")
+    LOGGER.debug("GET /v2/sessions invoked get_sessions")
     tag_list = []
     if tags:
         try:
@@ -415,24 +254,19 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
-    return _get_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list)
-
-
-def _get_sessions(age=None, min_age=None, max_age=None, status=None, name_contains=None,
-                  succeeded=None, tag_list=None):  # noqa: E501
     return _get_filtered_sessions(age, min_age, max_age, status,
                                   name_contains, succeeded, tag_list), 200
 
 
 @dbutils.redis_error_handler
-def patch_session_v2(session_name):
+def patch_session(session_name):
     """Update a Config Framework Session
 
     Updates a new V2Session # noqa: E501
 
     :rtype: V2Session
     """
-    LOGGER.debug("PATCH /v2/sessions/id invoked patch_session_v2")
+    LOGGER.debug("PATCH /v2/sessions/id invoked patch_session")
     try:
         data = connexion.request.get_json()
         for key in data.keys():
