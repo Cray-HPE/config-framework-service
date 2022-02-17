@@ -90,4 +90,4 @@ cray-service:
 database:
   image:
     repository: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis
-    tag: 5.0-alpine3.12
+    tag: 5.0-alpine
