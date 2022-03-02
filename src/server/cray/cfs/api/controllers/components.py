@@ -1,4 +1,7 @@
-# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -12,13 +15,11 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# (MIT License)
 
 import connexion
 from copy import deepcopy
@@ -50,7 +51,7 @@ STATUS = {
 
 @dbutils.redis_error_handler
 def get_components(ids="", status="", enabled=None, config_name="", config_details=False,
-                   tags="", v2=False):
+                   tags=""):
     """Used by the GET /components API operation
 
     Allows filtering using a comma seperated list of ids.
@@ -84,12 +85,12 @@ def get_components(ids="", status="", enabled=None, config_name="", config_detai
                 detail=str(err))
     response = get_components_data(id_list=id_list, status_list=status_list, enabled=enabled,
                                    config_name=config_name, config_details=config_details,
-                                   tag_list=tag_list, v2=v2)
+                                   tag_list=tag_list)
     return response, 200
 
 
 def get_components_data(id_list=[], status_list=[], enabled=None, config_name="",
-                        config_details=False, tag_list=[], v2=False):
+                        config_details=False, tag_list=[]):
     """Used by the GET /components API operation=
 
     Allows filtering using a comma separated list of ids.
@@ -106,7 +107,7 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
         response = DB.get_all()
     opts = options.Options()
     configs = configurations.Configurations()
-    response = [_set_status(r, opts, configs, config_details, v2) for r in response if r]
+    response = [_set_status(r, opts, configs, config_details) for r in response if r]
     if status_list or (enabled is not None) or config_name or tag_list:
         response = [r for r in response if _matches_filter(r, status_list, enabled,
                                                            config_name, tag_list)]
@@ -173,7 +174,7 @@ def patch_components():
 
 
 @dbutils.redis_error_handler
-def get_component(component_id, config_details=False, v2=False):
+def get_component(component_id, config_details=False):
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /components/id invoked get_component")
     if component_id not in DB:
@@ -183,7 +184,7 @@ def get_component(component_id, config_details=False, v2=False):
     component = DB.get(component_id)
     opts = options.Options()
     configs = configurations.Configurations()
-    component = _set_status(component, opts, configs, config_details, v2)
+    component = _set_status(component, opts, configs, config_details)
     return component, 200
 
 
@@ -242,22 +243,22 @@ def _set_last_updated(data):
     if 'state' in data and type(data['state']) == list:
         for layer in data['state']:
             if 'lastUpdated' not in layer:
-                layer['lastUpdated'] == datetime.now().strftime(TIME_FORMAT)
+                layer['lastUpdated'] = datetime.now().strftime(TIME_FORMAT)
     if 'desiredState' in data and type(data['desiredState']) == dict:
         data['desiredState']['lastUpdated'] = datetime.now().strftime(TIME_FORMAT)
     return data
 
 
-def _set_status(data, options, configs, config_details, v2):
+def _set_status(data, options, configs, config_details):
     if 'desiredConfig' in data:
         data['configurationStatus'] = STATUS[_get_status(data, options, configs,
-                                                         config_details, v2)]
+                                                         config_details)]
     else:
         data['configurationStatus'] = STATUS[STATUS_DEPRECATED]
     return data
 
 
-def _get_status(data, options, configs, config_details, v2):
+def _get_status(data, options, configs, config_details):
     """
     Returns the configuration status of a component
 
@@ -291,7 +292,7 @@ def _get_status(data, options, configs, config_details, v2):
 
     status = STATUS_CONFIGURED
     for layer in desiredState['layers']:
-        layer_status = _get_layer_status(layer, currentState, maxRetries, options, v2)
+        layer_status = _get_layer_status(layer, currentState, maxRetries, options)
         layer['status'] = STATUS[layer_status]
         status = min(status, layer_status)
     if (status == STATUS_PENDING) and maxRetries:
@@ -303,10 +304,8 @@ def _get_status(data, options, configs, config_details, v2):
     return status
 
 
-def _get_layer_status(desiredState, currentStateLayers, maxRetries, options, v2):
+def _get_layer_status(desiredState, currentStateLayers, maxRetries, options):
     desiredCloneUrl = desiredState.get('cloneUrl', '')
-    if not desiredCloneUrl and not v2:
-        desiredCloneUrl = options.default_clone_url
     desiredPlaybook = desiredState.get('playbook', '')
     if not desiredPlaybook:
         desiredPlaybook = options.default_playbook
@@ -378,19 +377,3 @@ def _state_append_handler(data):
         data['state'] = newState
         del data['stateAppend']
     return data
-
-
-# Creates copies of functions so that v2 endpoints can have unique functions
-put_components_v2 = put_components
-patch_components_v2 = patch_components
-put_component_v2 = put_component
-patch_component_v2 = patch_component
-delete_component_v2 = delete_component
-
-
-def get_components_v2(**kwargs):
-    return get_components(v2=True, **kwargs)
-
-
-def get_component_v2(**kwargs):
-    return get_component(v2=True, **kwargs)

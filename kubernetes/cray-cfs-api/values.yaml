@@ -15,7 +15,8 @@ cray-service:
     cray-cfs-api:
       name: cray-cfs-api
       image:
-        repository: cray/cray-cfs
+        repository: artifactory.algol60.net/csm-docker/stable/cray-cfs
+        # tag defaults to chart appVersion
       volumeMounts:
         - name: ca-pubkey
           mountPath: /etc/cray/ca
@@ -60,6 +61,18 @@ cray-service:
         limits:
           memory: "250Mi"
           cpu: "500m"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - cray-cfs-api
   ingress:
     ui: false
     enabled: true
@@ -73,3 +86,8 @@ cray-service:
           - key: certificate_authority.crt
             path: certificate_authority.crt
         name: cray-configmap-ca-public-key
+
+database:
+  image:
+    repository: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis
+    tag: 5.0-alpine

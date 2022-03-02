@@ -1,4 +1,7 @@
-# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -12,20 +15,17 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# (MIT License)
 
 import logging
 import connexion
 
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.models.v1_options import V1Options
 from cray.cfs.api.models.v2_options import V2Options
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.options')
@@ -35,7 +35,6 @@ DB = dbutils.get_wrapper(db='options')
 # options simpler
 OPTIONS_KEY = 'options'
 DEFAULTS = {
-    'defaultCloneUrl': 'https://api-gw-service-nmn.local/vcs/cray/config-management.git',  # noqa: E501
     'defaultPlaybook': 'site.yml',
     'defaultAnsibleConfig': 'cfs-default-ansible-cfg',
 }
@@ -48,7 +47,7 @@ def _init(namespace='services'):
         return
     # Cleanup
     to_delete = []
-    all_options = set(V1Options().attribute_map.values()) | set(V2Options().attribute_map.values())
+    all_options = set(V2Options().attribute_map.values())
     for key in data:
         if key not in all_options:
             to_delete.append(key)
@@ -64,7 +63,7 @@ def get_options():
     data = get_options_data()
     to_delete = []
     for key in data:
-        if key not in V1Options().attribute_map.values():
+        if key not in V2Options().attribute_map.values():
             to_delete.append(key)
     for key in to_delete:
         del data[key]
@@ -105,24 +104,6 @@ def patch_options():
     return DB.patch(OPTIONS_KEY, data), 200
 
 
-# V2 #
-@dbutils.redis_error_handler
-def get_options_v2():
-    """Used by the GET /options API operation"""
-    LOGGER.debug("GET /options invoked get_options")
-    data = get_options_data()
-    to_delete = []
-    for key in data:
-        if key not in V2Options().attribute_map.values():
-            to_delete.append(key)
-    for key in to_delete:
-        del data[key]
-    return data, 200
-
-
-patch_options_v2 = patch_options
-
-
 class Options():
     """Helper class for other endpoints that need access to options"""
     def get_option(self, key, type, default=None):
@@ -154,10 +135,6 @@ class Options():
     @property
     def default_batcher_retry_policy(self):
         return self.get_option('defaultBatcherRetryPolicy', int, default=1)
-
-    @property
-    def default_clone_url(self):
-        return self.get_option('defaultCloneUrl', str)
 
     @property
     def default_playbook(self):
