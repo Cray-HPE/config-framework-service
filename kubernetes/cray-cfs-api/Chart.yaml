@@ -39,13 +39,11 @@ dependencies:
 maintainers:
 - name: rbak-hpe
   email: ryan.bak@hpe.com
-- name: rkleinman-hpe
-  email: randy.kleinman@hpe.com
 appVersion: 0.0.0
 annotations:
   artifacthub.io/images: |
     - name: cray-cfs
       image: artifactory.algol60.net/csm-docker/stable/cray-cfs:0.0.0
     - name: redis
-      image: docker.io/library/redis:5.0-alpine3.14
+      image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:5.0-alpine
   artifacthub.io/license: MIT
