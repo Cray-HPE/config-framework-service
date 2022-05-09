@@ -354,9 +354,11 @@ def _update_handler(data):
 
 def _tag_cleanup_handler(data):
     tags = data.get('tags', {})
+    clean_tags = {}
     for k, v in tags.items():
-        if v == '':
-            del tags[k]
+        if v:
+            clean_tags[k] = v
+    data['tags'] = clean_tags
     return data
 
 
