@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,19 +21,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-name: Lint, test, and scan Helm charts
+# Check a PR for a modified changelog file, assuming CHANGELOG.md is the file.
+# Ignore PRs with the gitflow-maintenance and/or dependabot label(s).
+name: Changelog Checker
 on:
   pull_request:
-    branches:
-      - master
-      - release/**
-  schedule:
-    - cron: "0 0 * * *"
-  workflow_dispatch:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Workflow Jobs
 jobs:
-  lint-test-scan:
-    uses: Cray-HPE/.github/.github/workflows/charts-lint-test-scan.yml@main
-    with:
-      lint-charts: ${{ github.event_name == 'pull_request' }}
-    secrets:
-      snyk-token: ${{ secrets.SNYK_TOKEN }}
+  check-changelog:
+    runs-on: ubuntu-latest
+    if: "!(
+      contains(github.event.pull_request.labels.*.name, 'gitflow-maintenance') ||
+      contains(github.event.pull_request.labels.*.name, 'dependabot')
+    )"
+    steps:
+      - name: Ensure changelog has changes
+        uses: Cray-HPE/.github/actions/csm-changelog-checker@v1-csm-changelog-checker

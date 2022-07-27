@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,19 +21,32 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-name: Lint, test, and scan Helm charts
+name: Gitflow Merge Back
 on:
   pull_request:
-    branches:
-      - master
-      - release/**
-  schedule:
-    - cron: "0 0 * * *"
-  workflow_dispatch:
+    types: [ closed ]
+    branches: [ master ]
+
 jobs:
-  lint-test-scan:
-    uses: Cray-HPE/.github/.github/workflows/charts-lint-test-scan.yml@main
-    with:
-      lint-charts: ${{ github.event_name == 'pull_request' }}
-    secrets:
-      snyk-token: ${{ secrets.SNYK_TOKEN }}
+  merge-to-develop:
+    # this job will only run if the PR has been merged, not just closed
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Create the gitflow mergeback PR
+        uses: Cray-HPE/.github/actions/csm-gitflow-mergeback@v1-csm-gitflow-mergeback
+        id: create-pr
+        with:
+          source-branch: master
+          base-branch: develop
+          automerge: true
+          app-key: ${{ secrets.CSM_GITFLOW_MERGEBACK_BOT_APP_KEY }}
+          app-id: ${{ secrets.CSM_GITFLOW_MERGEBACK_BOT_APP_ID }}
+
+      - name: Generated Pull Request Info
+        shell: bash
+        run: |
+          echo "Pull Request Number - ${{ steps.create-pr.outputs.pr-number }}"
+          echo "Pull Request URL - ${{ steps.create-pr.outputs.pr-url }}"
+
