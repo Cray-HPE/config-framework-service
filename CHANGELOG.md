@@ -8,4 +8,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.11.0] - 2022-07-27
 ### Added
+- cray-cfs-api PVC storage class overrides
 - Conversion of repository to gitflow
