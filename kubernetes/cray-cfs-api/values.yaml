@@ -34,6 +34,7 @@ cray-service:
   type: Deployment
   nameOverride: cray-cfs-api
   serviceAccountName: cray-cfs
+  priorityClassName: csm-high-priority-service
   containers:
     cray-cfs-api:
       name: cray-cfs-api
