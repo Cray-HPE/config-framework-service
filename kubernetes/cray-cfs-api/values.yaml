@@ -117,3 +117,4 @@ database:
     tag: 5.0-alpine
     storageClass: ceph-cephfs-external
     accessMode: ReadWriteMany
+    
