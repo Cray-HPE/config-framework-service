@@ -115,5 +115,5 @@ database:
   image:
     repository: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis
     tag: 5.0-alpine
-    storageClass: ceph-cephfs-external
-    accessMode: ReadWriteMany
+  storageClass: ceph-cephfs-external
+  accessMode: ReadWriteMany
