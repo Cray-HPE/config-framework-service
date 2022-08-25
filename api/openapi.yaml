@@ -1012,7 +1012,7 @@ paths:
           in: query
           description: >-
             Retrieve the components with the given id
-            (e.g. xname for hardward components). Can be chained
+            (e.g. xname for hardware components). Can be chained
             for selecting groups of components.
         - name: status
           schema:
