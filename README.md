@@ -3,7 +3,7 @@
 ## Generating the server
 
 The OpenAPI specification automatically generates server code as a function of
-building the docker image, however, it may be desireable to generate the server code
+building the docker image, however, it may be desirable to generate the server code
 while writing and testing code locally, outside of the docker image itself. This
 is helpful when the openapi code in question generates stubbed content, to be later
 filled in by the application developer.
