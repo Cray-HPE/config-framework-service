@@ -29,9 +29,9 @@ metadata:
   name: cfs-db
   namespace: services
 spec:
-  storageClassName: ceph-cephfs-external
+  storageClassName: "{{ .Values.database.storageClass}}"
   accessModes:
-    - ReadWriteMany
+    - "{{ .Values.database.accessMode}}"
   resources:
     requests:
       storage: 3Gi
