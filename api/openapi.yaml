@@ -628,6 +628,7 @@ components:
             $ref: '#/components/schemas/ConfigurationLayer'
         additional_inventory:
           $ref: '#/components/schemas/AdditionalInventoryLayer'
+      additionalProperties: false
     ConfigurationArray:
       description: An array of configurations.
       type: array
