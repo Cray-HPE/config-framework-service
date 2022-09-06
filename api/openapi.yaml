@@ -344,6 +344,24 @@ components:
                 example: ['nid000001', 'nid000002', 'nid000003']
                 items:
                   type: string
+        image_map:
+          type: array
+          description: |
+            Mapping of image ids to resultant image names.  This is only valid for 'image' inventory definition types.
+            Only images that are defined in 'groups' will result in a new image.
+            If images in 'groups' are not specified here, CFS will generate a name for the resultant image.
+          items:
+            type: object
+            required: ['source_id', 'result_name']
+            properties:
+              source_id:
+                description: Source image id.  This is the image id that is used in 'groups'.
+                example: ff287206-6ff7-4659-92ad-6e732821c6b4
+                type: string
+              result_name:
+                description: Resultant image name.
+                example: new-test-image
+                type: string
     ## SESSIONS ENDPOINT ##
     V2Session:
       description: |

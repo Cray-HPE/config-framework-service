@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Spelling corrections.
 
+### Added
+- Added new parameter for naming image customization results
+
 ## [1.11.1] - 8/18/22
 ### Fixed
 - Escalated pod priority so that configuration has a better chance of running when a node is cordoned
