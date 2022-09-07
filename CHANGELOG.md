@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- Restricted parameters for configurations and status filtering
+
+### Fixed
 - Spelling corrections.
 
 ### Added
