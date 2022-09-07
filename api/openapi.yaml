@@ -298,6 +298,9 @@ components:
         batcherPendingTimeout:
           type: integer
           description: How long cfs-batcher will wait on a pending session before deleting and recreating it (in seconds).
+        loggingLevel:
+          type: string
+          description: The logging level for core CFS services.  This does not affect the Ansible logging level.
       additionalProperties: false
     TargetSpecSection:
       type: object
