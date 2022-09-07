@@ -133,7 +133,9 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/V2ComponentStateArray'
+            oneOf:
+              - $ref: '#/components/schemas/V2ComponentsUpdate'
+              - $ref: '#/components/schemas/V2ComponentStateArray'
     V2ComponentUpdateRequest:
       description: The configuration/state for a single component
       required: true
@@ -739,6 +741,36 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/V2ComponentState'
+    V2ComponentsFilter:
+      description: Information for patching multiple components.
+      type: object
+      properties:
+        ids:
+          type: string
+          description: A comma separated list of component ids
+        status:
+          type: string
+          description: All components with this status will be patched.
+          enum: ['unconfigured', 'pending', 'failed', 'configured']
+        enabled:
+          type: boolean
+          description: Patches all components with the given "enabled" state.
+        configName:
+          type: string
+          description: A configuration name.  All components with this configuration set will be patched.
+        tags:
+          type: string
+          description: Patches all components with the given tags.  Key-value pairs should be separated using =,
+            and tags can be a comma-separated list.  Only components that match all tags will be patched.
+    V2ComponentsUpdate:
+      description: Information for patching multiple components.
+      type: object
+      properties:
+        patch:
+          $ref: '#/components/schemas/V2ComponentState'
+        filters:
+          $ref: '#/components/schemas/V2ComponentsFilter'
+      required: [patch, filters]
     ProblemDetails:
       description: An error response for RFC 7807 problem details.
       type: object

@@ -152,8 +152,19 @@ def put_components():
 def patch_components():
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /components invoked patch_components")
+    data = connexion.request.get_json()
+    if isinstance(data, list):
+        return patch_v2_components_list(data)
+    elif isinstance(data, dict):
+        return patch_v2_components_dict(data)
+    else:
+        return connexion.problem(
+           status=400, title="Error parsing the data provided.",
+           detail="Unexpected data type {}".format(str(type(data))))
+
+
+def patch_v2_components_list(data):
     try:
-        data = connexion.request.get_json()
         components = []
         for component_data in data:
             component_id = component_data['id']
@@ -170,6 +181,58 @@ def patch_components():
     for component_id, component_data in components:
         component_data = _set_auto_fields(component_data)
         response.append(DB.patch(component_id, component_data, _update_handler))
+    return response, 200
+
+
+def patch_v2_components_dict(data):
+    filters = data.get("filters", {})
+    id_list = []
+    status_list = []
+    tag_list = []
+    if filters.get("ids", None):
+        try:
+            id_list = filters.get("ids", None).split(',')
+        except Exception as err:
+            return connexion.problem(
+                status=400, title="Error parsing the ids provided.",
+                detail=str(err))
+    if filters.get("status", None):
+        try:
+            status_list = filters.get("status", None).split(',')
+        except Exception as err:
+            return connexion.problem(
+                status=400, title="Error parsing the status provided.",
+                detail=str(err))
+    if filters.get("tags", None):
+        try:
+            tag_list = [tuple(tag.split('=')) for tag in filters.get("tags", None).split(',')]
+            for tag in tag_list:
+                assert(len(tag) == 2)
+        except Exception as err:
+            return connexion.problem(
+                status=400, title="Error parsing the tags provided.",
+                detail=str(err))
+
+    components = []
+    if id_list:
+        for component_id in id_list:
+            component_data = DB.get(component_id)
+            if component_data:
+                components.append(component_data)
+    else:
+        # TODO: On large scale systems, this response may be too large
+        # and require paging to be implemented
+        components = DB.get_all()
+
+    response = []
+    patch = data.get("patch", {})
+    if "id" in patch:
+        del patch["id"]
+    patch = _set_auto_fields(patch)
+    for component in components:
+        if _matches_filter(component, status_list, filters.get("enabled", None),
+                           filters.get("configName", None), tag_list):
+            response.append(DB.patch(component_id, patch, _update_handler))
     return response, 200
 
 

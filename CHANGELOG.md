@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added new parameter for naming image customization results
 - Added additional control options for batcher
+- Added ability to bulk update components
 
 ## [1.11.1] - 8/18/22
 ### Fixed
