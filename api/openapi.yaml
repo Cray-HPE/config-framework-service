@@ -290,6 +290,12 @@ components:
           description: >
             The maximum number of seconds that batcher will backoff from session creation if problems are detected.
           example: 3600
+        batcherDisable:
+          type: boolean
+          description: Disables cfs-batcher's automatic session creation if set to True.
+        batcherPendingTimeout:
+          type: integer
+          description: How long cfs-batcher will wait on a pending session before deleting and recreating it (in seconds).
       additionalProperties: false
     TargetSpecSection:
       type: object
