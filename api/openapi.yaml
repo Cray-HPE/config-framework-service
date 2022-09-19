@@ -644,6 +644,9 @@ components:
           description: The name of the configuration.
           example: sample-config
           readOnly: true
+        description:
+          type: string
+          description: A user defined description. This field is not used by CFS.
         lastUpdated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.

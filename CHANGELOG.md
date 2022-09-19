@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added additional control options for batcher
 - Added ability to bulk update components
 - Added option to control CFS log levels
+- Added description field for configurations
 
 ## [1.11.1] - 8/18/22
 ### Fixed
