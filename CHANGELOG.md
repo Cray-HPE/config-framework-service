@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ability to bulk update components
 - Added option to control CFS log levels
 - Added description field for configurations
+- Added version endpoints for the API
 
 ## [1.11.1] - 8/18/22
 ### Fixed

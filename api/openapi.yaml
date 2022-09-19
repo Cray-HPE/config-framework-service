@@ -152,6 +152,12 @@ components:
             $ref: '#/components/schemas/Configuration'
   responses:
     # Success
+    Version:
+      description: Version information for the service
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Version'
     Healthz:
       description: Status information for the service
       content:
@@ -233,6 +239,17 @@ components:
           example: /sessions/session-20190728032600
         href:
           type: string
+      additionalProperties: false
+    Version:
+      description: Version data
+      type: object
+      properties:
+        major:
+          type: integer
+        minor:
+          type: integer
+        patch:
+          type: integer
       additionalProperties: false
     Healthz:
       description: Service health status
@@ -810,6 +827,28 @@ components:
           type: string
 
 paths:
+  /:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_version
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
+  /versions:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_versions
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
   /healthz:
     get:
       summary: Get service health details
@@ -824,6 +863,17 @@ paths:
         503:
           $ref: '#/components/responses/Healthz'
   # V2 #
+  /v2:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_versions_v2
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
   /v2/options:
     get:
       summary: Retrieve the configuration service options
