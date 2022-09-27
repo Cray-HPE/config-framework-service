@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,35 +21,40 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# Config Framework Service API Main
+# Cray-provided base controllers for the Boot Orchestration Service
 
-import os
+
 import logging
-import connexion
+import yaml
 
-from cray.cfs.api import encoder
-from cray.cfs.api.controllers import options
-from cray.cfs.api.controllers import sessions
+from cray.cfs.api.models.version import Version
 
-log_level = os.environ.get('STARTING_LOG_LEVEL', 'WARN')
-LOG_FORMAT = "%(asctime)-15s - %(levelname)-7s - %(name)s - %(message)s"
-logging.basicConfig(level=log_level, format=LOG_FORMAT)
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
 
 
-def create_app():
-    sessions._init()
-    options._init()
+def calc_version():
+    # parse open API spec file from docker image or local repository
+    openapispec_f = '/app/lib/server/cray/cfs/api/openapi/openapi.yaml'
+    f = None
+    try:
+        f = open(openapispec_f, 'r')
+    except IOError as e:
+        LOGGER.debug('error opening openapi.yaml file: %s' % e)
 
-    LOGGER.info("Starting Configuration Framework Service API server")
-    app = connexion.App(__name__, specification_dir='./openapi/')
-    app.app.json_encoder = encoder.JSONEncoder
-    app.add_api('openapi.yaml', arguments={'title': 'Configuration Framework Service'},
-                pythonic_params=True, base_path='/')
-    return app
+    openapispec_map = yaml.safe_load(f)
+    f.close()
+    major, minor, patch = openapispec_map['info']['version'].split('.')
+    return Version(
+        major=major,
+        minor=minor,
+        patch=patch,
+    )
 
 
-app = create_app()
+def get_version():
+    LOGGER.debug('in get_version')
+    return calc_version(), 200
 
-if __name__ == '__main__':
-    app.run()
+
+get_versions = get_version
+get_versions_v2 = get_version

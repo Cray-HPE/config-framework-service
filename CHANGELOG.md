@@ -6,7 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- Restricted parameters for configurations and status filtering
+
+### Fixed
 - Spelling corrections.
+
+### Added
+- Added new parameter for naming image customization results
+- Added additional control options for batcher
+- Added ability to bulk update components
+- Added option to control CFS log levels
+- Added description field for configurations
+- Added version endpoints for the API
 
 ## [1.11.1] - 8/18/22
 ### Fixed

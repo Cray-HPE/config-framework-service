@@ -133,7 +133,9 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/V2ComponentStateArray'
+            oneOf:
+              - $ref: '#/components/schemas/V2ComponentsUpdate'
+              - $ref: '#/components/schemas/V2ComponentStateArray'
     V2ComponentUpdateRequest:
       description: The configuration/state for a single component
       required: true
@@ -150,6 +152,12 @@ components:
             $ref: '#/components/schemas/Configuration'
   responses:
     # Success
+    Version:
+      description: Version information for the service
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Version'
     Healthz:
       description: Status information for the service
       content:
@@ -232,6 +240,17 @@ components:
         href:
           type: string
       additionalProperties: false
+    Version:
+      description: Version data
+      type: object
+      properties:
+        major:
+          type: integer
+        minor:
+          type: integer
+        patch:
+          type: integer
+      additionalProperties: false
     Healthz:
       description: Service health status
       type: object
@@ -290,6 +309,15 @@ components:
           description: >
             The maximum number of seconds that batcher will backoff from session creation if problems are detected.
           example: 3600
+        batcherDisable:
+          type: boolean
+          description: Disables cfs-batcher's automatic session creation if set to True.
+        batcherPendingTimeout:
+          type: integer
+          description: How long cfs-batcher will wait on a pending session before deleting and recreating it (in seconds).
+        loggingLevel:
+          type: string
+          description: The logging level for core CFS services.  This does not affect the Ansible logging level.
       additionalProperties: false
     TargetSpecSection:
       type: object
@@ -344,6 +372,24 @@ components:
                 example: ['nid000001', 'nid000002', 'nid000003']
                 items:
                   type: string
+        image_map:
+          type: array
+          description: |
+            Mapping of image ids to resultant image names.  This is only valid for 'image' inventory definition types.
+            Only images that are defined in 'groups' will result in a new image.
+            If images in 'groups' are not specified here, CFS will generate a name for the resultant image.
+          items:
+            type: object
+            required: ['source_id', 'result_name']
+            properties:
+              source_id:
+                description: Source image id.  This is the image id that is used in 'groups'.
+                example: ff287206-6ff7-4659-92ad-6e732821c6b4
+                type: string
+              result_name:
+                description: Resultant image name.
+                example: new-test-image
+                type: string
     ## SESSIONS ENDPOINT ##
     V2Session:
       description: |
@@ -615,6 +661,9 @@ components:
           description: The name of the configuration.
           example: sample-config
           readOnly: true
+        description:
+          type: string
+          description: A user defined description. This field is not used by CFS.
         lastUpdated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
@@ -628,6 +677,7 @@ components:
             $ref: '#/components/schemas/ConfigurationLayer'
         additional_inventory:
           $ref: '#/components/schemas/AdditionalInventoryLayer'
+      additionalProperties: false
     ConfigurationArray:
       description: An array of configurations.
       type: array
@@ -714,6 +764,36 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/V2ComponentState'
+    V2ComponentsFilter:
+      description: Information for patching multiple components.
+      type: object
+      properties:
+        ids:
+          type: string
+          description: A comma separated list of component ids
+        status:
+          type: string
+          description: All components with this status will be patched.
+          enum: ['unconfigured', 'pending', 'failed', 'configured']
+        enabled:
+          type: boolean
+          description: Patches all components with the given "enabled" state.
+        configName:
+          type: string
+          description: A configuration name.  All components with this configuration set will be patched.
+        tags:
+          type: string
+          description: Patches all components with the given tags.  Key-value pairs should be separated using =,
+            and tags can be a comma-separated list.  Only components that match all tags will be patched.
+    V2ComponentsUpdate:
+      description: Information for patching multiple components.
+      type: object
+      properties:
+        patch:
+          $ref: '#/components/schemas/V2ComponentState'
+        filters:
+          $ref: '#/components/schemas/V2ComponentsFilter'
+      required: [patch, filters]
     ProblemDetails:
       description: An error response for RFC 7807 problem details.
       type: object
@@ -747,6 +827,28 @@ components:
           type: string
 
 paths:
+  /:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_version
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
+  /versions:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_versions
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
   /healthz:
     get:
       summary: Get service health details
@@ -761,6 +863,17 @@ paths:
         503:
           $ref: '#/components/responses/Healthz'
   # V2 #
+  /v2:
+    get:
+      summary: Get API versions
+      description: Return list of versions currently running.
+      tags:
+        - version
+      x-openapi-router-controller: cray.cfs.api.controllers.versions
+      operationId: get_versions_v2
+      responses:
+        200:
+          $ref: '#/components/responses/Version'
   /v2/options:
     get:
       summary: Retrieve the configuration service options
@@ -821,6 +934,7 @@ paths:
         - name: status
           schema:
             type: string
+            enum: ['pending', 'running', 'complete']
           in: query
           description: >-
             Return only sessions with the given status.
@@ -904,6 +1018,7 @@ paths:
         - name: status
           schema:
             type: string
+            enum: ['pending', 'running', 'complete']
             default: complete
           in: query
           description: >-
@@ -1017,6 +1132,11 @@ paths:
         - name: status
           schema:
             type: string
+            enum:
+              - unconfigured
+              - failed
+              - pending
+              - configured
           in: query
           description: >-
             Retrieve the components with the status. Multiple statuses can be specified
