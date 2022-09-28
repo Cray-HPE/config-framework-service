@@ -23,7 +23,7 @@
 #
 apiVersion: v2
 name: cray-cfs-api
-version: 0.0.0
+version: 0.0.0-chart
 description: Kubernetes resources for config-framework-service
 keywords:
 - config-framework-service
@@ -39,11 +39,11 @@ dependencies:
 maintainers:
 - name: rbak-hpe
   email: ryan.bak@hpe.com
-appVersion: 0.0.0
+appVersion: 0.0.0-docker
 annotations:
   artifacthub.io/images: |
     - name: cray-cfs
-      image: artifactory.algol60.net/csm-docker/stable/cray-cfs:0.0.0
+      image: artifactory.algol60.net/csm-docker/stable/cray-cfs:0.0.0-docker
     - name: redis
       image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:5.0-alpine
   artifacthub.io/license: MIT
