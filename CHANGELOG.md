@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Spelling corrections.
+- Update Chart with correct image and chart version strings during builds.
 
 ### Added
 - Added new parameter for naming image customization results
