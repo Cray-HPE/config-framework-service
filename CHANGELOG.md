@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Spelling corrections.
 - Updated Chart with correct image and chart version strings during builds.
+- Modified version string placeholder tag in openapi.yaml to avoid unintentional string replacement during builds.
 
 ### Added
 - Added new parameter for naming image customization results
