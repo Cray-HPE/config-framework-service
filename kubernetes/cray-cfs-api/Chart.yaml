@@ -43,7 +43,7 @@ appVersion: 0.0.0-docker
 annotations:
   artifacthub.io/images: |
     - name: cray-cfs
-      image: artifactory.algol60.net/csm-docker/stable/cray-cfs:0.0.0-docker
+      image: artifactory.algol60.net/csm-docker/S-T-A-B-L-E/cray-cfs:0.0.0-docker
     - name: redis
       image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:5.0-alpine
   artifacthub.io/license: MIT

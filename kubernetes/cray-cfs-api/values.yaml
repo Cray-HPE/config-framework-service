@@ -39,7 +39,7 @@ cray-service:
     cray-cfs-api:
       name: cray-cfs-api
       image:
-        repository: artifactory.algol60.net/csm-docker/stable/cray-cfs
+        repository: artifactory.algol60.net/csm-docker/S-T-A-B-L-E/cray-cfs
         # tag defaults to chart appVersion
       volumeMounts:
         - name: ca-pubkey
