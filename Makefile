@@ -25,7 +25,7 @@
 # cms-meta-tools repo to ./cms_meta_tools
 
 DOCKER_NAME ?= cray-cfs
-CHART_NAME ?= cray-cfs-api
+CHART_NAME ?= cfs-ara
 CHART_PATH ?= kubernetes
 
 DOCKER_VERSION ?= $(shell head -1 .docker_version)
@@ -33,7 +33,7 @@ CHART_VERSION ?= $(shell head -1 .chart_version)
 
 HELM_UNITTEST_IMAGE ?= quintush/helm-unittest:3.3.0-0.2.5
 
-all : runbuildprep lint image chart
+all : runbuildprep lint chart
 chart: chart_setup chart_package chart_test
 
 runbuildprep:
