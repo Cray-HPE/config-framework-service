@@ -34,7 +34,9 @@ pipeline {
 
         stage("Build Prep") {
             steps {
-                sh "make runbuildprep"
+                 withCredentials([usernamePassword(credentialsId: 'artifactory-algol60-readonly', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USERNAME')]) {
+                    sh "make runbuildprep"
+                    }
             }
         }
 
