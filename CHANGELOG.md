@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled building of unstable artifacts
 - Updated header of update_versions.conf to reflect new tool options
 
+## [1.11.3] - 2022-12-20
+### Added
+- Add Artifactory authentication to Jenkinsfile
+
+## [1.11.2] - 2022-08-19
 ### Fixed
 - Spelling corrections.
 - Updated Chart with correct image and chart version strings during builds.
