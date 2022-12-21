@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,29 +21,40 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-apiVersion: v2
-name: cray-cfs-api
-version: 0.0.0-chart
-description: Kubernetes resources for config-framework-service
-keywords:
-- config-framework-service
-- cfs-api
-- cfs
-home: https://github.com/Cray-HPE/config-framework-service
-sources:
-- https://github.com/Cray-HPE/config-framework-service
-dependencies:
-- name: cray-service
-  version: ^7.0.0
-  repository: https://artifactory.algol60.net/artifactory/csm-helm-charts/
-maintainers:
-- name: rbak-hpe
-  email: ryan.bak@hpe.com
-appVersion: 0.0.0-docker
-annotations:
-  artifacthub.io/images: |
-    - name: cray-cfs
-      image: artifactory.algol60.net/csm-docker/S-T-A-B-L-E/cray-cfs:0.0.0-docker
-    - name: redis
-      image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:5.0-alpine
-  artifacthub.io/license: MIT
+# Cray-provided base controllers for the Boot Orchestration Service
+
+
+import logging
+import yaml
+
+from cray.cfs.api.models.version import Version
+
+LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
+
+
+def calc_version():
+    # parse open API spec file from docker image or local repository
+    openapispec_f = '/app/lib/server/cray/cfs/api/openapi/openapi.yaml'
+    f = None
+    try:
+        f = open(openapispec_f, 'r')
+    except IOError as e:
+        LOGGER.debug('error opening openapi.yaml file: %s' % e)
+
+    openapispec_map = yaml.safe_load(f)
+    f.close()
+    major, minor, patch = openapispec_map['info']['version'].split('.')
+    return Version(
+        major=major,
+        minor=minor,
+        patch=patch,
+    )
+
+
+def get_version():
+    LOGGER.debug('in get_version')
+    return calc_version(), 200
+
+
+get_versions = get_version
+get_versions_v2 = get_version

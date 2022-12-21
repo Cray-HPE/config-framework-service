@@ -31,16 +31,14 @@ import connexion
 from cray.cfs.api import encoder
 from cray.cfs.api.controllers import options
 from cray.cfs.api.controllers import sessions
-from cray.cfs.api.controllers import configurations
 
-log_level = os.environ.get('LOG_LEVEL', 'WARN')
+log_level = os.environ.get('STARTING_LOG_LEVEL', 'WARN')
 LOG_FORMAT = "%(asctime)-15s - %(levelname)-7s - %(name)s - %(message)s"
 logging.basicConfig(level=log_level, format=LOG_FORMAT)
 LOGGER = logging.getLogger(__name__)
 
 
 def create_app():
-    logging.basicConfig(level=logging.INFO)
     sessions._init()
     options._init()
 
