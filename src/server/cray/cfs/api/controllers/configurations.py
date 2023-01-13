@@ -68,7 +68,7 @@ def get_configuration(configuration_id):
     LOGGER.debug("GET /configurations/id invoked get_configuration")
     if configuration_id not in DB:
         return connexion.problem(
-            status=404, title="Configuration could not found.",
+            status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     return DB.get(configuration_id), 200
 
@@ -117,7 +117,7 @@ def patch_configuration(configuration_id):
     LOGGER.debug("PATCH /configurations/id invoked put_configuration")
     if configuration_id not in DB:
         return connexion.problem(
-            status=404, title="Configuration could not found.",
+            status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     data = DB.get(configuration_id)
 
@@ -137,7 +137,7 @@ def delete_configuration(configuration_id):
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
     if configuration_id not in DB:
         return connexion.problem(
-            status=404, title="Configuration could not found.",
+            status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     if configuration_id in _get_in_use_list():
         return connexion.problem(

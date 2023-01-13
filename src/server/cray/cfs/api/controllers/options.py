@@ -23,6 +23,8 @@
 #
 import logging
 import connexion
+import threading
+import time
 
 
 from cray.cfs.api import dbutils
@@ -37,10 +39,15 @@ OPTIONS_KEY = 'options'
 DEFAULTS = {
     'defaultPlaybook': 'site.yml',
     'defaultAnsibleConfig': 'cfs-default-ansible-cfg',
+    'loggingLevel': 'INFO'
 }
 
 
 def _init(namespace='services'):
+    # Start log level updater
+    log_level_updater = threading.Thread(target=check_logging_level, args=())
+    log_level_updater.start()
+
     """ Cleanup old options """
     data = DB.get(OPTIONS_KEY)
     if not data:
@@ -139,3 +146,26 @@ class Options():
     @property
     def default_playbook(self):
         return self.get_option('defaultPlaybook', str)
+
+
+def update_log_level(new_level_str):
+    new_level = logging.getLevelName(new_level_str.upper())
+    current_level = LOGGER.getEffectiveLevel()
+    if current_level != new_level:
+        LOGGER.log(current_level, 'Changing logging level from {} to {}'.format(
+            logging.getLevelName(current_level), logging.getLevelName(new_level)))
+        logger = logging.getLogger()
+        logger.setLevel(new_level)
+        LOGGER.log(new_level, 'Logging level changed from {} to {}'.format(
+            logging.getLevelName(current_level), logging.getLevelName(new_level)))
+
+
+def check_logging_level():
+    while True:
+        try:
+            data = get_options_data()
+            if 'logging_level' in data:
+                update_log_level(data['logging_level'])
+        except Exception as e:
+            LOGGER.debug(e)
+        time.sleep(5)
