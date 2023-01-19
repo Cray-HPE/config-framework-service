@@ -21,7 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-openapi: "3.0.3"
+openapi: "3.0.2"
 
 info:
   title: "Configuration Framework Service"
