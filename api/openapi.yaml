@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -267,7 +267,7 @@ components:
       properties:
         hardwareSyncInterval:
           type: integer
-          description: How frequently the CFS hardware-sync-agent checks with the Hardware State Manager to update it's known hardware (in seconds)
+          description: How frequently the CFS hardware-sync-agent checks with the Hardware State Manager to update its known hardware (in seconds)
           example: 5
         batcherCheckInterval:
           type: integer
@@ -375,7 +375,7 @@ components:
         image_map:
           type: array
           description: |
-            Mapping of image ids to resultant image names.  This is only valid for 'image' inventory definition types.
+            Mapping of image IDs to resultant image names.  This is only valid for 'image' inventory definition types.
             Only images that are defined in 'groups' will result in a new image.
             If images in 'groups' are not specified here, CFS will generate a name for the resultant image.
           items:
@@ -663,7 +663,7 @@ components:
           readOnly: true
         description:
           type: string
-          description: A user defined description. This field is not used by CFS.
+          description: A user-defined description. This field is not used by CFS.
         lastUpdated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
@@ -770,7 +770,7 @@ components:
       properties:
         ids:
           type: string
-          description: A comma separated list of component ids
+          description: A comma-separated list of component IDs
         status:
           type: string
           description: All components with this status will be patched.
