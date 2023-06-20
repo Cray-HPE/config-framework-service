@@ -58,3 +58,4 @@ def get_version():
 
 get_versions = get_version
 get_versions_v2 = get_version
+get_versions_v3 = get_version

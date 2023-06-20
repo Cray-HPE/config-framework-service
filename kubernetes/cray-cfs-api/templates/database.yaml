@@ -133,6 +133,10 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: cray-cfs-operator
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cray-cfs-api-migration
   podSelector:
     matchLabels:
       app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
