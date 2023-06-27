@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Quadrupled the size the uwsgi buffer for the API.
 
+### Added
+- Added a new configuration parameter for enabling DKMS in IMS
+
 ## [1.12.1] - 1/19/2023
 ### Changed
 - Language linting of description text fields in openapi spec file
