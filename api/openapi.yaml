@@ -650,6 +650,17 @@ components:
             The configuration branch to use.  This will automatically set commit to master on the branch
             when the configuration is added.
           pattern: '^[^\s;]*$'
+        specialParameters:
+          type: object
+          description: |
+            Optional parameters that do not affect the configuration content or are only used in
+            special circumstances.
+          properties:
+            imsRequireDkms:
+              type: boolean
+              description: |
+                If true, any image customization sessions that use this configuration will enable DKMS in IMS.
+          additionalProperties: false
       required: [cloneUrl]
       additionalProperties: false
     Configuration:
