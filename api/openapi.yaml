@@ -482,6 +482,10 @@ components:
           type: integer
           description: The maximum number of results that a query will return if the limit parameter is not specified.
           minimum: 1
+        debug_wait_time:
+          type: integer
+          description: The number of seconds CFS sessions will wait after failure for debugging when debug_on_failure is true.
+          minimum: 0
       additionalProperties: false
     ## SESSIONS ENDPOINT ##
     SessionTargetSection:
@@ -772,6 +776,13 @@ components:
             such as information about the session creator.
           additionalProperties:
             type: string
+        debug_on_failure:
+          type: boolean
+          description: >-
+            When true, the ansible container for the session will remain running after an Ansible failure.  The
+            container will remain running for a number of seconds specified by the debug_wait_time options, or until
+            complete flag is touched.
+          default: false
       additionalProperties: false
     V2SessionCreate:
       description: |

@@ -50,6 +50,7 @@ COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
      src/server/cray/cfs/api/dbutils.py \
      src/server/cray/cfs/api/kafka_utils.py \
+     src/server/cray/cfs/api/k8s_utils.py \
      lib/server/cray/cfs/api/
 
 # Application Image

@@ -140,7 +140,7 @@ def create_session_v3():  # noqa: E501
             title="Conflicting session name"
         )
 
-    if session_create.configuration_name not in CONFIG_DB:
+    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):
         return connexion.problem(
             detail="No configurations exist named {}".format(session_create.configuration_name),
             status=400,
@@ -195,6 +195,7 @@ def _create_session(session_create):
         },
         'status': initial_status,
         'tags': tags,
+        'debug_on_failure': session_create.debug_on_failure,
     }
     if session_create.target:
         body['target'] = session_create.target.to_dict()

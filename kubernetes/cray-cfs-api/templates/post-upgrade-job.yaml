@@ -48,7 +48,7 @@ spec:
         traffic.sidecar.istio.io/excludeOutboundPorts: "2379,2380,6379"
         "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
     spec:
-      serviceAccountName: "{{ include "cray-service.name" . }}-migration"
+      serviceAccountName: cray-cfs
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
