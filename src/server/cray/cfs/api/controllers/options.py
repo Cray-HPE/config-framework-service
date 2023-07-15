@@ -41,6 +41,7 @@ DEFAULTS = {
     'default_ansible_config': 'cfs-default-ansible-cfg',
     'logging_level': 'INFO',
     'default_page_size': 1000,
+    'include_ara_links': True,
 }
 
 
@@ -188,6 +189,10 @@ class Options:
     @property
     def logging_level(self):
         return self.get_option('logging_level', str)
+
+    @property
+    def include_ara_links(self):
+        return self.get_option('include_ara_links', bool, True)
 
 
 def update_log_level(new_level_str):

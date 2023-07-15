@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -51,6 +51,7 @@ COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/dbutils.py \
      src/server/cray/cfs/api/kafka_utils.py \
      src/server/cray/cfs/api/k8s_utils.py \
+     src/server/cray/cfs/api/migrations.py \
      lib/server/cray/cfs/api/
 
 # Application Image

@@ -28,6 +28,7 @@ from functools import partial
 import logging
 
 from cray.cfs.api import dbutils
+from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.controllers import options
 from cray.cfs.api.controllers import configurations
 from cray.cfs.api.models.v2_component_state import V2ComponentState as V2Component
@@ -128,8 +129,9 @@ def get_components_v3(ids="", status="", enabled=None, config_name="", state_det
     components_data, next_page_exists = get_components_data(id_list=id_list, status_list=status_list, enabled=enabled,
                                                             config_name=config_name, config_details=config_details,
                                                             tag_list=tag_list, limit=limit, after_id=after_id)
-    if not state_details:
-        for component in components_data:
+    for component in components_data:
+        _set_link(component)
+        if not state_details:
             del component["state"]
     response = {"components": components_data, "next": None}
     if next_page_exists:
@@ -421,6 +423,7 @@ def get_component_v3(component_id, state_details=False, config_details=False):
     component = DB.get(component_id)
     configs = configurations.Configurations()
     component = _set_status(component, configs, config_details)
+    component = _set_link(component)
     if not state_details:
         del component["state"]
     return component, 200
@@ -632,6 +635,12 @@ def _get_desired_state(data, configs=None):
     config_name = data['desired_config']
     config = configs.get_config(config_name)
     return config
+
+
+def _set_link(data):
+    if options.Options().include_ara_links:
+        data["logs"] = f"{get_ara_ui_url()}/hosts?name={data['id']}"
+    return data
 
 
 def _update_handler(data):

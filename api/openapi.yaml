@@ -486,6 +486,9 @@ components:
           type: integer
           description: The number of seconds CFS sessions will wait after failure for debugging when debug_on_failure is true.
           minimum: 0
+        include_ara_links:
+          type: boolean
+          description: If true, session and component records will include links to ARA dashboards for the logs
       additionalProperties: false
     ## SESSIONS ENDPOINT ##
     SessionTargetSection:
@@ -783,6 +786,10 @@ components:
             container will remain running for a number of seconds specified by the debug_wait_time options, or until
             complete flag is touched.
           default: false
+        logs:
+          type: string
+          description: The link to the ARA UI with logs for this component
+          readOnly: true
       additionalProperties: false
     V2SessionCreate:
       description: |
@@ -1339,6 +1346,10 @@ components:
             such as information about the component owner.
           additionalProperties:
             type: string
+        logs:
+          type: string
+          description: The link to the ARA UI with logs for this component
+          readOnly: true
       additionalProperties: false
     V2ComponentStateArray:
       description: An array of component configurations.

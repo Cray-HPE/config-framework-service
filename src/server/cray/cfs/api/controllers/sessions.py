@@ -34,6 +34,7 @@ import connexion
 
 from cray.cfs.api import dbutils
 from cray.cfs.api import kafka_utils
+from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.controllers import options
 from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
 from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
@@ -167,6 +168,7 @@ def create_session_v3():  # noqa: E501
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=data)
     response_data = DB.put(data['name'], data)
+    _set_link(response_data)
     return response_data, 200
 
 
@@ -386,7 +388,9 @@ def get_session_v3(session_name):  # noqa: E501
         return connexion.problem(
             status=404, title="Session could not found.",
             detail="Session {} could not be found".format(session_name))
-    return DB.get(session_name), 200
+    session_data = DB.get(session_name)
+    _set_link(session_data)
+    return session_data, 200
 
 
 @dbutils.redis_error_handler
@@ -443,6 +447,8 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
     sessions_data, next_page_exists = _get_filtered_sessions(age, min_age, max_age, status,
                                                              name_contains, succeeded, tag_list,
                                                              limit=limit, after_id=after_id)
+    for session in sessions_data:
+        _set_link(session)
     response = {"sessions": sessions_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -723,6 +729,12 @@ def _age_to_timestamp(age):
             delta[interval] = int(result.groups()[0])
     delta = datetime.timedelta(**delta)
     return datetime.datetime.now() - delta
+
+
+def _set_link(data):
+    if options.Options().include_ara_links:
+        data["logs"] = f"{get_ara_ui_url()}/hosts?label={data['name']}"
+    return data
 
 
 def convert_session_to_v2(data):
