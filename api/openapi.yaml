@@ -442,10 +442,11 @@ components:
           type: string
           description: >
             [DEPRECATED] The default playbook to be used if not specified in a node's desired state.
-            This option is read-only via the v3 api and remains only for compatibility with the v2 api.
-            This option will be removed from v3 when the v2 api is removed.
+            This option is read-only via the v3 API and remains only for compatibility with the v2 API.
+            This option will be removed from v3 when the v2 API is removed.
           example: site.yml
           pattern: '^[^\s;]*$'
+          deprecated: true
           readOnly: true
         default_ansible_config:
           type: string
@@ -597,6 +598,7 @@ components:
             subset of nodes or groups. This option corresponds to ansible-playbook's --limit and
             can be used to specify nodes or groups.
           example: host1
+          nullable: true
         verbosity:
           type: integer
           default: 0
@@ -614,6 +616,7 @@ components:
             "--skip-tags", "--start-at-task", and "--tags". WARNING: Parameters passed to Ansible in
             this way should be used with caution.  State will not be recorded for components when
             using these flags to avoid incorrect reporting of partial playbook runs.
+          nullable: true
     SessionStatusArtifactsSection:
       type: array
       description: Status of artifacts
@@ -644,7 +647,8 @@ components:
           readOnly: true
           type: string
         completionTime:
-          description: The date/time when the session completed execution in RFC 3339 format.
+          description: The date/time when the session completed execution in RFC 3339 format. This has a null value when the session has not yet completed.
+          nullable: true
           example: '2019-07-28T03:26:00Z'
           format: date-time
           readOnly: true

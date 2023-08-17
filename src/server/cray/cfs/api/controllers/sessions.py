@@ -220,7 +220,7 @@ def delete_session_v2(session_name):  # noqa: E501
     LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     session = DB.get(session_name)
     DB.delete(session_name)
@@ -242,7 +242,7 @@ def delete_session_v3(session_name):  # noqa: E501
     LOGGER.debug("DELETE /v3/sessions/id invoked delete_session")
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     session = DB.get(session_name)
     DB.delete(session_name)
@@ -367,7 +367,7 @@ def get_session_v2(session_name):  # noqa: E501
     LOGGER.debug("GET /v2/sessions/id invoked get_session")
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     return convert_session_to_v2(DB.get(session_name)), 200
 
@@ -386,7 +386,7 @@ def get_session_v3(session_name):  # noqa: E501
     LOGGER.debug("GET /v3/sessions/id invoked get_session")
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     session_data = DB.get(session_name)
     _set_link(session_data)
@@ -418,7 +418,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 api to page through the results.")
+            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
     return [convert_session_to_v2(session) for session in sessions_data], 200
 
 
@@ -478,7 +478,7 @@ def patch_session_v2(session_name):
 
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     data = dbutils.convert_data_from_v2(data, V2Session)
     response_data = _patch_session(session_name, data)
@@ -506,7 +506,7 @@ def patch_session_v3(session_name):
 
     if session_name not in DB:
         return connexion.problem(
-            status=404, title="Session could not found.",
+            status=404, title="Session not found.",
             detail="Session {} could not be found".format(session_name))
     response_data = _patch_session(session_name, data)
     return response_data, 200

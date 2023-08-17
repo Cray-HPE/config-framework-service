@@ -141,7 +141,7 @@ class DBWrapper():
         return sorted_keys
 
     def put(self, key, new_data):
-        """Put data in to the database, replacing any old data."""
+        """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
         return self.get(key)
@@ -183,7 +183,7 @@ class DBWrapper():
         return patched_id_list
 
     def _update(self, data, new_data):
-        """Recursively patches json to allow sub-fields to be patched."""
+        """Recursively patches JSON to allow sub-fields to be patched."""
         for k, v in new_data.items():
             if isinstance(v, dict):
                 data[k] = self._update(data.get(k, {}), v)

@@ -63,4 +63,4 @@ spec:
           - "cray.cfs.api.migrations"
         env:
         - name: APP_VERSION
-          value: 0.0.0-app-version
+          value: 0.0.0-docker

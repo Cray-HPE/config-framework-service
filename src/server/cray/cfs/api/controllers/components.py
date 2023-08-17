@@ -89,7 +89,7 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 api to page through the results.")
+            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
     response = [convert_component_to_v2(component) for component in components_data]
     return response, 200
 
@@ -247,7 +247,7 @@ def patch_v2_components_list(data):
             component_id = component_data['id']
             if component_id not in DB:
                 return connexion.problem(
-                    status=404, title="Component could not found.",
+                    status=404, title="Component not found.",
                     detail="Component {} could not be found".format(component_id))
             components.append((component_id, component_data))
     except Exception as err:
@@ -339,7 +339,7 @@ def patch_v3_components_list(data):
             component_id = component_data['id']
             if component_id not in DB:
                 return connexion.problem(
-                    status=404, title="Component could not found.",
+                    status=404, title="Component not found.",
                     detail="Component {} could not be found".format(component_id))
             components.append((component_id, component_data))
     except Exception as err:
@@ -403,7 +403,7 @@ def get_component_v2(component_id, config_details=False):
     LOGGER.debug("GET /components/id invoked get_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     component = DB.get(component_id)
     configs = configurations.Configurations()
@@ -418,7 +418,7 @@ def get_component_v3(component_id, state_details=False, config_details=False):
     LOGGER.debug("GET /components/id invoked get_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     component = DB.get(component_id)
     configs = configurations.Configurations()
@@ -466,7 +466,7 @@ def patch_component_v2(component_id):
     LOGGER.debug("PATCH /components/id invoked patch_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     try:
         data = connexion.request.get_json()
@@ -486,7 +486,7 @@ def patch_component_v3(component_id):
     LOGGER.debug("PATCH /components/id invoked patch_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     try:
         data = connexion.request.get_json()
@@ -504,7 +504,7 @@ def delete_component_v2(component_id):
     LOGGER.debug("DELETE /components/id invoked delete_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     return DB.delete(component_id), 204
 
@@ -515,7 +515,7 @@ def delete_component_v3(component_id):
     LOGGER.debug("DELETE /components/id invoked delete_component")
     if component_id not in DB:
         return connexion.problem(
-            status=404, title="Component could not found.",
+            status=404, title="Component not found.",
             detail="Component {} could not be found".format(component_id))
     return DB.delete(component_id), 204
 
