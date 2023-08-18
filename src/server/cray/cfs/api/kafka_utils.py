@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,7 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-import json
+import ujson as json
 import logging
 import os
 import time
@@ -77,7 +77,7 @@ class ProducerWrapper:
                 time.sleep(5)
 
 
-    def produce(self, event_type, topic=None, data={}):
+    def produce(self, data, event_type, topic=None):
         if not topic:
             topic = self.topic
         event = {

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,9 +26,9 @@ import connexion
 import threading
 import time
 
-
 from cray.cfs.api import dbutils
 from cray.cfs.api.models.v2_options import V2Options
+from cray.cfs.api.models.v3_options import V3Options
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.options')
 DB = dbutils.get_wrapper(db='options')
@@ -37,44 +37,45 @@ DB = dbutils.get_wrapper(db='options')
 # options simpler
 OPTIONS_KEY = 'options'
 DEFAULTS = {
-    'defaultPlaybook': 'site.yml',
-    'defaultAnsibleConfig': 'cfs-default-ansible-cfg',
-    'loggingLevel': 'INFO'
+    'default_playbook': 'site.yml',
+    'default_ansible_config': 'cfs-default-ansible-cfg',
+    'logging_level': 'INFO',
+    'default_page_size': 1000,
+    'include_ara_links': True,
 }
 
 
-def _init(namespace='services'):
-    # Start log level updater
-    log_level_updater = threading.Thread(target=check_logging_level, args=())
-    log_level_updater.start()
+def _init():
+    # Start options refresh
+    options_refresh = threading.Thread(target=periodically_refresh_options, args=())
+    options_refresh.start()
 
-    """ Cleanup old options """
+
+def cleanup_old_options():
     data = DB.get(OPTIONS_KEY)
     if not data:
         return
     # Cleanup
-    to_delete = []
-    all_options = set(V2Options().attribute_map.values())
-    for key in data:
-        if key not in all_options:
-            to_delete.append(key)
-    for key in to_delete:
-        del data[key]
-    DB.put(OPTIONS_KEY, data)
+    model_data = V2Options.from_dict(data).to_dict() | V3Options.from_dict(data).to_dict()
+    clean_data = {k: v for k, v in model_data.items() if v is not None}
+    DB.put(OPTIONS_KEY, clean_data)
 
 
 @dbutils.redis_error_handler
-def get_options():
+def get_options_v2():
     """Used by the GET /options API operation"""
     LOGGER.debug("GET /options invoked get_options")
     data = get_options_data()
-    to_delete = []
-    for key in data:
-        if key not in V2Options().attribute_map.values():
-            to_delete.append(key)
-    for key in to_delete:
-        del data[key]
-    return data, 200
+    response = convert_options_to_v2(data)
+    return response, 200
+
+
+@dbutils.redis_error_handler
+def get_options_v3():
+    """Used by the GET /options API operation"""
+    LOGGER.debug("GET /options invoked get_options")
+    response = get_options_data()
+    return response, 200
 
 
 def get_options_data():
@@ -97,7 +98,24 @@ def _check_defaults(data):
 
 
 @dbutils.redis_error_handler
-def patch_options():
+def patch_options_v2():
+    """Used by the PATCH /options API operation"""
+    LOGGER.debug("PATCH /options invoked patch_options")
+    try:
+        data = connexion.request.get_json()
+    except Exception as err:
+        return connexion.problem(
+            status=400, title="Error parsing the data provided.",
+            detail=str(err))
+    if OPTIONS_KEY not in DB:
+        DB.put(OPTIONS_KEY, {})
+    data = dbutils.convert_data_from_v2(data, V2Options)
+    result = DB.patch(OPTIONS_KEY, data)
+    return dbutils.convert_data_to_v2(result, V2Options), 200
+
+
+@dbutils.redis_error_handler
+def patch_options_v3():
     """Used by the PATCH /options API operation"""
     LOGGER.debug("PATCH /options invoked patch_options")
     try:
@@ -111,13 +129,26 @@ def patch_options():
     return DB.patch(OPTIONS_KEY, data), 200
 
 
-class Options():
+class Options:
     """Helper class for other endpoints that need access to options"""
-    def get_option(self, key, type, default=None):
-        if not hasattr(self, 'options'):
-            self.options = get_options_data()
+    def __new__(cls):
+        """This override makes the class a singleton"""
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(Options, cls).__new__(cls)
+            cls.instance.__init__()
+        return cls.instance
+
+    def __init__(self):
+        self.options = None
+
+    def refresh(self):
+        self.options = get_options_data()
+
+    def get_option(self, key, data_type, default=None):
+        if not self.options:
+            self.refresh()
         try:
-            return type(self.options[key])
+            return data_type(self.options[key])
         except KeyError as e:
             if default is not None:
                 LOGGER.warning(
@@ -129,23 +160,39 @@ class Options():
 
     @property
     def batcher_check_interval(self):
-        return self.get_option('batcherCheckInterval', int, default=60)
+        return self.get_option('batcher_check_interval', int, default=60)
 
     @property
     def batch_size(self):
-        return self.get_option('batchSize', int, default=100)
+        return self.get_option('batch_size', int, default=100)
 
     @property
     def batch_window(self):
-        return self.get_option('batchWindow', int, default=60)
+        return self.get_option('batch_window', int, default=60)
+
+    @property
+    def default_ansible_config(self):
+        return self.get_option('default_ansible_config', str, default='cfs-default-ansible-cfg')
 
     @property
     def default_batcher_retry_policy(self):
-        return self.get_option('defaultBatcherRetryPolicy', int, default=1)
+        return self.get_option('default_batcher_retry_policy', int, default=1)
 
     @property
     def default_playbook(self):
-        return self.get_option('defaultPlaybook', str)
+        return self.get_option('default_playbook', str)
+
+    @property
+    def default_page_size(self):
+        return self.get_option('default_page_size', int, default=1000)
+
+    @property
+    def logging_level(self):
+        return self.get_option('logging_level', str)
+
+    @property
+    def include_ara_links(self):
+        return self.get_option('include_ara_links', bool, True)
 
 
 def update_log_level(new_level_str):
@@ -160,12 +207,35 @@ def update_log_level(new_level_str):
             logging.getLevelName(current_level), logging.getLevelName(new_level)))
 
 
-def check_logging_level():
+def periodically_refresh_options():
+    """Caching and refreshing options saves time during calls"""
+    options = Options()
     while True:
         try:
-            data = get_options_data()
-            if 'logging_level' in data:
-                update_log_level(data['logging_level'])
+            options.refresh()
+            if options.logging_level:
+                update_log_level(options.logging_level)
         except Exception as e:
             LOGGER.debug(e)
-        time.sleep(5)
+        time.sleep(2)
+
+
+def convert_options_to_v2(data):
+    data = dbutils.convert_data_to_v2(data, V2Options)
+    return data
+
+
+def defaults(**default_kwargs):
+    """
+    Allows controller functions to specify parameters that have defaults stored in options
+    """
+    def wrap(f):
+        def wrapped_f(*args, **kwargs):
+            options = Options()
+            options.refresh()
+            for key in default_kwargs:
+                if key not in kwargs:
+                    kwargs[key] = getattr(options, default_kwargs[key])
+            return f(*args, **kwargs)
+        return wrapped_f
+    return wrap

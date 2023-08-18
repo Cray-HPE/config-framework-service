@@ -5,12 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- V3 api with support for paging
+- Additional debugging options including debug_on_failure
+- ARA links in the component and session records
+
 ### Changed
 - Disabled concurrent Jenkins builds on same branch/commit
 - Added build timeout to avoid hung builds
 
 ### Dependencies
-Bumped depndency versions
+Bumped dependency versions
 | Package                  | From    | To       |
 |--------------------------|---------|----------|
 | `adal`                   | 1.2.0   | 1.2.7    |
