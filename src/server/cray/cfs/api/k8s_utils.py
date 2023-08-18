@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,41 +21,26 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# Cray-provided base controllers for the Boot Orchestration Service
 
+from kubernetes import client, config
+from kubernetes.config.config_exception import ConfigException
 
-import logging
-import yaml
+try:
+    config.load_incluster_config()
+except ConfigException:  # pragma: no cover
+    config.load_kube_config()  # Development
 
-from cray.cfs.api.models.version import Version
+_api_client = client.ApiClient()
+k8scustom = client.CustomObjectsApi(_api_client)
 
-LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
+ARA_UI_URL = ""
 
-
-def calc_version():
-    # parse open API spec file from docker image or local repository
-    openapispec_f = '/app/lib/server/cray/cfs/api/openapi/openapi.yaml'
-    f = None
-    try:
-        f = open(openapispec_f, 'r')
-    except IOError as e:
-        LOGGER.debug('error opening openapi.yaml file: %s' % e)
-
-    openapispec_map = yaml.safe_load(f)
-    f.close()
-    major, minor, patch = openapispec_map['info']['version'].split('.')
-    return Version(
-        major=major,
-        minor=minor,
-        patch=patch,
-    )
-
-
-def get_version():
-    LOGGER.debug('in get_version')
-    return calc_version(), 200
-
-
-get_versions = get_version
-get_versions_v2 = get_version
-get_versions_v3 = get_version
+def get_ara_ui_url():
+    global ARA_UI_URL
+    if not ARA_UI_URL:
+        try:
+            data = k8scustom.get_namespaced_custom_object("networking.istio.io", "v1beta1", "services", "virtualservices", "cfs-ara-external")
+            ARA_UI_URL = data["spec"]["hosts"][0]
+        except:
+            pass
+    return ARA_UI_URL

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,12 +22,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 import connexion
-import json
+import ujson as json
 import logging
 import redis
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
+
+from cray.cfs.api.models.base_model_ import Model as BaseModel
 
 LOGGER = logging.getLogger(__name__)
 DATABASES = ["options", "sessions", "components", "configurations"]  # Index is the db id.
@@ -89,37 +91,99 @@ class DBWrapper():
         data = json.loads(datastr)
         return data
 
-    def get_all(self):
+    def get_all(self, limit=0, after_id="", data_filter=None):
         """Get an array of data for all keys."""
-        data = []
-        keys = self.client.keys()
-        if keys:
-            for key in keys:
-                datastr = self.client.get(key)
-                single_data = json.loads(datastr)
-                data.append(single_data)
-        return data
+
+        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
+        keys = set()
+        for key in self.client.scan_iter():
+            keys.add(key.decode())
+        if after_id:
+            keys.add(after_id) # This fixes the case where the record being referenced has been deleted.
+        # Sorting the keys guarantees a consistent order when paging
+        sorted_keys = sorted(list(keys))
+
+        if limit < 0:
+            limit = 0
+        skip = False
+        if after_id:
+            skip = True
+        page_full = False
+        next_page_exists = False
+
+        data_page = []
+        for key in sorted_keys:
+            if skip and key == after_id:
+                # This marks the starting point of a page when after_id is specified
+                skip = False
+                continue
+            if not skip:
+                data_str = self.client.get(key)
+                data = json.loads(data_str)
+                if not data_filter or data_filter(data):
+                    # filtering happens in get_all rather than after due to paging/memory constraints
+                    #   we can't load all data and then filter on the results
+                    if page_full:
+                        next_page_exists = True
+                        break
+                    else:
+                        data_page.append(data)
+                        if limit and len(data_page) >= limit:
+                            page_full = True
+        return data_page, next_page_exists
+
+    def get_keys(self):
+        keys = set()
+        for key in self.client.scan_iter():
+            keys.add(key)
+        # Sorting the keys guarantees a consistent order when paging
+        sorted_keys = sorted(list(keys))
+        return sorted_keys
 
     def put(self, key, new_data):
-        """Put data in to the database, replacing any old data."""
+        """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
         return self.get(key)
 
-    def patch(self, key, new_data, data_handler=None):
+    def patch(self, key, new_data, update_handler=None):
         """Patch data in the database."""
-        """data_handler provides a way to operate on the full patched data"""
-        datastr = self.client.get(key)
-        data = json.loads(datastr)
+        """update_handler provides a way to operate on the full patched data"""
+        data_str = self.client.get(key)
+        data = json.loads(data_str)
         data = self._update(data, new_data)
-        if data_handler:
-            data = data_handler(data)
-        datastr = json.dumps(data)
-        self.client.set(key, datastr)
-        return self.get(key)
+        if update_handler:
+            data = update_handler(data)
+        data_str = json.dumps(data)
+        self.client.set(key, data_str)
+        data = self.get(key)
+        return data
+
+    def patch_all(self, data_filter, patch, update_handler=None):
+        """Patch multiple resources in the database."""
+        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
+        keys = set()
+        for key in client.scan_iter():
+            keys.add(key)
+        # Sorting the keys guarantees a consistent order when paging
+        sorted_keys = sorted(list(keys))
+        patched_id_list = []
+        for key in sorted_keys:
+            data_str = self.client.get(key)
+            data = json.loads(data_str)
+            if not data_filter or data_filter(data):
+                # filtering happens in get_all rather than after due to paging/memory constraints
+                #   we can't load all data and then filter on the results
+                data = self._update(data, patch)
+                if update_handler:
+                    data = update_handler(data)
+                data_str = json.dumps(data)
+                self.client.set(key, data_str)
+                patched_id_list.append(key)
+        return patched_id_list
 
     def _update(self, data, new_data):
-        """Recursively patches json to allow sub-fields to be patched."""
+        """Recursively patches JSON to allow sub-fields to be patched."""
         for k, v in new_data.items():
             if isinstance(v, dict):
                 data[k] = self._update(data.get(k, {}), v)
@@ -130,6 +194,26 @@ class DBWrapper():
     def delete(self, key):
         """Deletes data from the database."""
         self.client.delete(key)
+
+    def delete_all(self, data_filter, deletion_handler=None):
+        """Delete multiple resources in the database."""
+        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
+        keys = set()
+        for key in self.client.scan_iter():
+            keys.add(key)
+        # Sorting the keys guarantees a consistent order when paging
+        sorted_keys = sorted(list(keys))
+
+        deleted_id_list = []
+        for key in sorted_keys:
+            data_str = self.client.get(key)
+            data = json.loads(data_str)
+            if not data_filter or data_filter(data):
+                self.client.delete(key)
+                if deletion_handler:
+                    deletion_handler(data)
+                deleted_id_list.append(key)
+        return deleted_id_list
 
     def info(self):
         """Returns the database info."""
@@ -158,19 +242,69 @@ def get_wrapper(db):
     return DBWrapper(db)
 
 
-# Our api uses camel case, but the auto generated models return snake case
-# so this allows uses to use the model validation, while storing/returning data that matches our spec
-def snake_to_camel_json(data):
-    if type(data) == dict:
-        camel_out = {}
-        for key, value in data.items():
-            camel_out[snake_to_camel(key)] = snake_to_camel_json(value)
-        return camel_out
-    elif type(data) == list:
-        return [snake_to_camel_json(i) for i in data]
-    else:
-        return data
+def convert_data_to_v2(data, model_type):
+    """
+    When exporting from a model with to_dict, all keys are in snake_case.  However the model contains the information
+        on the keys in the api spec.  This gives the ability to make the data match the given model/spec, which
+        is useful when translating between the v2 and v3 api.
+    Data must start in the v3 format exported by model().to_dict()
+    """
+    result = {}
+    model = model_type()
+    for attribute, attribute_key in model.attribute_map.items():
+        if attribute in data:
+            data_type = model.openapi_types[attribute]
+            result[attribute_key] = _convert_data_to_v2(data[attribute], data_type)
+    return result
 
 
-def snake_to_camel(snake_input):
-    return ''.join((word.title() if i != 0 else word) for i, word in enumerate(snake_input.split('_')))
+def _convert_data_to_v2(data, data_type):
+    if not isinstance(data_type, type):
+        # Special case where the data_type is a "typing" object.  e.g typing.Dict
+        if not data:
+            return data
+        elif data_type.__origin__ == list:
+            return [_convert_data_to_v2(item_data, data_type.__args__[0])
+                    for item_data in data]
+        elif data_type.__origin__ == dict:
+            return {key: _convert_data_to_v2(item_data, data_type.__args__[1])
+                    for key, item_data in data.items()}
+    elif issubclass(data_type, BaseModel):
+        if not data:
+            data = {}
+        return convert_data_to_v2(data, data_type)
+    return data
+
+
+def convert_data_from_v2(data, model_type):
+    """
+    When exporting from a model with to_dict, all keys are in snake_case.  However the model contains the information
+        on the keys in the api spec.  This gives the ability to make the data match the given model/spec, which
+        is useful when translating between the v2 and v3 api.
+    Data must start in the v3 format exported by model().to_dict()
+    """
+    result = {}
+    model = model_type()
+    for attribute_key, attribute in model.attribute_map.items():
+        if attribute in data:
+            data_type = model.openapi_types[attribute_key]
+            result[attribute_key] = _convert_data_from_v2(data[attribute], data_type)
+    return result
+
+
+def _convert_data_from_v2(data, data_type):
+    if not isinstance(data_type, type):
+        # Special case where the data_type is a "typing" object.  e.g typing.Dict
+        if not data:
+            return data
+        elif data_type.__origin__ == list:
+            return [_convert_data_from_v2(item_data, data_type.__args__[0])
+                    for item_data in data]
+        elif data_type.__origin__ == dict:
+            return {key: _convert_data_from_v2(item_data, data_type.__args__[1])
+                    for key, item_data in data.items()}
+    elif issubclass(data_type, BaseModel):
+        if not data:
+            data = {}
+        return convert_data_from_v2(data, data_type)
+    return data
