@@ -452,16 +452,22 @@ components:
           type: string
           description: The Kubernetes ConfigMap which holds the default ansible.cfg for a given CFS session. This ConfigMap must be present in the same Kubernetes namespace as the CFS service.
           example: cfs-default-ansible-cfg
+          minLength: 0
+          maxLength: 60
         session_ttl:
           type: string
           description: A time-to-live applied to all completed CFS sessions.  Specified in hours or days. e.g. 3d or 24h.  Set to an empty string to disable.
           example: 24h
+          minLength: 0
+          maxLength: 10
         additional_inventory_url:
           type: string
           description: >
             The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
           pattern: '^[^\s;]*$'
+          minLength: 1
+          maxLength: 120
         batcher_max_backoff:
           type: integer
           description: >
@@ -881,6 +887,8 @@ components:
           type: string
           description: The name of a CFS configuration to apply
           example: example-config
+          minLength: 1
+          maxLength: 60
         configuration_limit:
           type: string
           description: >-
@@ -999,6 +1007,8 @@ components:
           type: string
           description: The name of the inventory layer.
           example: sample-inventory
+          minLength: 1
+          maxLength: 45
         clone_url:
           type: string
           description: The clone URL of the configuration content repository.
@@ -1067,6 +1077,8 @@ components:
           type: string
           description: The name of the configuration layer.
           example: sample-config
+          minLength: 1
+          maxLength: 45
         clone_url:
           type: string
           description: The clone URL of the configuration content repository.
@@ -1323,6 +1335,8 @@ components:
         desired_config:
           type: string
           description: A reference to a configuration
+          minLength: 1
+          maxLength: 60
         desired_state:
           type: array
           items:
@@ -2528,3 +2542,5 @@ paths:
         required: true
         schema:
           type: string
+          minLength: 1
+          maxLength: 60
