@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.1] - 8/24/2023
+### Dependencies
+Move `openapi-spec-validator` from 0.2.10 to 0.2.9 to resolve incompatability with `jsonschema` 2.6.0.
+
 ## [1.14.0] - 8/18/2023
 ### Added
 - V3 api with support for paging
