@@ -46,6 +46,7 @@ DEFAULTS = {
 
 
 def _init():
+    cleanup_old_options()
     # Start options refresh
     options_refresh = threading.Thread(target=periodically_refresh_options, args=())
     options_refresh.start()
