@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed component id list filtering when used with paging
 - Fixed the options migrations when cfs-api is upgraded to v3 far ahead of other CFS services
+- Fixed the component definition to allow new components with no desired configuration
 
 ## [1.14.1] - 8/24/2023
 ### Fixed

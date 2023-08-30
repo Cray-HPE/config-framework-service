@@ -1335,7 +1335,7 @@ components:
         desired_config:
           type: string
           description: A reference to a configuration
-          minLength: 1
+          minLength: 0
           maxLength: 60
         desired_state:
           type: array
