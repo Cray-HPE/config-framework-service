@@ -160,21 +160,22 @@ def _component_filter(component_data, config_details, configs,
                       id_list, status_list, enabled, config_name, tag_list):
     _set_status(component_data, configs, config_details) # This sets the status both for filtering and for the response data
     if id_list or status_list or (enabled is not None) or config_name or tag_list:
-        return _matches_filter(component_data, status_list, enabled, config_name, tag_list)
+        return _matches_filter(component_data, id_list, status_list, enabled, config_name, tag_list)
     else:
         # No filter is being used so all components are valid
         return True
 
 
-def _matches_filter(data, status, enabled, config_name, tags):
-    data_status = data.get('configuration_status', '')
-    if status and not any([data_status == s for s in status]):
+def _matches_filter(data, id_list, status_list, enabled, config_name, tag_list):
+    if id_list and not data.get("id") in id_list:
         return False
-    if enabled is not None and data.get('enabled', None) != enabled:
+    if status_list and not data.get('configuration_status') in status_list:
         return False
-    if config_name and data.get('desired_config', '') != config_name:
+    if enabled is not None and data.get('enabled') != enabled:
         return False
-    if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
+    if config_name and data.get('desired_config') != config_name:
+        return False
+    if tag_list and any([data.get('tags', {}).get(k) != v for k, v in tag_list]):
         return False
     return True
 
