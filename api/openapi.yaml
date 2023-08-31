@@ -466,7 +466,7 @@ components:
             The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
           pattern: '^[^\s;]*$'
-          minLength: 1
+          minLength: 0
           maxLength: 120
         batcher_max_backoff:
           type: integer
@@ -1335,7 +1335,7 @@ components:
         desired_config:
           type: string
           description: A reference to a configuration
-          minLength: 1
+          minLength: 0
           maxLength: 60
         desired_state:
           type: array
