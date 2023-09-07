@@ -467,7 +467,7 @@ components:
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
           pattern: '^[^\s;]*$'
           minLength: 0
-          maxLength: 120
+          maxLength: 240
         batcher_max_backoff:
           type: integer
           description: >
@@ -905,6 +905,7 @@ components:
             can be used to specify nodes or groups.
           example: host1
           pattern: '^[^\s;]*$'
+          default: ""
         ansible_config:
           type: string
           description: >-
@@ -930,6 +931,7 @@ components:
             "--skip-tags", "--start-at-task", and "--tags". WARNING: Parameters passed to Ansible in
             this way should be used with caution.  State will not be recorded for components when
             using these flags to avoid incorrect reporting of partial playbook runs.
+          default: ""
         target:
           $ref: '#/components/schemas/SessionTargetSection'
         tags:
