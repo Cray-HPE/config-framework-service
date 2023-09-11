@@ -687,7 +687,10 @@ components:
         job:
           description: The name of the configuration execution environment associated with this session.
           example: cray-cfs-job-session-20190728032600
-          readOnly: true
+          type: string
+        ims_job:
+          description: The name os the IMS job associated with the session when running against an image.
+          example: 5037edd8-e9c5-437d-b54b-db4a8ad2cb15
           type: string
         completion_time:
           description: The date/time when the session completed execution in RFC 3339 format.
