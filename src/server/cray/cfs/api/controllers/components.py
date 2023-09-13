@@ -607,16 +607,16 @@ def _get_layer_status(desired_state, current_state_layers, max_retries):
         return STATUS_UNCONFIGURED
 
     for current_state in current_state_layers:
-        current_commit = current_state.get('commit', '')
+        current_status = current_state.get('status', '')
         if all([desired_clone_url == current_state.get('clone_url', ''),
                 desired_playbook == current_state.get('playbook', ''),
-                desired_commit in current_commit]):
-            if '_failed' in current_commit:
+                desired_commit == current_state.get('commit', '')]):
+            if current_status == 'failed':
                 if max_retries:
                     return STATUS_FAILED
                 else:
                     return STATUS_PENDING
-            if '_incomplete' in current_commit:
+            if current_status == 'incomplete' :
                 # Set for successful nodes when any_errors_fatal causes a playbook to exit early.
                 return STATUS_PENDING
             return STATUS_CONFIGURED
