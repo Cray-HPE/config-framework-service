@@ -68,6 +68,11 @@ def create_session_v2():  # noqa: E501
         data = connexion.request.get_json()
         LOGGER.debug("Create content: ", data)
         v2_session_create = V2SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
+        # This is a workaround for the addition of the configuration name max length in v3
+        # The configuration name is restored later
+        v2_session_configuration = v2_session_create.configuration_name
+        v2_session_create.configuration_name = "temp"
+        # end workaround
         session_create = V3SessionCreate.from_dict(v2_session_create.to_dict())
     except Exception as err:
         return connexion.problem(
@@ -83,9 +88,9 @@ def create_session_v2():  # noqa: E501
             title="Conflicting session name"
         )
 
-    if session_create.configuration_name not in CONFIG_DB:
+    if v2_session_configuration not in CONFIG_DB:
         return connexion.problem(
-            detail="No configurations exist named {}".format(session_create.configuration_name),
+            detail="No configurations exist named {}".format(v2_session_configuration),
             status=400,
             title="Invalid configuration"
         )
@@ -107,6 +112,9 @@ def create_session_v2():  # noqa: E501
 
     session = _create_session(session_create)
     session_data = session.to_dict()
+    # This is a workaround for the addition of the configuration name max length in v3
+    session_data['configuration_name'] = v2_session_configuration
+    # end workaround
     session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=session_data)
     response_data = DB.put(session_data['name'], session_data)
