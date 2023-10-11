@@ -113,7 +113,7 @@ def create_session_v2():  # noqa: E501
     session = _create_session(session_create)
     session_data = session.to_dict()
     # This is a workaround for the addition of the configuration name max length in v3
-    session_data['configuration_name'] = v2_session_configuration
+    session_data['configuration']['name'] = v2_session_configuration
     # end workaround
     session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=session_data)
