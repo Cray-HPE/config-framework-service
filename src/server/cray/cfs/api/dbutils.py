@@ -32,7 +32,7 @@ from kubernetes.config.config_exception import ConfigException
 from cray.cfs.api.models.base_model_ import Model as BaseModel
 
 LOGGER = logging.getLogger(__name__)
-DATABASES = ["options", "sessions", "components", "configurations"]  # Index is the db id.
+DATABASES = ["options", "sessions", "components", "configurations", "sources"]  # Index is the db id.
 
 try:
     config.load_incluster_config()

@@ -58,6 +58,8 @@ cray-service:
             secretKeyRef:
               name: vcs-user-credentials
               key: vcs_password
+        - name: VAULT_ADDR
+          value: http://cray-vault.vault:8200
       ports:
         - name: http
           containerPort: 9000

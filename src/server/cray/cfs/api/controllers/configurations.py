@@ -32,10 +32,14 @@ import tempfile
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import components
 from cray.cfs.api.controllers import options
+from cray.cfs.api.controllers import sources
+from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
+from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
+SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
@@ -141,7 +145,7 @@ def put_configuration_v2(configuration_id):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
-    for layer in data.get('layers'):
+    for layer in _iter_layers(data, include_additional_inventory=True):
         if 'branch' in layer and 'commit' in layer:
             return connexion.problem(
                 status=400, title="Error handling error branches",
@@ -149,13 +153,13 @@ def put_configuration_v2(configuration_id):
 
     try:
         data = _set_auto_fields(data)
-    except subprocess.CalledProcessError as e:
+    except BranchConversionException as e:
         return connexion.problem(
-            status=400, title="Error converting branch name to commit.",
+            status=400, title="Error converting branch name to commit",
             detail=str(e))
 
     layer_keys = set()
-    for layer in data.get('layers'):
+    for layer in _iter_layers(data, include_additional_inventory=False):
         layer_key = (layer.get('clone_url'), layer.get('playbook'))
         if layer_key in layer_keys:
             return connexion.problem(
@@ -169,7 +173,7 @@ def put_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
-def put_configuration_v3(configuration_id):
+def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /configurations/id invoked put_configuration")
     try:
@@ -179,28 +183,45 @@ def put_configuration_v3(configuration_id):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
-    for layer in data.get('layers'):
+    for layer in _iter_layers(data, include_additional_inventory=True):
+        if 'clone_url' in layer and 'source' in layer:
+            return connexion.problem(
+                status=400, title="Error handling source",
+                detail='Only source or clone_url should be specified for each layer, not both.')
+        if 'clone_url' not in layer and 'source' not in layer:
+            return connexion.problem(
+                status=400, title="Error handling source",
+                detail='Either source or clone_url must be specified for each layer.')
+        if layer["source"] and layer["source"] not in SOURCES_DB:
+            return connexion.problem(
+                status=400, title="Source does not exist",
+                detail=f"The source {layer['source']} does not exist.")
         if 'branch' in layer and 'commit' in layer:
             return connexion.problem(
-                status=400, title="Error handling error branches",
+                status=400, title="Error handling branches",
                 detail='Only branch or commit should be specified for each layer, not both.')
 
     try:
         data = _set_auto_fields(data)
-    except subprocess.CalledProcessError as e:
+    except BranchConversionException as e:
         return connexion.problem(
-            status=400, title="Error converting branch name to commit.",
+            status=400, title="Error converting branch name to commit",
             detail=str(e))
 
     layer_keys = set()
-    for layer in data.get('layers'):
-        layer_key = (layer.get('clone_url'), layer.get('playbook'))
+    for layer in _iter_layers(data, include_additional_inventory=False):
+        layer_key = (layer.get('clone_url', layer.get('source')), layer.get('playbook'))
         if layer_key in layer_keys:
             return connexion.problem(
                 status=400, title="Error with conflicting layers",
                 detail='Two or more layers apply the same playbook from the same repo, '
                        'but have different commit ids.')
         layer_keys.add(layer_key)
+
+    if drop_branches:
+        for layer in _iter_layers(data, include_additional_inventory=True):
+            if "branch" in layer:
+                del(layer["branch"])
 
     data['name'] = configuration_id
     return DB.put(configuration_id, data), 200
@@ -218,9 +239,9 @@ def patch_configuration_v2(configuration_id):
     data = dbutils.convert_data_from_v2(data, V2Configuration)
     try:
         data = _set_auto_fields(data)
-    except subprocess.CalledProcessError as e:
+    except BranchConversionException as e:
         return connexion.problem(
-            status=400, title="Error converting branch name to commit.",
+            status=400, title="Error converting branch name to commit",
             detail=str(e))
 
     return convert_configuration_to_v2(DB.put(configuration_id, data)), 200
@@ -238,9 +259,9 @@ def patch_configuration_v3(configuration_id):
 
     try:
         data = _set_auto_fields(data)
-    except subprocess.CalledProcessError as e:
+    except BranchConversionException as e:
         return connexion.problem(
-            status=400, title="Error converting branch name to commit.",
+            status=400, title="Error converting branch name to commit",
             detail=str(e))
 
     return DB.put(configuration_id, data), 200
@@ -278,9 +299,25 @@ def delete_configuration_v3(configuration_id):
     return DB.delete(configuration_id), 204
 
 
+def _iter_layers(config_data, include_additional_inventory=True):
+    if include_additional_inventory and config_data.get("additional_inventory"):
+        for layer in (config_data.get('layers') + config_data.get('additional_inventory')):
+            yield layer
+    else:
+        for layer in config_data.get('layers'):
+            yield layer
+
+
 def _set_auto_fields(data):
     data = _set_last_updated(data)
-    data = _convert_branches_to_commits(data)
+    try:
+        data = _convert_branches_to_commits(data)
+    except BranchConversionException as e:
+        LOGGER.error(f"Error converting branch name to commit: {e}")
+        raise
+    except Exception as e:
+        LOGGER.exception(f"Unexpected error converting branch name to commit: {e}")
+        raise BranchConversionException(e) from e
     return data
 
 
@@ -289,14 +326,25 @@ def _set_last_updated(data):
     return data
 
 
+class BranchConversionException(Exception):
+    pass
+
+
 def _convert_branches_to_commits(data):
-    for layer in data.get('layers'):
+    for layer in _iter_layers(data, include_additional_inventory=True):
         if 'branch' in layer:
-            layer['commit'] = _get_commit_id(layer.get('clone_url'), layer.get('branch'))
+            branch = layer.get('branch')
+            if 'source' in layer:
+                source, _ = sources.get_source_v3(layer.get('source'))
+                clone_url = source['clone_url']
+            else:
+                source = None
+                clone_url = layer.get('clone_url')
+            layer['commit'] = _get_commit_id(clone_url, branch, source=source)
     return data
 
 
-def _get_commit_id(repo_url, branch):
+def _get_commit_id(repo_url, branch, source=None):
     """
     Given a branch and git url, returns the commit id at the top of that branch
 
@@ -308,16 +356,19 @@ def _get_commit_id(repo_url, branch):
       commit: A commit id for the given branch
 
     Raises:
-      subprocess.CalledProcessError -- for errors encountered calling git
+      BranchConversionException -- for errors encountered calling git
     """
     with tempfile.TemporaryDirectory(dir='/tmp') as tmp_dir:
         repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
 
         split_url = repo_url.split('/')
-        username = os.environ['VCS_USERNAME'].strip()
-        password = os.environ['VCS_PASSWORD'].strip()
-        ssl_info = os.environ['GIT_SSL_CAINFO']
+        try:
+            username, password = _get_git_credentials(source)
+        except Exception as e:
+            LOGGER.error(f"Error retrieving git credentials: {e}")
+            raise
+        ssl_info = _get_ssl_info(source, tmp_dir)
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
         creds_file_name = os.path.join(tmp_dir, '.git-credentials')
         with open(creds_file_name, 'w') as creds_file:
@@ -343,8 +394,45 @@ def _get_commit_id(repo_url, branch):
             LOGGER.info('Translated git branch {} to commit {}'.format(branch, commit))
             return commit
         except subprocess.CalledProcessError as e:
-            LOGGER.error('Failed interacting with the specified clone_url: {}'.format(e))
-            raise
+            raise BranchConversionException(f"Failed interacting with the specified clone_url: {e}") from e
+
+
+def _get_git_credentials(source=None):
+    if not source:
+        username = os.environ['VCS_USERNAME'].strip()
+        password = os.environ['VCS_PASSWORD'].strip()
+        return username, password
+    source_credentials = source["credentials"]
+    secret_name = source_credentials["secret_name"]
+    try:
+        secret = get_vault_secret(secret_name)
+    except Exception as e:
+        raise BranchConversionException(f"Error loading Vault secret: {e}") from e
+    try:
+        username = secret["username"]
+        password = secret["password"]
+    except Exception as e:
+        raise BranchConversionException(f"Error reading username and password from secret: {e}") from e
+    return username, password
+
+
+def _get_ssl_info(source=None, tmp_dir=""):
+    if source and source.get("ca_cert"):
+        cert_info = source.get("ca_cert")
+        configmap_name = cert_info["configmap_name"]
+        configmap_namespace = cert_info.get("configmap_namespace")
+        if configmap_namespace:
+            response = get_kubernetes_configmap(configmap_name, configmap_namespace)
+        else:
+            response = get_kubernetes_configmap(configmap_name)
+        data = response.data
+        file_name = list(data.keys())[0]
+        file_path = os.path.join(tmp_dir, file_name)
+        with open(file_path, 'w') as f:
+            f.write(data[file_name])
+        return file_path
+    else:
+        return os.environ['GIT_SSL_CAINFO']
 
 
 class Configurations(object):

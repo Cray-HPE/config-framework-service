@@ -195,6 +195,10 @@ class Options:
     def include_ara_links(self):
         return self.get_option('include_ara_links', bool, True)
 
+    @property
+    def additional_inventory_source(self):
+        return self.get_option('additional_inventory_source', str, default="")
+
 
 def update_log_level(new_level_str):
     new_level = logging.getLevelName(new_level_str.upper())
