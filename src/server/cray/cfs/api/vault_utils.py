@@ -21,30 +21,36 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+import os
+import typing
 
-from kubernetes import client, config
-from kubernetes.config.config_exception import ConfigException
+import hvac
 
-try:
-    config.load_incluster_config()
-except ConfigException:  # pragma: no cover
-    config.load_kube_config()  # Development
 
-_api_client = client.ApiClient()
-k8score = client.CoreV1Api(_api_client)
-k8scustom = client.CustomObjectsApi(_api_client)
+def get_client() -> hvac.Client:
+    client = hvac.Client(url=os.environ['VAULT_ADDR'])
+    with open('/var/run/secrets/kubernetes.io/serviceaccount/token', 'r') as file:
+        jwt = file.read()
+    with open('/var/run/secrets/kubernetes.io/serviceaccount/namespace', 'r') as file:
+        role = file.read()
+    hvac.api.auth_methods.Kubernetes(client.adapter).login(
+        jwt=jwt,
+        role=role
+    )
+    return client
 
-ARA_UI_URL = ""
 
-def get_ara_ui_url():
-    global ARA_UI_URL
-    if not ARA_UI_URL:
-        try:
-            data = k8scustom.get_namespaced_custom_object("networking.istio.io", "v1beta1", "services", "virtualservices", "cfs-ara-external")
-            ARA_UI_URL = data["spec"]["hosts"][0]
-        except:
-            pass
-    return ARA_UI_URL
+def put_secret(secret_path: str, secret_data: typing.Dict[str, str]) -> None:
+    client = get_client()
+    client.secrets.kv.v2.create_or_update_secret(path=secret_path, secret=secret_data)
 
-def get_configmap(configmap_name: str, namespace: str = "services") -> client.V1ConfigMap:
-    return k8score.read_namespaced_config_map(configmap_name, namespace)
+
+def get_secret(secret_path: str) -> typing.Dict[str, str]:
+    client = get_client()
+    secret = client.secrets.kv.read_secret_version(secret_path)
+    return secret["data"]["data"]
+
+
+def delete_secret(secret_path: str) -> None:
+    client = get_client()
+    client.secrets.kv.delete_metadata_and_all_versions(secret_path)

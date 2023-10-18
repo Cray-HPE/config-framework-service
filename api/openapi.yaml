@@ -74,7 +74,10 @@ info:
     /components - Add, update, retrieve, or delete component information.
 
 
-    /configurations - Add, update, retrieve or delete desired configuration states. (v2 api only)
+    /configurations - Add, update, retrieve or delete desired configuration states.
+
+
+    /sources - Add, update, retrieve, or delete playbook source information. (v3 api only)
 
     ## Workflows
 
@@ -187,6 +190,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V3ConfigurationData'
+    V3SourceCreateRequest:
+      description: A source
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3SourceCreateData'
+    V3SourceUpdateRequest:
+      description: A source
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3SourceUpdateData'
   responses:
     # Success
     Version:
@@ -297,6 +314,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V3ConfigurationDataCollection'
+    V3SourceData:
+      description: A single source
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3SourceData'
+    V3SourceDataCollection:
+      description: A collection of sources
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3SourceDataCollection'
     ResourceDeleted:
       description: The resource was deleted.
     # Errors
@@ -314,6 +343,12 @@ components:
             $ref: '#/components/schemas/ProblemDetails'
     ConflictingSessionName:
       description: A session with the same name already exists.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    ConflictingSourceName:
+      description: A source with the same name already exists
       content:
         application/problem+json:
           schema:
@@ -464,10 +499,19 @@ components:
           type: string
           description: >
             The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
+            This is mutually exclusive with the additional_inventory_source option and only one can be set.
           example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
           pattern: '^[^\s;]*$'
           minLength: 0
           maxLength: 240
+        additional_inventory_source:
+          type: string
+          description: >
+            A CFS source with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
+            This is mutually exclusive with the additional_source_url option and only one can be set.
+          example: example-source
+          minLength: 0
+          maxLength: 60
         batcher_max_backoff:
           type: integer
           description: >
@@ -1019,6 +1063,9 @@ components:
           description: The clone URL of the configuration content repository.
           example: https://vcs.domain/vcs/org/inventory.git
           pattern: '^[^\s;]*$'
+        source:
+          type: string
+          description: A CFS source with directions to the configuration content repository
         commit:
           type: string
           description: The commit hash of the configuration repository when the state is set.
@@ -1089,6 +1136,9 @@ components:
           description: The clone URL of the configuration content repository.
           example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
           pattern: '^[^\s;]*$'
+        source:
+          type: string
+          description: A CFS source with directions to the configuration content repository
         playbook:
           type: string
           description: The Ansible playbook to run.
@@ -1104,7 +1154,7 @@ components:
             The configuration branch to use.  This will automatically set commit to master on the branch
             when the configuration is added.
           pattern: '^[^\s;]*$'
-      required: [clone_url, playbook]
+      required: [playbook]
       additionalProperties: false
     V2Configuration:
       description: A collection of ConfigurationLayers.
@@ -1420,6 +1470,149 @@ components:
         filters:
           $ref: '#/components/schemas/V3ComponentsFilter'
       required: [patch, filters]
+    ## SOURCES ENDPOINT ##
+    V3SourceCredentials:
+      description: Information for retrieving the git credentials
+      type: object
+      properties:
+        authentication_method:
+          type: string
+          description: The git authentication method used.
+          enum:
+            - password
+#            - token
+#            - key
+        secret_name:
+          type: string
+          description: The name of the credentials vault secret.
+          readOnly: true
+        username:
+          type: string
+          description: The username for authenticating to git
+          writeOnly: true
+        password:
+          type: string
+          description: The password for authenticating to git
+          writeOnly: true
+      additionalProperties: false
+    V3SourceCert:
+      description: CA certificate info for retrieving the git credentials
+      type: object
+      properties:
+        configmap_name:
+          type: string
+          description: The name of the configmap containing a necessary CA cert.
+          minLength: 1
+        configmap_namespace:
+          type: string
+          description: The namespace of the CA cert configmap in kubernetes.
+      additionalProperties: false
+      required:
+        - configmap_name
+    V3SourceData:
+      description: Information for retrieving git content from a source.
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the configuration.  This field is optional and will default to the clone_url if not specified.
+          example: sample-config
+        description:
+          type: string
+          description: A user-defined description. This field is not used by CFS.
+        last_updated:
+          type: string
+          description: The date/time when the state was last updated in RFC 3339 format.
+          example: '2019-07-28T03:26:00Z'
+          format: date-time
+          readOnly: true
+        clone_url:
+          type: string
+          description: The url to access the git content
+        credentials:
+          $ref: '#/components/schemas/V3SourceCredentials'
+          description: Information on a secret containing the username and password for accessing the git content
+        ca_cert:
+          $ref: '#/components/schemas/V3SourceCert'
+          description: Information on a configmap containing a CA certificate for authenticating to git
+          nullable: true
+      additionalProperties: false
+    V3SourceDataCollection:
+      description: A collection of source data.
+      type: object
+      properties:
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/V3SourceData'
+        next:
+          $ref: '#/components/schemas/V3NextData'
+    V3SourceCreateCredentials:
+      description: Information for retrieving the git credentials
+      type: object
+      properties:
+        authentication_method:
+          type: string
+          description: The git authentication method used.
+          enum:
+            - password
+          default: password
+        username:
+          type: string
+          description: The username for authenticating to git
+          writeOnly: true
+        password:
+          type: string
+          description: The password for authenticating to git
+          writeOnly: true
+      additionalProperties: false
+      required:
+        - username
+        - password
+    V3SourceCreateData:
+      description: Information for retrieving git content from a source.
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the configuration.  This field is optional and will default to the clone_url if not specified.
+          example: sample-config
+        description:
+          type: string
+          description: A user-defined description. This field is not used by CFS.
+        clone_url:
+          type: string
+          description: The url to access the git content
+        credentials:
+          $ref: '#/components/schemas/V3SourceCreateCredentials'
+          description: Information on a secret containing the username and password for accessing the git content
+        ca_cert:
+          $ref: '#/components/schemas/V3SourceCert'
+          description: Information on a configmap containing a CA certificate for authenticating to git
+          nullable: true
+      additionalProperties: false
+      required:
+        - clone_url
+        - credentials
+    V3SourceUpdateData:
+      description: Information for retrieving git content from a source.
+      type: object
+      properties:
+        description:
+          type: string
+          description: A user-defined description. This field is not used by CFS.
+        clone_url:
+          type: string
+          description: The url to access the git content
+        credentials:
+          $ref: '#/components/schemas/V3SourceCredentials'
+          description: Information on a secret containing the username and password for accessing the git content
+        ca_cert:
+          $ref: '#/components/schemas/V3SourceCert'
+          description: Information on a configmap containing a CA certificate for authenticating to git
+          nullable: true
+      additionalProperties: false
+    ## OTHER ##
     ProblemDetails:
       description: An error response for RFC 7807 problem details.
       type: object
@@ -2505,6 +2698,14 @@ paths:
       operationId: put_configuration_v3
       requestBody:
         $ref: '#/components/requestBodies/V3ConfigurationUpdateRequest'
+      parameters:
+        - name: drop_branches
+          schema:
+            type: boolean
+            default: false
+          in: query
+          description: >-
+            Don't store the branches after converting each branch to a commit.
       responses:
         200:
           $ref: '#/components/responses/V3ConfigurationData'
@@ -2549,3 +2750,112 @@ paths:
           type: string
           minLength: 1
           maxLength: 60
+  /v3/sources:
+    get:
+      summary: Retrieve a collection of sources
+      tags:
+        - sources
+        - v3
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description: >-
+        Retrieve the full collection of sources in the form of a
+        SourceArray.
+      operationId: get_sources_v3
+      parameters:
+        - name: limit
+          schema:
+            type: integer
+            minimum: 1
+          in: query
+          description: >-
+            When set, CFS will only return a number of sources up to this limit.  Combined with after_id, this
+            enables paging across results
+        - name: after_id
+          schema:
+            type: string
+          in: query
+          description: >-
+            When set, CFS will only return the configurations after the source specified.  Combined with limit, this
+            enables paging across results.
+        - name: in_use
+          schema:
+            type: boolean
+          in: query
+          description: >-
+            Query for only sources that are currently referenced by configurations.
+      responses:
+        200:
+          $ref: '#/components/responses/V3SourceDataCollection'
+        400:
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Add a single source
+      tags:
+        - sources
+        - v3
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description: Add a source to CFS
+      operationId: post_source_v3
+      requestBody:
+        $ref: '#/components/requestBodies/V3SourceCreateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/V3SourceData'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        409:
+          $ref: '#/components/responses/ConflictingSourceName'
+  /v3/sources/{source_id}:
+    get:
+      summary: Retrieve a single source
+      tags:
+        - sources
+        - v3
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description: Retrieve the given source
+      operationId: get_source_v3
+      responses:
+        200:
+          $ref: '#/components/responses/V3SourceData'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    patch:
+      summary: Update the commits for a source
+      tags:
+        - sources
+        - v3
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description: Updates a CFS source
+      operationId: patch_source_v3
+      requestBody:
+        $ref: '#/components/requestBodies/V3SourceUpdateRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/V3SourceData'
+        400:
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags:
+        - sources
+        - v3
+      summary: Delete a single source
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description:  >-
+        Delete the given source. This will fail in any components are using
+        the specified source.
+      operationId: delete_source_v3
+      responses:
+        204:
+          $ref: '#/components/responses/ResourceDeleted'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+    parameters:
+      - name: source_id
+        in: path
+        description: Name of the target source
+        required: true
+        schema:
+          type: string
+          minLength: 1
