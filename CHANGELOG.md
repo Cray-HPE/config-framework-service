@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1] - 12/06/2023
+## Fixed
+- Fixed branch conversion for additional inventory in the configuration
+
 ## [1.17.0] - 10/18/2023
 ### Added
 - Added sources to support cloning from external repos
