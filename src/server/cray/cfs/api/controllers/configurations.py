@@ -301,7 +301,7 @@ def delete_configuration_v3(configuration_id):
 
 def _iter_layers(config_data, include_additional_inventory=True):
     if include_additional_inventory and config_data.get("additional_inventory"):
-        for layer in (config_data.get('layers') + config_data.get('additional_inventory')):
+        for layer in (config_data.get('layers') + [config_data.get('additional_inventory')]):
             yield layer
     else:
         for layer in config_data.get('layers'):
