@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.17.2] - 12/08/2023
 ## Fixed
 - Fixed branch updates with the v2 api
+- Fixed server error when using on clone_url in v3
 
 ## [1.17.1] - 12/06/2023
 ## Fixed

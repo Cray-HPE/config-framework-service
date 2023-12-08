@@ -192,7 +192,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             return connexion.problem(
                 status=400, title="Error handling source",
                 detail='Either source or clone_url must be specified for each layer.')
-        if layer["source"] and layer["source"] not in SOURCES_DB:
+        if layer.get("source") and layer.get("source") not in SOURCES_DB:
             return connexion.problem(
                 status=400, title="Source does not exist",
                 detail=f"The source {layer['source']} does not exist.")
