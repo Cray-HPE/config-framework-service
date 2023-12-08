@@ -236,7 +236,6 @@ def patch_configuration_v2(configuration_id):
             status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     data = DB.get(configuration_id)
-    data = dbutils.convert_data_from_v2(data, V2Configuration)
     try:
         data = _set_auto_fields(data)
     except BranchConversionException as e:
