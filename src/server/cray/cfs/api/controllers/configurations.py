@@ -192,7 +192,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             return connexion.problem(
                 status=400, title="Error handling source",
                 detail='Either source or clone_url must be specified for each layer.')
-        if layer["source"] and layer["source"] not in SOURCES_DB:
+        if layer.get("source") and layer.get("source") not in SOURCES_DB:
             return connexion.problem(
                 status=400, title="Source does not exist",
                 detail=f"The source {layer['source']} does not exist.")
@@ -236,7 +236,6 @@ def patch_configuration_v2(configuration_id):
             status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     data = DB.get(configuration_id)
-    data = dbutils.convert_data_from_v2(data, V2Configuration)
     try:
         data = _set_auto_fields(data)
     except BranchConversionException as e:
