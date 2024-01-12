@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- Changed API behavior to match spec
+  - v3 session create return status code 201 on success
+  - v3 multi-session delete return status code 200 on success
+- Changed spec to match API behavior
+  - v2 configuration patch returns 404 if configuration not found
+  - v3 configuration patch returns 404 if configuration not found
+  - v2 session create return status code 200 on success
+  - v2 sessions list returns 400 in case of some errors
+  - v3 sessions list returns 400 in case of some errors
+  - v3 source patch returns 404 if source not found
+- Changed both spec and API behavior
+  - v3 source creation now returns 201 on success, per convention
+    for indicating successful creation of a new resource
+- Corrected minor mistake in a code comment
+
 ## [1.17.2] - 12/08/2023
 ## Fixed
 - Fixed branch updates with the v2 api
