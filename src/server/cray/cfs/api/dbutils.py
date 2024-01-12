@@ -179,7 +179,8 @@ class DBWrapper():
                     data = update_handler(data)
                 data_str = json.dumps(data)
                 self.client.set(key, data_str)
-                patched_id_list.append(key)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                patched_id_list.append(key.decode('utf-8'))
         return patched_id_list
 
     def _update(self, data, new_data):
@@ -212,7 +213,8 @@ class DBWrapper():
                 self.client.delete(key)
                 if deletion_handler:
                     deletion_handler(data)
-                deleted_id_list.append(key)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                deleted_id_list.append(key.decode('utf-8'))
         return deleted_id_list
 
     def info(self):
