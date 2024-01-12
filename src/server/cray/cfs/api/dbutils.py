@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -163,7 +163,7 @@ class DBWrapper():
         """Patch multiple resources in the database."""
         # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
         keys = set()
-        for key in client.scan_iter():
+        for key in self.client.scan_iter():
             keys.add(key)
         # Sorting the keys guarantees a consistent order when paging
         sorted_keys = sorted(list(keys))
