@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1780,6 +1780,8 @@ paths:
       responses:
         200:
           $ref: '#/components/responses/V2SessionDetailsArray'
+        400:
+          $ref: '#/components/responses/BadRequest'
     post:
       summary: Create a configuration framework session
       tags:
@@ -1801,7 +1803,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/V2SessionCreateRequest'
       responses:
-        201:
+        200:
           $ref: '#/components/responses/V2SessionDetails'
         400:
           $ref: '#/components/responses/BadRequest'
@@ -2165,6 +2167,8 @@ paths:
           $ref: '#/components/responses/V2ConfigurationDetails'
         400:
           $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
     delete:
       tags:
         - configurations
@@ -2295,6 +2299,8 @@ paths:
       responses:
         200:
           $ref: '#/components/responses/V3SessionDataCollection'
+        400:
+          $ref: '#/components/responses/BadRequest'
     post:
       summary: Create a configuration framework session
       tags:
@@ -2724,6 +2730,8 @@ paths:
           $ref: '#/components/responses/V3ConfigurationData'
         400:
           $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
     delete:
       tags:
         - configurations
@@ -2799,7 +2807,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/V3SourceCreateRequest'
       responses:
-        200:
+        201:
           $ref: '#/components/responses/V3SourceData'
         400:
           $ref: '#/components/responses/BadRequest'
@@ -2834,6 +2842,8 @@ paths:
           $ref: '#/components/responses/V3SourceData'
         400:
           $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
     delete:
       tags:
         - sources

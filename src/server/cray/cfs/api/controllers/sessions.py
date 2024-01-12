@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -177,7 +177,7 @@ def create_session_v3():  # noqa: E501
     _kafka.produce(event_type='CREATE', data=data)
     response_data = DB.put(data['name'], data)
     _set_link(response_data)
-    return response_data, 200
+    return response_data, 201
 
 
 def _create_session(session_create):
@@ -358,7 +358,7 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
             title='Error parsing age field'
         )
     response = {"session_ids": session_ids}
-    return response, 204
+    return response, 200
 
 
 @dbutils.redis_error_handler

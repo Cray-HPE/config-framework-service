@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -163,7 +163,7 @@ class DBWrapper():
         """Patch multiple resources in the database."""
         # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
         keys = set()
-        for key in client.scan_iter():
+        for key in self.client.scan_iter():
             keys.add(key)
         # Sorting the keys guarantees a consistent order when paging
         sorted_keys = sorted(list(keys))
@@ -179,7 +179,8 @@ class DBWrapper():
                     data = update_handler(data)
                 data_str = json.dumps(data)
                 self.client.set(key, data_str)
-                patched_id_list.append(key)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                patched_id_list.append(key.decode('utf-8'))
         return patched_id_list
 
     def _update(self, data, new_data):
@@ -212,7 +213,8 @@ class DBWrapper():
                 self.client.delete(key)
                 if deletion_handler:
                     deletion_handler(data)
-                deleted_id_list.append(key)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                deleted_id_list.append(key.decode('utf-8'))
         return deleted_id_list
 
     def info(self):
