@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     for indicating successful creation of a new resource
 - Corrected minor mistake in a code comment
 - Fix bug in patch_all method in dbutils (use DB client, not Kubernetes Python module)
+- Convert bytes to strings in patch_all and delete_all methods in dbutils, so
+  they can be JSON serialized
 
 ## [1.17.2] - 12/08/2023
 ## Fixed
