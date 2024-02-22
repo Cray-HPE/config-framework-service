@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+## [1.19.0] - 02/22/2024
 ### Dependencies
 - Bump `kubernetes` from 11.0.0 to 22.6.0 to match CSM 1.6 Kubernetes version
 
