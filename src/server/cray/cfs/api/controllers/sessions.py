@@ -741,7 +741,7 @@ def _age_to_timestamp(age):
 
 def _set_link(data):
     if options.Options().include_ara_links:
-        data["logs"] = f"{get_ara_ui_url()}/hosts?label={data['name']}"
+        data["logs"] = f"{get_ara_ui_url()}/?label={data['name']}"
     return data
 
 
