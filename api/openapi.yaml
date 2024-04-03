@@ -255,7 +255,7 @@ components:
           schema:
             $ref: '#/components/schemas/V3SessionDataCollection'
     V3SessionIdCollection:
-      description: A collection of configuration sessions
+      description: A collection of configuration session IDs
       content:
         application/json:
           schema:
@@ -359,11 +359,17 @@ components:
       type: object
       properties:
         major:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '1'
         minor:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '0'
         patch:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '10'
       additionalProperties: false
     Healthz:
       description: Service health status
@@ -382,6 +388,7 @@ components:
           type: integer
         after_id:
           type: string
+      nullable: true
       additionalProperties: true  # This can contain the parameters of any endpoint this is returned from
     ## OPTIONS ENDPOINT ##
     V2Options:
@@ -1006,7 +1013,7 @@ components:
       description: A collection of session data.
       type: object
       properties:
-        components:
+        sessions:
           type: array
           items:
             $ref: '#/components/schemas/V3SessionData'
@@ -1019,7 +1026,7 @@ components:
         session_ids:
           type: array
           items:
-            $ref: '#/components/schemas/V3SessionData'
+            type: string
     ## CONFIGURATIONS ENDPOINT ##
     V2AdditionalInventoryLayer:
       description: |
@@ -1217,7 +1224,7 @@ components:
       description: A collection of configuration data.
       type: object
       properties:
-        components:
+        configurations:
           type: array
           items:
             $ref: '#/components/schemas/V3ConfigurationData'
@@ -1336,9 +1343,28 @@ components:
             $ref: '#/components/schemas/V2ConfigurationStateLayer'
           description: Information about the desired config and status of the layers
         stateAppend:
-          $ref: '#/components/schemas/V2ConfigurationStateLayer'
+          # Until we move to OAS 3.1, if we want to reference a schema as being read-only or write-only,
+          # we have to do it inside the schema definition itself. It cannot be a sibling of a '$ref', because
+          # those are ignored.
+          type: object
           description: A single state that will be appended to the list of current states.
-          writeOnly: true
+          properties:
+            cloneUrl:
+              type: string
+              description: The clone URL of the configuration content repository.
+              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+            playbook:
+              type: string
+              description: The Ansible playbook to run.
+              example: site.yml
+            commit:
+              type: string
+              description: The commit hash of the configuration repository when the state is set.
+            sessionName:
+              type: string
+              description: The name of the CFS session that last configured the component.
+          additionalProperties: false
+          writeOnly: true         
         desiredConfig:
           type: string
           description: A reference to a configuration
@@ -1384,20 +1410,43 @@ components:
             $ref: '#/components/schemas/V3ConfigurationStateLayer'
           description: Information about the desired config and status of the layers
         state_append:
-          $ref: '#/components/schemas/V3ConfigurationStateLayer'
+          # Until we move to OAS 3.1, if we want to reference a schema as being read-only or write-only,
+          # we have to do it inside the schema definition itself. It cannot be a sibling of a '$ref', because
+          # those are ignored.
+          type: object
           description: A single state that will be appended to the list of current states.
+          properties:
+            clone_url:
+              type: string
+              description: The clone URL of the configuration content repository.
+              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+            playbook:
+              type: string
+              description: The Ansible playbook to run.
+              example: site.yml
+            commit:
+              type: string
+              description: The commit hash of the configuration repository when the state is set.
+            status:
+              type: string
+              description: The status of the configuration layer.
+              enum: ['applied', 'failed', 'skipped']
+            session_name:
+              type: string
+              description: The name of the CFS session that last configured the component.
+          additionalProperties: false
           writeOnly: true
-        desired_config:
-          type: string
-          description: A reference to a configuration
-          minLength: 0
-          maxLength: 60
         desired_state:
           type: array
           items:
             $ref: '#/components/schemas/V3ConfigurationStateLayer'
           description: Information about the desired config and status of the layers
           readOnly: true
+        desired_config:
+          type: string
+          description: A reference to a configuration
+          minLength: 0
+          maxLength: 60
         error_count:
           type: integer
           description: The count of failed configuration attempts.
@@ -1472,7 +1521,7 @@ components:
       required: [patch, filters]
     ## SOURCES ENDPOINT ##
     V3SourceCredentials:
-      description: Information for retrieving the git credentials
+      description: Information on a secret containing the username and password for accessing the git content
       type: object
       properties:
         authentication_method:
@@ -1496,7 +1545,7 @@ components:
           writeOnly: true
       additionalProperties: false
     V3SourceCert:
-      description: CA certificate info for retrieving the git credentials
+      description: Information on a configmap containing a CA certificate for authenticating to git          
       type: object
       properties:
         configmap_name:
@@ -1506,6 +1555,7 @@ components:
         configmap_namespace:
           type: string
           description: The namespace of the CA cert configmap in kubernetes.
+      nullable: true
       additionalProperties: false
       required:
         - configmap_name
@@ -1515,8 +1565,8 @@ components:
       properties:
         name:
           type: string
-          description: The name of the configuration.  This field is optional and will default to the clone_url if not specified.
-          example: sample-config
+          description: The name of the source.  This field is optional and will default to the clone_url if not specified.
+          example: sample-source
         description:
           type: string
           description: A user-defined description. This field is not used by CFS.
@@ -1531,17 +1581,14 @@ components:
           description: The url to access the git content
         credentials:
           $ref: '#/components/schemas/V3SourceCredentials'
-          description: Information on a secret containing the username and password for accessing the git content
         ca_cert:
           $ref: '#/components/schemas/V3SourceCert'
-          description: Information on a configmap containing a CA certificate for authenticating to git
-          nullable: true
       additionalProperties: false
     V3SourceDataCollection:
       description: A collection of source data.
       type: object
       properties:
-        components:
+        sources:
           type: array
           items:
             $ref: '#/components/schemas/V3SourceData'
@@ -1575,8 +1622,8 @@ components:
       properties:
         name:
           type: string
-          description: The name of the configuration.  This field is optional and will default to the clone_url if not specified.
-          example: sample-config
+          description: The name of the source.  This field is optional and will default to the clone_url if not specified.
+          example: sample-source
         description:
           type: string
           description: A user-defined description. This field is not used by CFS.
@@ -1584,12 +1631,9 @@ components:
           type: string
           description: The url to access the git content
         credentials:
-          $ref: '#/components/schemas/V3SourceCreateCredentials'
-          description: Information on a secret containing the username and password for accessing the git content
+          $ref: '#/components/schemas/V3SourceCreateCredentials'          
         ca_cert:
           $ref: '#/components/schemas/V3SourceCert'
-          description: Information on a configmap containing a CA certificate for authenticating to git
-          nullable: true
       additionalProperties: false
       required:
         - clone_url
@@ -1606,11 +1650,8 @@ components:
           description: The url to access the git content
         credentials:
           $ref: '#/components/schemas/V3SourceCredentials'
-          description: Information on a secret containing the username and password for accessing the git content
         ca_cert:
           $ref: '#/components/schemas/V3SourceCert'
-          description: Information on a configmap containing a CA certificate for authenticating to git
-          nullable: true
       additionalProperties: false
     ## OTHER ##
     ProblemDetails:
@@ -1648,8 +1689,8 @@ components:
 paths:
   /:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
@@ -1659,8 +1700,8 @@ paths:
           $ref: '#/components/responses/Version'
   /versions:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
@@ -1684,8 +1725,8 @@ paths:
   # V2 #
   /v2:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
@@ -2195,8 +2236,8 @@ paths:
           type: string
   /v3:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
