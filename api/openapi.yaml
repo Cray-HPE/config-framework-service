@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -245,11 +245,17 @@ components:
       type: object
       properties:
         major:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '1'
         minor:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '0'
         patch:
-          type: integer
+          type: string
+          pattern: '^(0|[1-9][0-9]*)$'
+          example: '10'
       additionalProperties: false
     Healthz:
       description: Service health status
@@ -260,6 +266,7 @@ components:
         kafkaStatus:
           type: string
       additionalProperties: false
+    ## OPTIONS ENDPOINT ##
     V2Options:
       description: |
         Configuration options for the configuration service.
@@ -725,9 +732,28 @@ components:
             $ref: '#/components/schemas/ConfigurationStateLayer'
           description: Information about the desired config and status of the layers
         stateAppend:
-          $ref: '#/components/schemas/ConfigurationStateLayer'
+          # Until we move to OAS 3.1, if we want to reference a schema as being read-only or write-only,
+          # we have to do it inside the schema definition itself. It cannot be a sibling of a '$ref', because
+          # those are ignored.
+          type: object
           description: A single state that will be appended to the list of current states.
-          writeOnly: true
+          properties:
+            cloneUrl:
+              type: string
+              description: The clone URL of the configuration content repository.
+              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+            playbook:
+              type: string
+              description: The Ansible playbook to run.
+              example: site.yml
+            commit:
+              type: string
+              description: The commit hash of the configuration repository when the state is set.
+            sessionName:
+              type: string
+              description: The name of the CFS session that last configured the component.
+          additionalProperties: false
+          writeOnly: true         
         desiredConfig:
           type: string
           description: A reference to a configuration
@@ -794,6 +820,7 @@ components:
         filters:
           $ref: '#/components/schemas/V2ComponentsFilter'
       required: [patch, filters]
+    ## OTHER ##
     ProblemDetails:
       description: An error response for RFC 7807 problem details.
       type: object
@@ -829,8 +856,8 @@ components:
 paths:
   /:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
@@ -840,8 +867,8 @@ paths:
           $ref: '#/components/responses/Version'
   /versions:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
@@ -865,8 +892,8 @@ paths:
   # V2 #
   /v2:
     get:
-      summary: Get API versions
-      description: Return list of versions currently running.
+      summary: Get CFS service version
+      description: Return the CFS service version that is currently running.
       tags:
         - version
       x-openapi-router-controller: cray.cfs.api.controllers.versions
