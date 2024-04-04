@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.2] - 04/04/2024
+### Fixed
+- Corrected errors in the API spec to make it properly follow OAS 3.0.2 and to
+  accurately reflect actual CFS behavior.
+
 ## [1.19.1] - 02/26/2024
 ### Fixed
 - Fixed ARA link returned with session data
