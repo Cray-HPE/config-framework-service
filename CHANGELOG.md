@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.7] - 4/5/2024
+### Fixed
+- Fix bug in `patch_v2_components_dict` to properly handle response from `DB.get_all()`
+
 ## [1.12.6] - 4/5/2024
 ### Fixed
 - Fix bug in `patch_v2_components_dict` that causes it to only patch a single component.
