@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.6] - 4/5/2024
+### Fixed
+- Fix bug in `patch_v2_components_dict` that causes it to only patch a single component.
+
 ## [1.12.5] - 4/4/2024
 ### Fixed
 - Corrected errors in the API spec to make it properly follow OAS 3.0.2 and to
