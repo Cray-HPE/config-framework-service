@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -302,7 +302,7 @@ def patch_v2_components_dict(data):
     else:
         # On large scale systems, this response may be too large
         # use v3 for smaller responses
-        components = DB.get_all()
+        components = [ (component_data["id"], component_data) for component_data in DB.get_all()[0] ]
 
     response = []
     patch = data.get("patch", {})
