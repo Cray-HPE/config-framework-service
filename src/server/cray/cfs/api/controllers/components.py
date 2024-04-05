@@ -222,7 +222,7 @@ def patch_v2_components_dict(data):
     else:
         # TODO: On large scale systems, this response may be too large
         # and require paging to be implemented
-        components = DB.get_all()
+        components = [ (component_data["id"], component_data) for component_data in DB.get_all() ]
 
     response = []
     patch = data.get("patch", {})
