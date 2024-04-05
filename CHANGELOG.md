@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Fix bug in `patch_v2_components_dict` to properly handle response from `DB.get_all()`
 
 ## [1.19.2] - 04/04/2024
 ### Fixed
