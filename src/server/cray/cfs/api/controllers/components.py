@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -218,7 +218,7 @@ def patch_v2_components_dict(data):
         for component_id in id_list:
             component_data = DB.get(component_id)
             if component_data:
-                components.append(component_data)
+                components.append((component_id, component_data))
     else:
         # TODO: On large scale systems, this response may be too large
         # and require paging to be implemented
@@ -229,8 +229,8 @@ def patch_v2_components_dict(data):
     if "id" in patch:
         del patch["id"]
     patch = _set_auto_fields(patch)
-    for component in components:
-        if _matches_filter(component, status_list, filters.get("enabled", None),
+    for component_id, component_data in components:
+        if _matches_filter(component_data, status_list, filters.get("enabled", None),
                            filters.get("configName", None), tag_list):
             response.append(DB.patch(component_id, patch, _update_handler))
     return response, 200
