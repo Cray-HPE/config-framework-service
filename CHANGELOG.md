@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.3] - 04/05/2024
+### Fixed
+- Fix bug in `patch_v2_components_dict` to properly handle response from `DB.get_all()`
+
 ## [1.19.2] - 04/04/2024
 ### Fixed
 - Corrected errors in the API spec to make it properly follow OAS 3.0.2 and to
