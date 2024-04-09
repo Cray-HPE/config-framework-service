@@ -753,7 +753,7 @@ components:
               type: string
               description: The name of the CFS session that last configured the component.
           additionalProperties: false
-          writeOnly: true         
+          writeOnly: true
         desiredConfig:
           type: string
           description: A reference to a configuration
