@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.4] - 04/09/2024
+### Dependencies
+- Bump `connexion` from `2.6.0` to `2.14.2` to pick up bug fixes to prevent false schema errors being logged.
+- Bump `Werkzeug` from `0.15.6` to `1.0.1` to meet `connexion` requirements.
+
 ## [1.18.3] - 04/05/2024
 ### Fixed
 - Fix bug in `patch_v2_components_dict` to properly handle response from `DB.get_all()`
