@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Dependencies
+- Bump `connexion` from `2.6.0` to `2.14.2` to pick up bug fixes.
 
 ## [1.12.7] - 4/5/2024
 ### Fixed
