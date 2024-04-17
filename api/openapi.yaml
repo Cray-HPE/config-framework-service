@@ -1556,7 +1556,7 @@ components:
           writeOnly: true
       additionalProperties: false
     V3SourceCert:
-      description: Information on a configmap containing a CA certificate for authenticating to git          
+      description: Information on a configmap containing a CA certificate for authenticating to git
       type: object
       properties:
         configmap_name:
@@ -1642,7 +1642,7 @@ components:
           type: string
           description: The url to access the git content
         credentials:
-          $ref: '#/components/schemas/V3SourceCreateCredentials'          
+          $ref: '#/components/schemas/V3SourceCreateCredentials'
         ca_cert:
           $ref: '#/components/schemas/V3SourceCert'
       additionalProperties: false
