@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.5] - 04/17/2024
+### Fixed
+- Added missing `special_parameters` to `V3ConfigurationLayer` schema in API spec.
+
 ## [1.18.4] - 04/09/2024
 ### Dependencies
 - Bump `connexion` from `2.6.0` to `2.14.2` to pick up bug fixes to prevent false schema errors being logged.
