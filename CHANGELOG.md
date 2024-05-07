@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.9] - 5/7/2024
+### Fixed
+- Fixed broken status filtering in `patch_v2_components_dict`
+
 ## [1.12.8] - 4/9/2024
 ### Dependencies
 - Bump `connexion` from `2.6.0` to `2.14.2` to pick up bug fixes to prevent false schema errors being logged.

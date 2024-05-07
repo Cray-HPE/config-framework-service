@@ -24,6 +24,7 @@
 import connexion
 from copy import deepcopy
 from datetime import datetime
+from functools import partial
 import logging
 
 from cray.cfs.api import dbutils
@@ -213,26 +214,31 @@ def patch_v2_components_dict(data):
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
 
+    opts = options.Options()
+    configs = configurations.Configurations()
     components = []
+    set_status = partial(_set_status, options=opts, configs=configs, config_details=False)
     if id_list:
         for component_id in id_list:
             component_data = DB.get(component_id)
             if component_data:
-                components.append((component_id, component_data))
+                components.append(set_status(component_data))
     else:
         # TODO: On large scale systems, this response may be too large
         # and require paging to be implemented
-        components = [ (component_data["id"], component_data) for component_data in DB.get_all() ]
+        components = [ set_status(component_data) for component_data in DB.get_all() ]
 
+    matches_filter = partial(_matches_filter, status=status_list,
+                             enabled=filters.get("enabled", None),
+                             config_name=filters.get("configName", None), tags=tag_list)
     response = []
     patch = data.get("patch", {})
     if "id" in patch:
         del patch["id"]
     patch = _set_auto_fields(patch)
-    for component_id, component_data in components:
-        if _matches_filter(component_data, status_list, filters.get("enabled", None),
-                           filters.get("configName", None), tag_list):
-            response.append(DB.patch(component_id, patch, _update_handler))
+    for component_data in components:        
+        if matches_filter(component_data):
+            response.append(DB.patch(component_data["id"], patch, _update_handler))
     return response, 200
 
 
