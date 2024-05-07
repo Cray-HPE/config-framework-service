@@ -298,11 +298,11 @@ def patch_v2_components_dict(data):
         for component_id in id_list:
             component_data = DB.get(component_id)
             if component_data:
-                components.append((component_id, component_data))
+                components.append(component_data)
     else:
         # On large scale systems, this response may be too large
         # use v3 for smaller responses
-        components = [ (component_data["id"], component_data) for component_data in DB.get_all()[0] ]
+        components = DB.get_all()[0]
 
     response = []
     patch = data.get("patch", {})
@@ -310,10 +310,13 @@ def patch_v2_components_dict(data):
         del patch["id"]
     patch = dbutils.convert_data_from_v2(patch, V2Component)
     patch = _set_auto_fields(patch)
-    for component_id, component_data in components:
-        if _matches_filter(component_data, status_list, filters.get("enabled", None),
-                           filters.get("config_name", None), tag_list):
-            response_data = DB.patch(component_id, patch, _update_handler)
+    configs = configurations.Configurations()
+    component_filter = partial(_component_filter, config_details=False, configs=configs,
+                               id_list=[], status_list=status_list, enabled=filters.get("enabled", None),
+                               config_name=filters.get("config_name", None), tag_list=tag_list)
+    for component_data in components:
+        if component_filter(component_data):
+            response_data = DB.patch(component_data["id"], patch, _update_handler)
             response.append(convert_component_to_v2(response_data))
     return response, 200
 
