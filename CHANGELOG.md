@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.19.5] - 04/17/2024
 ### Fixed
+- Fix broken `_matches_filter` call in `patch_v2_components_dict`.
+
+## [1.19.5] - 04/17/2024
+### Fixed
 - Added missing `special_parameters` to `V3ConfigurationLayer` schema in API spec.
 
 ## [1.19.4] - 04/09/2024
