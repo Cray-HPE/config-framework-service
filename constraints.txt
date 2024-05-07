@@ -15,7 +15,7 @@ idna==2.8
 inflection==0.3.1
 isort==4.3.21
 itsdangerous==0.24
-Jinja2==2.10.3
+Jinja2==3.1.4
 jsonschema==3.0.0
 kafka-python==2.0.2
 # CSM 1.6 uses Kubernetes 1.22, so use client v22.x to ensure compatability
