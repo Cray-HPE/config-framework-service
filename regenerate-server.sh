@@ -28,7 +28,7 @@ docker run --rm -v ${PWD}:/local openapitools/openapi-generator-cli:v4.1.1 \
   generate \
     -i local/api/openapi.yaml.run \
     -g python-flask \
-    -o local/src/server \
+    -o local/lib/server \
     -c local/config/autogen-server.json
 
 echo "Code has been generated within src/server for development purposes ONLY"

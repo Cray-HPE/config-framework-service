@@ -1,13 +1,17 @@
 ansible.cfg
 *.code-workspace
+.env
+.version
 .vscode
 */*.retry
 */*.pyc
+lib/server
 src/server/cray/cfs/api/controllers/default_controller.py
 src/server/cray/cfs/api/controllers/sessions_controller.py
 src/server/cray/cfs/api/controllers/security_controller_.py
 
 # Ignore generated code
+api/openapi.yaml.run
 src/server/cray/cfs/api/models/*
 src/server/cray/cfs/api/util.py
 src/server/cray/cfs/api/typing_utils.py
