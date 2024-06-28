@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.19.6] - 06/28/2024
+## [1.19.7] - 06/28/2024
 ### Fixed
 - Add missing pod `securityContext`
 
@@ -23,7 +23,7 @@ Bumped dependency versions to resolve CVEs
 | `idna`                   | 2.8        | 3.7       |
 | `setuptools`             | unpinned   | 65.5.1    |
 
-## [1.19.5] - 04/17/2024
+## [1.19.6] - 04/17/2024
 ### Fixed
 - Fix broken `_matches_filter` call in `patch_v2_components_dict`.
 
