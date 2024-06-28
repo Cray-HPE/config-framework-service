@@ -6,7 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- Add missing pod securityContext
+- Add missing pod `securityContext`
+
+### Dependencies
+- CASMCMS-9005: Bump minimum `cray-services` base chart version from 7.0.0 to 10.0.5
+
+Bumped dependency versions to resolve CVEs
+
+| Package                  | From       | To        |
+|--------------------------|------------|-----------|
+| `certifi`                | 2018.11.29 | 2023.7.22 |
+| `urllib3`                | 1.25.11    | 1.26.19   |
+| `requests`               | 2.22.0     | 2.31.0    |
+| `idna`                   | 2.8        | 3.7       |
+| `setuptools`             | unpinned   | 65.5.1    |
 
 ## [1.19.5] - 04/17/2024
 ### Fixed
