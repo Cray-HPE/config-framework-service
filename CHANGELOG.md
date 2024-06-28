@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 - CASMCMS-9005: Bump minimum `cray-services` base chart version from 7.0.0 to 10.0.5
+- Bump `certifi` from 2018.11.29 to 2023.7.22 to resolve CVE
 
 ## [1.19.5] - 04/17/2024
 ### Fixed
