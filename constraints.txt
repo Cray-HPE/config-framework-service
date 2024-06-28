@@ -11,7 +11,7 @@ connexion==2.14.2
 cryptography==41.0.2
 Flask==1.0.4
 google-auth==1.6.3
-idna==2.8
+idna==3.7
 inflection==0.3.1
 isort==4.3.21
 itsdangerous==0.24

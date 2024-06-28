@@ -18,6 +18,7 @@ Bumped dependency versions to resolve CVEs
 | `certifi`                | 2018.11.29 | 2023.7.22 |
 | `urllib3`                | 1.25.11    | 1.26.19   |
 | `requests`               | 2.22.0     | 2.31.0    |
+| `idna`                   | 2.8        | 3.7       |
 
 ## [1.19.5] - 04/17/2024
 ### Fixed
