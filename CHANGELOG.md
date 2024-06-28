@@ -19,6 +19,7 @@ Bumped dependency versions to resolve CVEs
 | `urllib3`                | 1.25.11    | 1.26.19   |
 | `requests`               | 2.22.0     | 2.31.0    |
 | `idna`                   | 2.8        | 3.7       |
+| `setuptools`             | unpinned   | 65.5.1    |
 
 ## [1.19.5] - 04/17/2024
 ### Fixed
