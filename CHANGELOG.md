@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update API spec to reflect the actual allowed formats for the age/TTL fields.
+
 ## [1.12.9] - 5/7/2024
 ### Fixed
 - Fixed broken status filtering in `patch_v2_components_dict`
