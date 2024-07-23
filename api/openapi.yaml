@@ -427,8 +427,14 @@ components:
           example: cfs-default-ansible-cfg
         sessionTTL:
           type: string
-          description: A time-to-live applied to all completed CFS sessions.  Specified in hours or days. e.g. 3d or 24h.  Set to an empty string to disable.
+          description: >
+            A time-to-live applied to all completed CFS sessions.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
+            Set to an empty string to disable.
           example: 24h
+          pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+          minLength: 0
+          maxLength: 10
         additionalInventoryUrl:
           type: string
           description: >
@@ -498,8 +504,12 @@ components:
           maxLength: 60
         session_ttl:
           type: string
-          description: A time-to-live applied to all completed CFS sessions.  Specified in hours or days. e.g. 3d or 24h.  Set to an empty string to disable.
+          description: >
+            A time-to-live applied to all completed CFS sessions.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
+            Set to an empty string to disable.
           example: 24h
+          pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
           minLength: 0
           maxLength: 10
         additional_inventory_url:
@@ -1786,22 +1796,37 @@ paths:
         - name: age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Return only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
             DEPRECATED: This field has been replaced by min_age and max_age
         - name: min_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Return only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: max_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
+            Return only sessions younger than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: status
           schema:
             type: string
@@ -1872,22 +1897,37 @@ paths:
         - name: age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Deletes only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Deletes only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
             DEPRECATED: This field has been replaced by min_age and max_age
         - name: min_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Deletes only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: max_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
+            Deletes only sessions younger than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: status
           schema:
             type: string
@@ -1914,7 +1954,7 @@ paths:
             type: string
           in: query
           description: >-
-            Return only sessions whose have the matching tags.  Key-value pairs should be separated using =,
+            Deletes only sessions whose have the matching tags.  Key-value pairs should be separated using =,
             and tags can be a comma-separated list. Only sessions that match all tags will be deleted.
       description:
         Delete multiple configuration sessions.  If filters are provided, only sessions matching
@@ -2312,15 +2352,25 @@ paths:
         - name: min_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Return only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: max_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
+            Return only sessions younger than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: status
           schema:
             type: string
@@ -2391,15 +2441,25 @@ paths:
         - name: min_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions older than the given age.  Age is given in the format "1d" or "6h"
+            Deletes only sessions older than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: max_age
           schema:
             type: string
+            example: 24h
+            pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
+            minLength: 0
+            maxLength: 10
           in: query
           description: >-
-            Return only sessions younger than the given age.  Age is given in the format "1d" or "6h"
+            Deletes only sessions younger than the given age.
+            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
         - name: status
           schema:
             type: string

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update API spec to reflect the actual requirements and format for the age/TTL fields.
+
 ## [1.19.7] - 06/28/2024
 ### Fixed
 - Add missing pod `securityContext`
