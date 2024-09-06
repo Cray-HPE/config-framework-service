@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Generate API
-FROM openapitools/openapi-generator-cli:v4.1.2 as codegen
+FROM openapitools/openapi-generator-cli:v7.8.0 as codegen
 WORKDIR /app
 COPY api/openapi.yaml api/openapi.yaml
 COPY config/autogen-server.json config/autogen-server.json
