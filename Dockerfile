@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -42,9 +42,11 @@ RUN apk add --upgrade --no-cache apk-tools &&  \
 	apk update && \
 	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
 	apk -U upgrade --no-cache && \
+    pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
-    pip3 install --no-cache-dir -U 'setuptools<46.0.0' && \
-    pip3 install --no-cache-dir -r requirements.txt
+    pip3 list --format freeze && \
+    pip3 install --no-cache-dir -r requirements.txt && \
+    pip3 list --format freeze
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
