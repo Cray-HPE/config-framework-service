@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.2] - 09/09/2024
+### Changes
+- Log installed Python packages in Dockerfile for purposes of build logging
+
+### Dependencies
+- CASMCMS-9138: Bump Python dependency versions to resolve CVEs
+- Move to `openapi-generator-cli` v7.8.0
+- Pin major/minor of Python dependencies but take latest patch version
+
 ## [1.20.1] - 09/05/2024
 ### Dependencies
 - CSM 1.6 moved to Kubernetes 1.24, so use client v24.x to ensure compatability
