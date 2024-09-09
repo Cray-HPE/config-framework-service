@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 - CASMCMS-9138: Bump Python dependency versions to resolve CVEs
+- Move to `openapi-generator-cli` v7.8.0
+- Pin major/minor of Python dependencies but take latest patch version
 
 ## [1.20.1] - 09/05/2024
 ### Dependencies
