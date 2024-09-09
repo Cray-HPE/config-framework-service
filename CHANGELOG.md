@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.20.2] - 09/09/2024
 ### Changes
 - Log installed Python packages in Dockerfile for purposes of build logging
 
