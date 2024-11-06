@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 11/06/2024
+### Fixed
+- CASMCMS-9189: Two corrections to the CFS API spec
+  - The spec indicated that PUT requests to the `/components` endpoints could specify either a dictionary or a list, just as with PATCH requests to those endpoints.
+    However, the server code for the PUT endpoints only handled the list case. The API spec has been updated to reflect this reality.
+  - The spec allowed for components whose ID fields were set to 0-length strings, which should never be the case. There are some cases where the schema should permit
+    the field to be omitted entirely, but it should never be set to a 0-length string.
+
 ## [1.20.2] - 09/09/2024
 ### Changes
 - Log installed Python packages in Dockerfile for purposes of build logging
