@@ -127,6 +127,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V2Options'
+    V2ComponentsCreateRequest:
+      description: The configuration/state for an array of components
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ComponentStateArray'
     V2ComponentsUpdateRequest:
       description: The configuration/state for an array of components
       required: true
@@ -695,6 +702,10 @@ components:
         $ref: '#/components/schemas/Configuration'
     ## COMPONENTS ENDPOINT ##
     # V2 #
+    ComponentId:
+      type: string
+      description: The component's id. e.g. xname for hardware components
+      minLength: 1
     ConfigurationStateLayer:
       description: |
         The current configuration state for a component.
@@ -727,8 +738,7 @@ components:
       type: object
       properties:
         id:
-          type: string
-          description: The component's id. e.g. xname for hardware components
+          $ref: '#/components/schemas/ComponentId'
         state:
           type: array
           items:
@@ -1223,7 +1233,7 @@ paths:
       description: Update the state for a collection of components in the cfs database
       operationId: put_components
       requestBody:
-        $ref: '#/components/requestBodies/V2ComponentsUpdateRequest'
+        $ref: '#/components/requestBodies/V2ComponentsCreateRequest'
       responses:
         200:
           $ref: '#/components/responses/V2ComponentDetailsArray'
