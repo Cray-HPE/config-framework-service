@@ -144,6 +144,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V3Options'
+    V2ComponentsCreateRequest:
+      description: The configuration/state for an array of components
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ComponentStateArray'
+    V3ComponentsCreateRequest:
+      description: The configuration/state for an array of components
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3ComponentDataArray'
     V2ComponentsUpdateRequest:
       description: The configuration/state for an array of components
       required: true
@@ -1248,6 +1262,10 @@ components:
         next:
           $ref: '#/components/schemas/V3NextData'
     ## COMPONENTS ENDPOINT ##
+    ComponentId:
+      type: string
+      description: The component's id. e.g. xname for hardware components
+      minLength: 1
     V2ComponentsFilter:
       description: Information for patching multiple components.
       type: object
@@ -1352,8 +1370,7 @@ components:
       type: object
       properties:
         id:
-          type: string
-          description: The component's id. e.g. xname for hardware components
+          $ref: '#/components/schemas/ComponentId'
         state:
           type: array
           items:
@@ -1419,8 +1436,7 @@ components:
       type: object
       properties:
         id:
-          type: string
-          description: The component's id. e.g. xname for hardware components
+          $ref: '#/components/schemas/ComponentId'
         state:
           type: array
           items:
@@ -1517,7 +1533,7 @@ components:
         component_ids:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/ComponentId'
     V2ComponentsUpdate:
       description: Information for patching multiple components.
       type: object
@@ -2072,7 +2088,7 @@ paths:
       description: Update the state for a collection of components in the cfs database
       operationId: put_components_v2
       requestBody:
-        $ref: '#/components/requestBodies/V2ComponentsUpdateRequest'
+        $ref: '#/components/requestBodies/V2ComponentsCreateRequest'
       responses:
         200:
           $ref: '#/components/responses/V2ComponentDetailsArray'
@@ -2614,7 +2630,7 @@ paths:
       description: Update the state for a collection of components in the cfs database
       operationId: put_components_v3
       requestBody:
-        $ref: '#/components/requestBodies/V3ComponentsUpdateRequest'
+        $ref: '#/components/requestBodies/V3ComponentsCreateRequest'
       responses:
         200:
           $ref: '#/components/responses/V3ComponentIdCollection'
