@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.12.11] - 11/06/2024
 ### Fixed
 - CASMCMS-9189: Two corrections to the CFS API spec
   - The spec indicated that PUT requests to the `/components` endpoints could specify either a dictionary or a list, just as with PATCH requests to those endpoints.
