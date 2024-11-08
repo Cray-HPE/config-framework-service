@@ -27,6 +27,7 @@
 import os
 import logging
 import connexion
+from connexion.validators import DefaultsJSONRequestBodyValidator
 
 from cray.cfs.api import encoder
 from cray.cfs.api.controllers import options
@@ -37,6 +38,7 @@ LOG_FORMAT = "%(asctime)-15s - %(levelname)-7s - %(name)s - %(message)s"
 logging.basicConfig(level=log_level, format=LOG_FORMAT)
 LOGGER = logging.getLogger(__name__)
 
+validator_map = {"body": {"application/json": DefaultsJSONRequestBodyValidator}}
 
 def create_app():
     sessions._init()
@@ -46,7 +48,7 @@ def create_app():
     app = connexion.App(__name__, specification_dir='./openapi/')
     app.app.json_encoder = encoder.JSONEncoder
     app.add_api('openapi.yaml', arguments={'title': 'Configuration Framework Service'},
-                pythonic_params=True, base_path='/')
+                pythonic_params=True, base_path='/', validator_map=validator_map)
     return app
 
 
