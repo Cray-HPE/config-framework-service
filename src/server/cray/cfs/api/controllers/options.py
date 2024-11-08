@@ -148,6 +148,7 @@ class Options:
     def get_option(self, key, data_type, default=None):
         if not self.options:
             self.refresh()
+        assert self.options is not None
         try:
             return data_type(self.options[key])
         except KeyError as e:
