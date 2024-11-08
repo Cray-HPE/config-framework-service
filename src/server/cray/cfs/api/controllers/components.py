@@ -637,6 +637,8 @@ def _get_desired_state(data, configs=None):
     if not configs:
         configs = configurations.Configurations()
     config_name = data['desired_config']
+    if not config_name:
+        return None
     config = configs.get_config(config_name)
     return config
 
