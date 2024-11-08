@@ -26,6 +26,7 @@ import ujson as json
 import logging
 import redis
 import time
+import traceback
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
@@ -88,22 +89,25 @@ class DBWrapper():
     def get(self, key):
         for attempt in range(5):
             if attempt > 0:
+                LOGGER.warning(f"{self.me}: key '{key}' attempt {attempt}")
                 time.sleep(1)
             data = self._get(key)
             if data is not None:
                 return data
-        LOGGER.warning(f"{self.me}: key {key} still null/false after retries")
+            if attempt == 0:
+                traceback.print_stack()
+        LOGGER.warning(f"{self.me}: key '{key}' still null/false after retries")
         return data
 
     def get(self, key):
         """Get the data for the given key."""
         datastr = self.client.get(key)
         if not datastr:
-            LOGGER.warning(f"{self.me}: key {key} has false/null value: {datastr}")
+            LOGGER.warning(f"{self.me}: key '{key}' has false/null value: {datastr}")
             return None
         data = json.loads(datastr)
         if data is None:
-            LOGGER.warning(f"{self.me}: After decoding, key {key} has null value")
+            LOGGER.warning(f"{self.me}: After decoding, key '{key}' has null value")
             return None
         return data
 
