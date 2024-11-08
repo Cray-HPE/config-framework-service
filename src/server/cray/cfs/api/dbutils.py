@@ -99,7 +99,7 @@ class DBWrapper():
         LOGGER.warning(f"{self.me}: key '{key}' still null/false after retries")
         return data
 
-    def get(self, key):
+    def _get(self, key):
         """Get the data for the given key."""
         datastr = self.client.get(key)
         if not datastr:
