@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -436,7 +436,10 @@ def _get_ssl_info(source=None, tmp_dir=""):
 
 class Configurations(object):
     def __init__(self):
-        self.configs = {}
+        # Some callers call the get_config method without checking if the configuration name is
+        # set. If it is not set, calling the database will always just return None, so we can
+        # save ourselves the network traffic of a database call here.
+        self.configs = { "": None, None: None }
 
     """Helper class for other endpoints that need access to configurations"""
     def get_config(self, key):
