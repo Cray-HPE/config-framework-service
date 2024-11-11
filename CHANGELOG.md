@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Do not make database call to look for configuration with null name
+- CASMCMS-9197: Bypass needless code when listing configurations and sources
 
 ### Fixed
 - CASMCMS-9196: Use the default value for `authentication_method` when creating a source, if the request does not specify it.
