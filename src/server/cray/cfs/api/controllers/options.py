@@ -23,6 +23,7 @@
 #
 import logging
 import connexion
+import os
 import threading
 import time
 import traceback
@@ -45,6 +46,7 @@ DEFAULTS = {
     'include_ara_links': True,
 }
 
+_options_refresh_lock = threading.Lock()
 
 def _init():
     cleanup_old_options()
@@ -148,29 +150,47 @@ class Options:
         return cls.instance
 
     def melog(self, msg):
-        LOGGER.warning(f"Options {id(self)}: {msg}")
+        LOGGER.warning(f"Options pid={os.getpid()} tid={threading.get_ident()} id={id(self)}: {msg}")
+        #pass
 
     def __init__(self):
         self.melog("__init__: called")
-        traceback.print_stack()
+        #traceback.print_stack()
         self.options = None
         self.melog("__init__: self.options = None")
 
     def refresh(self):
+        with _options_refresh_lock:
+            self._refresh()
+
+    def _refresh(self):
         new_options = get_options_data()
         assert new_options is not None
         self.options = new_options
+        return new_options
+
+    def get_options(self):
+        option_data = self.options
+        if option_data:
+            return option_data
+        self.melog("get_options: self.options is None")
+        with _options_refresh_lock:
+            self.melog("get_options: Got lock")
+            option_data = self.options
+            if option_data:
+                self.melog("get_options: self.options no longer None")
+                return option_data
+            self.melog("get_option: Calling refresh")
+            option_data = self._refresh()
+            self.melog(f"get_option: self.options is {option_data} after refresh")
+            assert option_data is not None
+            return option_data
 
     def get_option(self, key, data_type, default=None):
-        if not self.options:
-            self.melog("get_option: self.options is None, calling refresh")
-            self.refresh()
-            self.melog(f"get_option: self.options is {self.options} after refresh")
-        else:
-            self.melog(f"get_option: self.options is not None: {self.options}")
-        assert self.options is not None
+        option_data = self.get_options()
+        assert option_data is not None
         try:
-            return data_type(self.options[key])
+            return data_type(option_data[key])
         except KeyError as e:
             if default is not None:
                 LOGGER.warning(
