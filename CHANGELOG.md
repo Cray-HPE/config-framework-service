@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - CASMCMS-9196: Use the default value for `authentication_method` when creating a source, if the request does not specify it.
 
+### Fixed
+- CASMCMS-9198: Enforce same value restrictions on CFS options between v2 and v3 (for options that exist in both).
+
 ## [1.21.0] - 11/06/2024
 ### Fixed
 - CASMCMS-9189: Two corrections to the CFS API spec
