@@ -127,6 +127,13 @@ def post_source_v3():
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
+    # CASMCMS-9196: connexion does not fill in default values for parameters in the request
+    # body. So here we set the default value for authentication_method, if needed. Note that
+    # connexion DOES validate that the request is valid, so we know that the credentials field
+    # is present.
+    if "authentication_method" not in data["credentials"]:
+        data["credentials"]["authentication_method"] = "password"
+
     error = _validate_source(data)
     if error:
         return error
