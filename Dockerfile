@@ -46,13 +46,14 @@ RUN cat lib/server/requirements.txt && \
     cat lib/server/requirements.txt && \
     apk add --upgrade --no-cache apk-tools &&  \
 	apk update && \
-	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
+	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git yq && \
 	apk -U upgrade --no-cache && \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -r requirements.txt && \
-    pip3 list --format freeze
+    pip3 list --format freeze && \
+    yq -o=json eval /app/api/openapi.yaml > /app/api/openapi.json
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \

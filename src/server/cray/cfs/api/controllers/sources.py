@@ -25,6 +25,7 @@ from collections.abc import Container
 import connexion
 from datetime import datetime
 from functools import partial
+#import jsonref
 import logging
 import uuid
 import urllib.parse
@@ -40,20 +41,27 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-
+#with open("/app/api/openapi.json", "rt") as jsonspec:
+#    OAS_JSON = jsonref.replace_refs(jsonref.load(jsonspec))
 
 @dbutils.redis_error_handler
 @options.defaults(limit="default_page_size")
 def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
-    LOGGER.debug("GET /sources invoked get_sources_v3")
+    LOGGER.info("GET /sources invoked get_sources_v3")
     called_parameters = locals()
+    LOGGER.info("GET /sources 1")
     sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit, after_id=after_id)
+    LOGGER.info("GET /sources 2")
     response = {"sources": sources_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
+        LOGGER.info("GET /sources 3")
         next_data["after_id"] = sources_data[-1]["name"]
+        LOGGER.info("GET /sources 4")
         response["next"] = next_data
+        LOGGER.info("GET /sources 5")
+    LOGGER.info("GET /sources 6")
     return response, 200
 
 
@@ -98,7 +106,7 @@ def _get_in_use_list():
 
 
 def _iter_configurations_data():
-    next_parameters = {}
+    next_parameters = { }
     while True:
         data, _ = configurations.get_configurations_v3(**next_parameters)
         for component in data["configurations"]:
@@ -119,6 +127,15 @@ def get_source_v3(source_id):
             detail="Source {} could not be found".format(source_id))
     return DB.get(source_id), 200
 
+#def set_schema_defaults(schema: dict, data: dict) -> None:
+#    for prop_name, prop_data in schema["properties"].items():
+#        if prop_name in data:
+#            if prop_data["type"] == "object":
+#                set_schema_defaults(schema=prop_data, data=data[prop_name])
+#            continue
+#        if "default" in prop_data:
+#            data[prop_name] = prop_data["default"]
+
 
 @dbutils.redis_error_handler
 def post_source_v3():
@@ -137,6 +154,10 @@ def post_source_v3():
     # is present.
     if "authentication_method" not in data["credentials"]:
         data["credentials"]["authentication_method"] = "password"
+
+    #LOGGER.info("data before setting defaults = %s", str(data))
+    #set_schema_defaults(schema=OAS_JSON["components"]["schemas"]["V3SourceCreateData"], data=data)
+    #LOGGER.info("data after setting defaults = %s", str(data))
 
     error = _validate_source(data)
     if error:

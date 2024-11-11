@@ -25,6 +25,7 @@ import logging
 import connexion
 import threading
 import time
+import traceback
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.models.v2_options import V2Options
@@ -80,7 +81,11 @@ def get_options_v3():
 
 
 def get_options_data():
-    return _check_defaults(DB.get(OPTIONS_KEY))
+    opts = DB.get(OPTIONS_KEY)
+    assert opts is not None
+    _opts_data = _check_defaults(opts)
+    assert _opts_data is not None
+    return _opts_data
 
 
 def _check_defaults(data):
@@ -94,7 +99,10 @@ def _check_defaults(data):
             data[key] = DEFAULTS[key]
             put = True
     if put:
-        return DB.put(OPTIONS_KEY, data)
+        dbput = DB.put(OPTIONS_KEY, data)
+        assert dbput is not None
+        return dbput
+    assert data is not None
     return data
 
 
@@ -139,15 +147,28 @@ class Options:
             cls.instance.__init__()
         return cls.instance
 
+    def melog(self, msg):
+        LOGGER.warning(f"Options {id(self)}: {msg}")
+
     def __init__(self):
+        self.melog("__init__: called")
+        traceback.print_stack()
         self.options = None
+        self.melog("__init__: self.options = None")
 
     def refresh(self):
-        self.options = get_options_data()
+        new_options = get_options_data()
+        assert new_options is not None
+        self.options = new_options
 
     def get_option(self, key, data_type, default=None):
         if not self.options:
+            self.melog("get_option: self.options is None, calling refresh")
             self.refresh()
+            self.melog(f"get_option: self.options is {self.options} after refresh")
+        else:
+            self.melog(f"get_option: self.options is not None: {self.options}")
+        assert self.options is not None
         try:
             return data_type(self.options[key])
         except KeyError as e:

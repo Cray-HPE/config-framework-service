@@ -1,6 +1,7 @@
 -c constraints.txt
 -r lib/server/requirements.txt
 
+jsonref
 kubernetes
 requests
 redis

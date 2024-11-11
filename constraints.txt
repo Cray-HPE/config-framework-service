@@ -16,6 +16,7 @@ inflection>=0.5.1,<0.6
 isort>=4.3,<4.4
 itsdangerous>=2.1.2,<2.2
 Jinja2>=3.0.3,<3.1
+jsonref>=1.1,<1.2
 jsonschema>=4.23,<4.24
 kafka-python>=2.0,<2.1
 # CSM 1.6 moved to Kubernetes 1.24, so use client v24.x to ensure compatability

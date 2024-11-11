@@ -25,6 +25,8 @@ import connexion
 import ujson as json
 import logging
 import redis
+import time
+import traceback
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
@@ -59,6 +61,7 @@ class DBWrapper():
     def __init__(self, db):
         db_id = self._get_db_id(db)
         self.client = self._get_client(db_id)
+        self.me = db
 
     def __contains__(self, key):
         return self.client.exists(key)
@@ -84,11 +87,28 @@ class DBWrapper():
 
     # The following methods act like REST calls for single items
     def get(self, key):
+        for attempt in range(5):
+            if attempt > 0:
+                LOGGER.warning(f"{self.me}: key '{key}' attempt {attempt}")
+                time.sleep(1)
+            data = self._get(key)
+            if data is not None:
+                return data
+            if attempt == 0:
+                traceback.print_stack()
+        LOGGER.warning(f"{self.me}: key '{key}' still null/false after retries")
+        return data
+
+    def _get(self, key):
         """Get the data for the given key."""
         datastr = self.client.get(key)
         if not datastr:
+            LOGGER.warning(f"{self.me}: key '{key}' has false/null value: {datastr}")
             return None
         data = json.loads(datastr)
+        if data is None:
+            LOGGER.warning(f"{self.me}: After decoding, key '{key}' has null value")
+            return None
         return data
 
     def get_all(self, limit=0, after_id="", data_filter=None):
