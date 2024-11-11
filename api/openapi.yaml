@@ -411,64 +411,34 @@ components:
       type: object
       properties:
         hardwareSyncInterval:
-          type: integer
-          description: How frequently the CFS hardware-sync-agent checks with the Hardware State Manager to update its known hardware (in seconds)
-          example: 5
+          $ref: '#/components/schemas/V3Options/properties/hardware_sync_interval'
         batcherCheckInterval:
-          type: integer
-          description: How frequently the batcher checks the configuration states to see if work needs to be done (in seconds)
-          example: 5
+          $ref: '#/components/schemas/V3Options/properties/batcher_check_interval'
         batchSize:
-          type: integer
-          description: The maximum number of nodes the batcher will run a single CFS session against.
-          example: 120
+          $ref: '#/components/schemas/V3Options/properties/batch_size'
         batchWindow:
-          type: integer
-          description: The maximum number of seconds the batcher will wait to run a CFS session once a node has been detected that needs configuration.
-          example: 120
+          $ref: '#/components/schemas/V3Options/properties/batch_window'
         defaultBatcherRetryPolicy:
-          type: integer
-          description: The default maximum number retries per node when configuration fails.
-          example: 1
+          $ref: '#/components/schemas/V3Options/properties/default_batcher_retry_policy'
         defaultPlaybook:
           type: string
           description: The default playbook to be used if not specified in a node's desired state.
           example: site.yml
           pattern: '^[^\s;]*$'
         defaultAnsibleConfig:
-          type: string
-          description: The Kubernetes ConfigMap which holds the default ansible.cfg for a given CFS session. This ConfigMap must be present in the same Kubernetes namespace as the CFS service.
-          example: cfs-default-ansible-cfg
+          $ref: '#/components/schemas/V3Options/properties/default_ansible_config'
         sessionTTL:
-          type: string
-          description: >
-            A time-to-live applied to all completed CFS sessions.
-            Specified in minutes, hours, days, or weeks. e.g. 3d or 24h.
-            Set to an empty string to disable.
-          example: 24h
-          pattern: '^(?:[0-9]+[mMhHdDwW]){0,1}$'
-          minLength: 0
-          maxLength: 10
+          $ref: '#/components/schemas/V3Options/properties/session_ttl'
         additionalInventoryUrl:
-          type: string
-          description: >
-            The git clone URL of a repo with additional inventory files.  All files in the repo will be copied into the hosts directory of CFS.
-          example: https://api-gw-service-nmn.local/vcs/cray/inventory.git
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/V3Options/properties/additional_inventory_url'
         batcherMaxBackoff:
-          type: integer
-          description: >
-            The maximum number of seconds that batcher will backoff from session creation if problems are detected.
-          example: 3600
+          $ref: '#/components/schemas/V3Options/properties/batcher_max_backoff'
         batcherDisable:
-          type: boolean
-          description: Disables cfs-batcher's automatic session creation if set to True.
+          $ref: '#/components/schemas/V3Options/properties/batcher_disable'
         batcherPendingTimeout:
-          type: integer
-          description: How long cfs-batcher will wait on a pending session before deleting and recreating it (in seconds).
+          $ref: '#/components/schemas/V3Options/properties/batcher_pending_timeout'
         loggingLevel:
-          type: string
-          description: The logging level for core CFS services.  This does not affect the Ansible logging level.
+          $ref: '#/components/schemas/V3Options/properties/logging_level'
       additionalProperties: false
     V3Options:
       description: |
