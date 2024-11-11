@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Do not make database call to look for configuration with null name
+- CASMCMS-9197: Bypass needless code when listing configurations and sources
 
 ## [1.21.0] - 11/06/2024
 ### Fixed
