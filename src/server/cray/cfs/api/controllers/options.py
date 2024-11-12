@@ -46,7 +46,7 @@ DEFAULTS = {
     'include_ara_links': True,
 }
 
-_options_refresh_lock = threading.Lock()
+#_options_refresh_lock = threading.Lock()
 
 def _init():
     cleanup_old_options()
@@ -160,8 +160,8 @@ class Options:
         self.melog("__init__: self.options = None")
 
     def refresh(self):
-        with _options_refresh_lock:
-            self._refresh()
+        #with _options_refresh_lock:
+        self._refresh()
 
     def _refresh(self):
         new_options = get_options_data()
@@ -174,8 +174,9 @@ class Options:
         if option_data:
             return option_data
         self.melog("get_options: self.options is None")
-        with _options_refresh_lock:
-            self.melog("get_options: Got lock")
+        #with _options_refresh_lock:
+        if 1 == 1:
+            #self.melog("get_options: Got lock")
             option_data = self.options
             if option_data:
                 self.melog("get_options: self.options no longer None")
