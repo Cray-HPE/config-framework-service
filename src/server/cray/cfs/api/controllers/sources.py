@@ -182,6 +182,30 @@ def patch_source_v3(source_id):
     return response_data, 200
 
 
+@dbutils.redis_error_handler
+def restore_source_v3(source_id):
+    """Used by the POST /sources/{source_id} API operation"""
+    LOGGER.debug(f"POST /sources/{source_id} invoked restore_source_v3")
+    try:
+        data = connexion.request.get_json()
+    except Exception as err:
+        return connexion.problem(
+            status=400, title="Error parsing the data provided.",
+            detail=str(err))
+
+    data = _set_auto_fields(data)
+    data["name"] = source_id
+
+    if data["name"] in DB:
+        return connexion.problem(
+            detail="A source with the name {} already exists".format(data["name"]),
+            status=409,
+            title="Conflicting source name"
+        )
+
+    return DB.put(data.get("name"), data), 201
+
+
 def _validate_source(source):
     source_credentials = source.get("credentials")
     if source_credentials:
