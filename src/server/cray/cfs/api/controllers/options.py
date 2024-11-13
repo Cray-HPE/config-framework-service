@@ -139,15 +139,17 @@ def patch_options_v3():
         DB.put(OPTIONS_KEY, {})
     return DB.patch(OPTIONS_KEY, data), 200
 
+_options_create_lock = threading.Lock()
 
 class Options:
     """Helper class for other endpoints that need access to options"""
     def __new__(cls):
         """This override makes the class a singleton"""
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(Options, cls).__new__(cls)
-            cls.instance.__init__()
-        return cls.instance
+        with _options_create_lock:
+            if not hasattr(cls, 'instance'):
+                cls.instance = super(Options, cls).__new__(cls)
+                cls.instance.__init__()
+            return cls.instance
 
     def melog(self, msg):
         LOGGER.warning(f"Options pid={os.getpid()} tid={threading.get_ident()} id={id(self)}: {msg}")
