@@ -152,9 +152,11 @@ class Options:
         We only want this singleton to be initialized once
         """
         if _initialize:
+            LOGGER.debug(f"__init__ {id(self)}")
             self.options = None
 
     def refresh(self):
+        LOGGER.debug(f"refresh {id(self)}")
         self.options = get_options_data()
 
     def get_option(self, key, data_type, default=None):
