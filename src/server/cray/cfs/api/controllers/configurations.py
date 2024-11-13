@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+from collections.abc import Container
 import connexion
 from datetime import datetime
 from functools import partial
@@ -72,23 +73,26 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
 
 @options.defaults(limit="default_page_size")
 def _get_configurations_data(in_use=None, limit=1, after_id=""):
-    configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list())
+    # CASMCMS-9197: Only specify a filter if we are actually filtering
+    if in_use is not None:
+        configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list())
+    else:
+        configuration_filter = None
     configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=configuration_filter)
     return configuration_data_page, next_page_exists
 
 
-def _configuration_filter(configuration_data, in_use, in_use_list):
-    if in_use is not None:
-        return _matches_filter(configuration_data, in_use, in_use_list)
-    else:
-        # No filter is being used so all components are valid
-        return True
+def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
+    """
+    If in_use is true:
+        Returns True if the name of the specified configuration is in in_use_list,
+        Returns False otherwise
 
-
-def _matches_filter(configuration_data, in_use, in_use_list):
-    if in_use is not None and (configuration_data["name"] in in_use_list) != in_use:
-            return False
-    return True
+    If in_use is false:
+        Returns True if the name of the specified configuration is NOT in in_use_list,
+        Returns False otherwise
+    """
+    return (configuration_data["name"] in in_use_list) == in_use
 
 
 def _get_in_use_list():
@@ -436,7 +440,10 @@ def _get_ssl_info(source=None, tmp_dir=""):
 
 class Configurations(object):
     def __init__(self):
-        self.configs = {}
+        # Some callers call the get_config method without checking if the configuration name is
+        # set. If it is not set, calling the database will always just return None, so we can
+        # save ourselves the network traffic of a database call here.
+        self.configs = { "": None, None: None }
 
     """Helper class for other endpoints that need access to configurations"""
     def get_config(self, key):
