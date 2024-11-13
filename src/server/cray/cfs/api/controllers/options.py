@@ -167,11 +167,13 @@ class Options:
         new_options = get_options_data()
         assert new_options is not None
         self.options = new_options
+        assert self.options is not None
         return new_options
 
     def get_options(self):
         option_data = self.options
         if option_data:
+            assert self.options is not None
             return option_data
         self.melog("get_options: self.options is None")
         #with _options_refresh_lock:
@@ -180,16 +182,19 @@ class Options:
             option_data = self.options
             if option_data:
                 self.melog("get_options: self.options no longer None")
+                assert self.options is not None
                 return option_data
             self.melog("get_option: Calling refresh")
             option_data = self._refresh()
             self.melog(f"get_option: self.options is {option_data} after refresh")
             assert option_data is not None
+            assert self.options is not None
             return option_data
 
     def get_option(self, key, data_type, default=None):
         option_data = self.get_options()
         assert option_data is not None
+        assert self.options is not None
         try:
             return data_type(option_data[key])
         except KeyError as e:
