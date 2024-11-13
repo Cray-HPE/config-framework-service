@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.9] - 11/13/2024
+### Changed
+- Do not make database call to look for configuration with null name
+- CASMCMS-9197: Bypass needless code when listing configurations and sources
+
+### Fixed
+- CASMCMS-9196: Use the default value for `authentication_method` when creating a source, if the request does not specify it.
+- CASMCMS-9198: Enforce same value restrictions on CFS options between v2 and v3 (for options that exist in both).
+
 ## [1.18.8] - 11/06/2024
 ### Fixed
 - CASMCMS-9189: Two corrections to the CFS API spec
