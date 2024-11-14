@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- CASMCMS-9202: Add POST option to v3/sources/{source_id} endpoint to allow restoring a previous
+  source by specifying its Vault secret name rather than a username/password.
 
 ## [1.22.0] - 11/13/2024
 ### Changed
