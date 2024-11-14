@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - CASMCMS-9200: Make Options class thread-safe and prevent redundant initialization
 
+### Added
+- CASMCMS-9202: Add POST option to v3/sources/{source_id} endpoint to allow restoring a previous
+  source by specifying its Vault secret name rather than a username/password.
+
 ## [1.18.9] - 11/13/2024
 ### Changed
 - Do not make database call to look for configuration with null name
