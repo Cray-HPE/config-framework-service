@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.1] - 11/14/2024
+### Added
+- Added note to API spec indicating minimum CFS version to use new POST v3/sources/{source_id}
+
 ## [1.23.0] - 11/14/2024
 ### Added
 - CASMCMS-9202: Add POST option to v3/sources/{source_id} endpoint to allow restoring a previous

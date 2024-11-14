@@ -3003,6 +3003,7 @@ paths:
         This is intended to be used to restore CFS data in the case that it is lost or corrupted.
         This will NOT recover a source that has been deleted using CFS, because when CFS deletes a
         source, it also deletes its corresponding Vault secret.
+        NOTE: This action is not available prior to CFS 1.23
       operationId: restore_source_v3
       requestBody:
         $ref: '#/components/requestBodies/V3SourceRestoreRequest'
