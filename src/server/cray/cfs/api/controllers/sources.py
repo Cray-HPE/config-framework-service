@@ -113,6 +113,7 @@ def get_source_v3(source_id):
     """Used by the GET /sources/{source_id} API operation"""
     LOGGER.debug(f"GET /sources/{source_id} invoked get_source_v3")
     source_id = urllib.parse.unquote(source_id)
+    LOGGER.debug(f"After parsing, source_id={source_id}")
     if source_id not in DB:
         return connexion.problem(
             status=404, title="Source not found",
