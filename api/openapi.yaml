@@ -211,6 +211,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/V3SourceCreateData'
+    V3SourceRestoreRequest:
+      description: A source
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V3SourceRestoreData'
     V3SourceUpdateRequest:
       description: A source
       required: true
@@ -1614,15 +1621,34 @@ components:
         username:
           type: string
           description: The username for authenticating to git
+          minLength: 1
           writeOnly: true
         password:
           type: string
           description: The password for authenticating to git
+          minLength: 1
           writeOnly: true
       additionalProperties: false
       required:
         - username
         - password
+    V3SourceRestoreCredentials:
+      description: Information on a secret containing the username and password for accessing the git content
+      type: object
+      properties:
+        authentication_method:
+          type: string
+          description: The git authentication method used.
+          enum:
+            - password
+        secret_name:
+          type: string
+          description: The name of the credentials vault secret.
+          minLength: 1
+      required:
+        - authentication_method
+        - secret_name
+      additionalProperties: false
     V3SourceCreateData:
       description: Information for retrieving git content from a source.
       type: object
@@ -1631,14 +1657,35 @@ components:
           type: string
           description: The name of the source.  This field is optional and will default to the clone_url if not specified.
           example: sample-source
+          minLength: 1
         description:
           type: string
           description: A user-defined description. This field is not used by CFS.
         clone_url:
           type: string
           description: The url to access the git content
+          minLength: 1
         credentials:
           $ref: '#/components/schemas/V3SourceCreateCredentials'
+        ca_cert:
+          $ref: '#/components/schemas/V3SourceCert'
+      additionalProperties: false
+      required:
+        - clone_url
+        - credentials
+    V3SourceRestoreData:
+      description: Information for retrieving git content from a source.
+      type: object
+      properties:
+        description:
+          type: string
+          description: A user-defined description. This field is not used by CFS.
+        clone_url:
+          type: string
+          description: The url to access the git content
+          minLength: 1
+        credentials:
+          $ref: '#/components/schemas/V3SourceRestoreCredentials'
         ca_cert:
           $ref: '#/components/schemas/V3SourceCert'
       additionalProperties: false
@@ -1655,6 +1702,7 @@ components:
         clone_url:
           type: string
           description: The url to access the git content
+          minLength: 1
         credentials:
           $ref: '#/components/schemas/V3SourceCredentials'
         ca_cert:
@@ -2942,6 +2990,29 @@ paths:
           $ref: '#/components/responses/BadRequest'
         404:
           $ref: '#/components/responses/ResourceNotFound'
+    post:
+      summary: Restore a source
+      tags:
+        - sources
+        - v3
+        - cli_ignore
+      x-openapi-router-controller: cray.cfs.api.controllers.sources
+      description:  >-
+        Restore a CFS source by providing the name of the Vault secret that contains the credentials.
+        This does NOT create the secret in Vault, nor does it validate that the secret exists.
+        This is intended to be used to restore CFS data in the case that it is lost or corrupted.
+        This will NOT recover a source that has been deleted using CFS, because when CFS deletes a
+        source, it also deletes its corresponding Vault secret.
+      operationId: restore_source_v3
+      requestBody:
+        $ref: '#/components/requestBodies/V3SourceRestoreRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/V3SourceData'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        409:
+          $ref: '#/components/responses/ConflictingSourceName'
     delete:
       tags:
         - sources

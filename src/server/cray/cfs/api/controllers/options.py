@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -132,15 +132,27 @@ def patch_options_v3():
 
 class Options:
     """Helper class for other endpoints that need access to options"""
+    _create_lock = threading.Lock()
+
     def __new__(cls):
         """This override makes the class a singleton"""
         if not hasattr(cls, 'instance'):
-            cls.instance = super(Options, cls).__new__(cls)
-            cls.instance.__init__()
+            # Make sure that no other thread has beaten us to the punch
+            with cls._create_lock:
+                if not hasattr(cls, 'instance'):
+                    new_instance = super(Options, cls).__new__(cls)
+                    new_instance.__init__(_initialize=True)
+                    # Only assign to cls.instance after all work has been done, to ensure
+                    # no other threads access it prematurely
+                    cls.instance = new_instance
         return cls.instance
 
-    def __init__(self):
-        self.options = None
+    def __init__(self, _initialize: bool=False):
+        """
+        We only want this singleton to be initialized once
+        """
+        if _initialize:
+            self.options = None
 
     def refresh(self):
         self.options = get_options_data()
