@@ -1058,6 +1058,8 @@ components:
     V3AdditionalInventoryLayer:
       description: |
         An inventory reference to include in a set of configurations.
+        Either clone_url or source must be specified -- it is required to specify one,
+        but they are mutually exclusive.
       type: object
       properties:
         name:
@@ -1084,7 +1086,6 @@ components:
             The repository branch to use. This will automatically set `commit` to master on the branch
             when the configuration is added.
           pattern: '^[^\s;]*$'
-      required: [clone_url]
       additionalProperties: false
     V2ConfigurationLayer:
       description: |
@@ -1131,6 +1132,8 @@ components:
     V3ConfigurationLayer:
       description: |
         A single desired configuration state for a component.
+        Either clone_url or source must be specified -- it is required to specify one,
+        but they are mutually exclusive.
       type: object
       properties:
         name:
