@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.13] - 11/15/2024
+### Fixed
+- CASMCMS-9208: Decode source name before restoring source data
+
 ## [1.18.12] - 11/15/2024
 ### Fixed
 - CASMCMS-9207: Update API spec to reflect actual status code for successful POST to v3/sources/{source_id}

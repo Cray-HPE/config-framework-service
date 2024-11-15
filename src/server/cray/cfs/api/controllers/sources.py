@@ -186,6 +186,7 @@ def patch_source_v3(source_id):
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
     LOGGER.debug(f"POST /sources/{source_id} invoked restore_source_v3")
+    source_id = urllib.parse.unquote(source_id)
     try:
         data = connexion.request.get_json()
     except Exception as err:
