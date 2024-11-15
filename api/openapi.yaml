@@ -2980,7 +2980,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/V3SourceRestoreRequest'
       responses:
-        200:
+        201:
           $ref: '#/components/responses/V3SourceData'
         400:
           $ref: '#/components/responses/BadRequest'
