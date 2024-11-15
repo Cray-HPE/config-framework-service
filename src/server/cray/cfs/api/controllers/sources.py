@@ -87,10 +87,7 @@ def _get_in_use_list():
     if source:
         in_use_list.add(source)
     for configuration in _iter_configurations_data():
-        source = configuration.get("additional_inventory_source", "")
-        if source and type(source) == str:
-            in_use_list.add(source)
-        for layer in configuration.get("layers"):
+        for layer in configurations.iter_layers(configuration, include_additional_inventory=True):
             source = layer.get("source", "")
             if source:
                 in_use_list.add(source)
