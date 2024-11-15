@@ -114,6 +114,11 @@ def _iter_components_data():
         if not next_parameters:
             break
 
+def _config_in_use(config_name: str) -> bool:
+    data, _ = components.get_components_v3(config_name=config_name, limit=1)
+    if data["components"]:
+        return True
+    return False
 
 @dbutils.redis_error_handler
 def get_configuration_v2(configuration_id):
@@ -278,7 +283,7 @@ def delete_configuration_v2(configuration_id):
         return connexion.problem(
             status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
-    if configuration_id in _get_in_use_list():
+    if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
             detail="Configuration {} is referenced by the desired state of"
@@ -294,7 +299,7 @@ def delete_configuration_v3(configuration_id):
         return connexion.problem(
             status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
-    if configuration_id in _get_in_use_list():
+    if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
             detail="Configuration {} is referenced by the desired state of"

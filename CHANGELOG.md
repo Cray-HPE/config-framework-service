@@ -5,8 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.18.14] - 11/15/2024
 ### Fixed
 - CASMCMS-9210: Correctly check `additional_inventory` layer when seeing if a source is in use
+
+### Changed
+- CASMCMS-9211: Improve performance of configuration delete operation.
 
 ## [1.18.13] - 11/15/2024
 ### Fixed
