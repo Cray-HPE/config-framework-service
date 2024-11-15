@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.3] - 11/15/2024
+### Fixed
+- CASMCMS-9207: Update API spec to reflect actual status code for successful POST to v3/sources/{source_id}
+
 ## [1.23.2] - 11/14/2024
 ### Fixed
 - CASMCMS-9206: Update API spec to reflect that in v3, a layer requires exactly one of `clone_url` and `source`.
