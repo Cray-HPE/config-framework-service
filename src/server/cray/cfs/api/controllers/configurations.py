@@ -154,7 +154,7 @@ def put_configuration_v2(configuration_id):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
-    for layer in _iter_layers(data, include_additional_inventory=True):
+    for layer in iter_layers(data, include_additional_inventory=True):
         if 'branch' in layer and 'commit' in layer:
             return connexion.problem(
                 status=400, title="Error handling error branches",
@@ -168,7 +168,7 @@ def put_configuration_v2(configuration_id):
             detail=str(e))
 
     layer_keys = set()
-    for layer in _iter_layers(data, include_additional_inventory=False):
+    for layer in iter_layers(data, include_additional_inventory=False):
         layer_key = (layer.get('clone_url'), layer.get('playbook'))
         if layer_key in layer_keys:
             return connexion.problem(
@@ -192,7 +192,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
-    for layer in _iter_layers(data, include_additional_inventory=True):
+    for layer in iter_layers(data, include_additional_inventory=True):
         if 'clone_url' in layer and 'source' in layer:
             return connexion.problem(
                 status=400, title="Error handling source",
@@ -218,7 +218,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             detail=str(e))
 
     layer_keys = set()
-    for layer in _iter_layers(data, include_additional_inventory=False):
+    for layer in iter_layers(data, include_additional_inventory=False):
         layer_key = (layer.get('clone_url', layer.get('source')), layer.get('playbook'))
         if layer_key in layer_keys:
             return connexion.problem(
@@ -228,7 +228,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
         layer_keys.add(layer_key)
 
     if drop_branches:
-        for layer in _iter_layers(data, include_additional_inventory=True):
+        for layer in iter_layers(data, include_additional_inventory=True):
             if "branch" in layer:
                 del(layer["branch"])
 
@@ -307,7 +307,7 @@ def delete_configuration_v3(configuration_id):
     return DB.delete(configuration_id), 204
 
 
-def _iter_layers(config_data, include_additional_inventory=True):
+def iter_layers(config_data, include_additional_inventory=True):
     if include_additional_inventory and config_data.get("additional_inventory"):
         for layer in (config_data.get('layers') + [config_data.get('additional_inventory')]):
             yield layer
@@ -339,7 +339,7 @@ class BranchConversionException(Exception):
 
 
 def _convert_branches_to_commits(data):
-    for layer in _iter_layers(data, include_additional_inventory=True):
+    for layer in iter_layers(data, include_additional_inventory=True):
         if 'branch' in layer:
             branch = layer.get('branch')
             if 'source' in layer:

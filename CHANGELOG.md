@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - CASMCMS-9211: Improve performance of configuration delete operation.
 
+### Fixed
+- CASMCMS-9210: Correctly check `additional_inventory` layer when seeing if a source is in use
+
 ## [1.23.4] - 11/15/2024
 ### Fixed
 - CASMCMS-9208: Decode source name before restoring source data
