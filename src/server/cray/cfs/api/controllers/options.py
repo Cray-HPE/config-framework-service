@@ -23,6 +23,8 @@
 #
 import logging
 import connexion
+import datetime
+import os
 import threading
 import time
 
@@ -45,7 +47,11 @@ DEFAULTS = {
 }
 
 
+def testlog(msg):
+    LOGGER.info("testlog: pid=%d tid=%d %s", os.getpid(), threading.get_ident(), msg)
+
 def _init():
+    testlog("_init called")
     cleanup_old_options()
     # Start options refresh
     options_refresh = threading.Thread(target=periodically_refresh_options, args=())
@@ -153,9 +159,11 @@ class Options:
         """
         if _initialize:
             self.options = None
+            self.last_updated = None
 
     def refresh(self):
         self.options = get_options_data()
+        self.last_updated = datetime.datetime.now()
 
     def get_option(self, key, data_type, default=None):
         if not self.options:
@@ -226,15 +234,27 @@ def update_log_level(new_level_str):
 
 def periodically_refresh_options():
     """Caching and refreshing options saves time during calls"""
+    zero_interval = datetime.timedelta()
+    maximum_interval = datetime.timedelta(seconds=2)
     options = Options()
     while True:
+        last_updated = options.last_updated
+        if last_updated is None:
+            time_until_update = zero_interval
+        else:
+            time_until_update = last_updated + maximum_interval - datetime.datetime.now()
+        if time_until_update > zero_interval:
+            # This means it is not yet time to refresh the options
+            time.sleep(time_until_update.total_seconds())
+            continue
         try:
+            testlog("periodically_refresh_options: Calling options.refresh")
             options.refresh()
             if options.logging_level:
                 update_log_level(options.logging_level)
         except Exception as e:
             LOGGER.debug(e)
-        time.sleep(2)
+        time.sleep(maximum_interval.total_seconds())
 
 
 def convert_options_to_v2(data):
