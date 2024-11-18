@@ -29,7 +29,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal, Optional, Union
 import urllib.parse
 
 from cray.cfs.api import dbutils
@@ -93,7 +93,7 @@ def _get_configurations_data(in_use: Optional[bool]=None, limit: int=1, after_id
     return configuration_data_page, next_page_exists
 
 
-def _get_config_filter(in_use: Optional[bool]=None, source_name: str="") -> Callable|Literal[False]:
+def _get_config_filter(in_use: Optional[bool]=None, source_name: str="") -> Union[Callable,Literal[False]]:
     """
     If the specified options result in a filter which will match all configurations, return None.
     If the specified options result in a filter which will match no configurations, return False.
