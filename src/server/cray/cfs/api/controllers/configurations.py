@@ -29,6 +29,8 @@ import logging
 import os
 import subprocess
 import tempfile
+from typing import Callable, Literal, Optional
+import urllib.parse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import components
@@ -58,11 +60,21 @@ def get_configurations_v2(in_use=None):
 
 @dbutils.redis_error_handler
 @options.defaults(limit="default_page_size")
-def get_configurations_v3(in_use=None, limit=1, after_id=""):
+def get_configurations_v3(in_use: Optional[bool]=None,
+                          limit: int=1,
+                          after_id: str="",
+                          source_name: str=""):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /configurations invoked get_configurations")
+    if source_name:
+        LOGGER.info("source_name pre-decode: %s", source_name)
+        source_name = urllib.parse.unquote(source_name)
+        LOGGER.info("source_name post-decode: %s", source_name)
     called_parameters = locals()
-    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id)
+    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use,
+                                                                     limit=limit,
+                                                                     after_id=after_id,
+                                                                     source_name=source_name)
     response = {"configurations": configurations_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -72,18 +84,52 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
 
 
 @options.defaults(limit="default_page_size")
-def _get_configurations_data(in_use=None, limit=1, after_id=""):
-    # CASMCMS-9197: Only specify a filter if we are actually filtering
-    if in_use is not None:
-        configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list())
-    else:
-        configuration_filter = None
+def _get_configurations_data(in_use: Optional[bool]=None, limit: int=1, after_id: str="", source_name: str=""):
+    configuration_filter = _get_config_filter(in_use, source_name)
+    if configuration_filter is False:
+        # This means that no configurations can match the specified filter. So save time and return an empty list.
+        return [], False
     configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=configuration_filter)
     return configuration_data_page, next_page_exists
 
 
-def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
+def _get_config_filter(in_use: Optional[bool]=None, source_name: str="") -> Callable|Literal[False]:
     """
+    If the specified options result in a filter which will match all configurations, return None.
+    If the specified options result in a filter which will match no configurations, return False.
+    Otherwise, return a filter function
+    """
+    if in_use is not None:
+        in_use_list=_get_in_use_list()
+        if in_use_list:
+            configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=in_use_list, source_name=source_name)
+            return configuration_filter
+        elif in_use is True:
+            # If in_use is true and the in_use_list is empty, then we know there are no configs that will match
+            return False
+
+    # If we get here it means either:
+    # in_use is None
+    # or
+    # in_use is False and in_use_list is empty
+    # EIther way, all configurations will match based on that. So we ignore in_use and consider source_name
+
+    if source_name:
+        configuration_filter = partial(_configuration_filter, source_name=source_name)
+        return configuration_filter
+
+    # If source_name is also empty, then all configs will match
+    return None
+
+def _configuration_filter(configuration_data: dict,
+                          in_use: Optional[bool]=None,
+                          in_use_list: Container[str]=(),
+                          source_name: str="") -> bool:
+    """
+    If source_name is specified, returns False if that name is not specified in any of the configuration layers.
+
+    If in_use is None, return True.
+
     If in_use is true:
         Returns True if the name of the specified configuration is in in_use_list,
         Returns False otherwise
@@ -92,6 +138,17 @@ def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: C
         Returns True if the name of the specified configuration is NOT in in_use_list,
         Returns False otherwise
     """
+    if source_name:
+        if all(source_name != layer["source"]
+               for layer in iter_layers(configuration_data, include_additional_inventory=True)
+               if "source" in layer):
+            # None of the layers specify source_name
+            return False
+
+    if in_use is None:
+        # No filters remaining, so this matches by default
+        return True
+
     return (configuration_data["name"] in in_use_list) == in_use
 
 

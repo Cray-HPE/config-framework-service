@@ -104,6 +104,11 @@ def _iter_configurations_data():
         if not next_parameters:
             break
 
+def _source_in_use(source_name: str) -> bool:
+    data, _ = configurations.get_configurations_v3(source_name=urllib.parse.quote(source_name), limit=1)
+    if data["configurations"]:
+        return True
+    return False
 
 @dbutils.redis_error_handler
 def get_source_v3(source_id):
@@ -253,7 +258,7 @@ def delete_source_v3(source_id):
         return connexion.problem(
             status=404, title="Source not found",
             detail="Source {} could not be found".format(source_id))
-    if source_id in _get_in_use_list():
+    if _source_in_use(source_id):
         return connexion.problem(
             status=400, title="Source is in use.",
             detail="Source {} is referenced by some configurations".format(source_id))

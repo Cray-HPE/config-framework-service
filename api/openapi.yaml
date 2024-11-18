@@ -2824,6 +2824,13 @@ paths:
           in: query
           description: >-
             Query for only configurations that are currently referenced by components.
+        - name: source_name
+          schema:
+            type: string
+            minLength: 1
+          in: query
+          description: >-
+            Query for only configurations that use the specified source in one of their layers.
       responses:
         200:
           $ref: '#/components/responses/V3ConfigurationDataCollection'
