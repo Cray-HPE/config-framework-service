@@ -25,6 +25,7 @@ import connexion
 import ujson as json
 import logging
 import redis
+import threading
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
@@ -56,19 +57,14 @@ class DBWrapper():
     and can be safely shared by multiple threads.
     """
 
-    def __init__(self, db):
-        db_id = self._get_db_id(db)
+    def __init__(self, db_id: int):
         self.client = self._get_client(db_id)
+        # Ensure that the database and cache remain consistent
+        self.write_lock = threading.Lock()
+        self.cache = self.populate_cache()
 
     def __contains__(self, key):
         return self.client.exists(key)
-
-    def _get_db_id(self, db):
-        """Converts a db name to the id used by Redis."""
-        if isinstance(db, int):
-            return db
-        else:
-            return DATABASES.index(db)
 
     def _get_client(self, db_id):
         """Create a connection with the database."""
@@ -82,22 +78,29 @@ class DBWrapper():
                          db_id, err)
             raise
 
+    def populate_cache(self):
+        """Return a mapping from all keys to their corresponding data
+           Based on https://github.com/redis/redis-py/issues/984#issuecomment-391404875
+        """
+        data = {}
+        cursor = '0'
+        while cursor != 0:
+            cursor, keys = self.client.scan(cursor=cursor, count=1000)
+            values = [ json.loads(datastr) if datastr else None
+                       for datastr in self.client.mget(keys) ]
+            keys = [ k.decode() for k in keys ]
+            data.update(dict(zip(keys, values)))
+        return data
+
     # The following methods act like REST calls for single items
     def get(self, key):
         """Get the data for the given key."""
-        datastr = self.client.get(key)
-        if not datastr:
-            return None
-        data = json.loads(datastr)
-        return data
+        return self.cache.get(key)
 
     def get_all(self, limit=0, after_id="", data_filter=None):
         """Get an array of data for all keys."""
 
-        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key.decode())
+        keys = set(self.cache)
         if after_id:
             keys.add(after_id) # This fixes the case where the record being referenced has been deleted.
         # Sorting the keys guarantees a consistent order when paging
@@ -118,8 +121,7 @@ class DBWrapper():
                 skip = False
                 continue
             if not skip:
-                data_str = self.client.get(key)
-                data = json.loads(data_str)
+                data = self.get(key)
                 if not data_filter or data_filter(data):
                     # filtering happens in get_all rather than after due to paging/memory constraints
                     #   we can't load all data and then filter on the results
@@ -133,17 +135,16 @@ class DBWrapper():
         return data_page, next_page_exists
 
     def get_keys(self):
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key)
         # Sorting the keys guarantees a consistent order when paging
-        sorted_keys = sorted(list(keys))
+        sorted_keys = sorted(list(self.cache))
         return sorted_keys
 
     def put(self, key, new_data):
         """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
-        self.client.set(key, datastr)
+        with self.write_lock:
+            self.client.set(key, datastr)
+            self.cache[key] = new_data
         return self.get(key)
 
     def patch(self, key, new_data, update_handler=None):
@@ -154,10 +155,7 @@ class DBWrapper():
         data = self._update(data, new_data)
         if update_handler:
             data = update_handler(data)
-        data_str = json.dumps(data)
-        self.client.set(key, data_str)
-        data = self.get(key)
-        return data
+        return self.put(key, data)
 
     def patch_all(self, data_filter, patch, update_handler=None):
         """Patch multiple resources in the database."""
@@ -177,8 +175,7 @@ class DBWrapper():
                 data = self._update(data, patch)
                 if update_handler:
                     data = update_handler(data)
-                data_str = json.dumps(data)
-                self.client.set(key, data_str)
+                self.put(key, data)
                 # Decode the key into a UTF-8 string, so the list will be JSON serializable
                 patched_id_list.append(key.decode('utf-8'))
         return patched_id_list
@@ -194,7 +191,9 @@ class DBWrapper():
 
     def delete(self, key):
         """Deletes data from the database."""
-        self.client.delete(key)
+        with self.write_lock:
+            self.client.delete(key)
+            self.cache.pop(key, None)
 
     def delete_all(self, data_filter, deletion_handler=None):
         """Delete multiple resources in the database."""
@@ -210,7 +209,7 @@ class DBWrapper():
             data_str = self.client.get(key)
             data = json.loads(data_str)
             if not data_filter or data_filter(data):
-                self.client.delete(key)
+                self.delete(key)
                 if deletion_handler:
                     deletion_handler(data)
                 # Decode the key into a UTF-8 string, so the list will be JSON serializable
@@ -238,10 +237,16 @@ def redis_error_handler(func):
                 detail=str(e))
     return wrapper
 
+DatabaseWrappers = {}
+for db_id, db_name in enumerate(DATABASES):
+    db_wrapper = DBWrapper(db_id)
+    DatabaseWrappers[db_id] = db_wrapper
+    DatabaseWrappers[db_name] = db_wrapper
+
 
 def get_wrapper(db):
     """Returns a database object."""
-    return DBWrapper(db)
+    return DatabaseWrappers[db]
 
 
 def convert_data_to_v2(data, model_type):

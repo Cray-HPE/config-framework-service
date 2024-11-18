@@ -29,6 +29,7 @@ import time
 from cray.cfs.api import dbutils
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
+from cray.cfs.api.singleton import singleton
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.options')
 DB = dbutils.get_wrapper(db='options')
@@ -129,30 +130,11 @@ def patch_options_v3():
         DB.put(OPTIONS_KEY, {})
     return DB.patch(OPTIONS_KEY, data), 200
 
-
+@singleton
 class Options:
     """Helper class for other endpoints that need access to options"""
-    _create_lock = threading.Lock()
-
-    def __new__(cls):
-        """This override makes the class a singleton"""
-        if not hasattr(cls, 'instance'):
-            # Make sure that no other thread has beaten us to the punch
-            with cls._create_lock:
-                if not hasattr(cls, 'instance'):
-                    new_instance = super(Options, cls).__new__(cls)
-                    new_instance.__init__(_initialize=True)
-                    # Only assign to cls.instance after all work has been done, to ensure
-                    # no other threads access it prematurely
-                    cls.instance = new_instance
-        return cls.instance
-
-    def __init__(self, _initialize: bool=False):
-        """
-        We only want this singleton to be initialized once
-        """
-        if _initialize:
-            self.options = None
+    def __init__(self):
+        self.options = None
 
     def refresh(self):
         self.options = get_options_data()
