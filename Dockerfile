@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Generate API
-FROM openapitools/openapi-generator-cli:v4.1.2 as codegen
+FROM openapitools/openapi-generator-cli:v7.8.0 as codegen
 WORKDIR /app
 COPY api/openapi.yaml api/openapi.yaml
 COPY config/autogen-server.json config/autogen-server.json
