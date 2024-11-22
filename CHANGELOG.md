@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- Use 7.8.0 openapi generator
+- Use 7.8.0 openapi generator; bump other dependency versions to accomodate that (and to resolve CVEs).
 
 ## [1.18.14] - 11/15/2024
 ### Fixed
