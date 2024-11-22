@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.15] - 11/22/2024
+### Fixed
+- CASMCMS-9219: Use v7.8.0 of `openapi-generator-cli`; bump other dependency versions to accomodate that (and to resolve CVEs).
+
 ## [1.18.14] - 11/15/2024
 ### Fixed
 - CASMCMS-9210: Correctly check `additional_inventory` layer when seeing if a source is in use

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Generate API
-FROM openapitools/openapi-generator-cli:v4.1.2 as codegen
+FROM openapitools/openapi-generator-cli:v7.8.0 as codegen
 WORKDIR /app
 COPY api/openapi.yaml api/openapi.yaml
 COPY config/autogen-server.json config/autogen-server.json
@@ -38,13 +38,21 @@ FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 as 
 WORKDIR /app
 COPY --from=codegen /app .
 COPY constraints.txt requirements.txt ./
-RUN apk add --upgrade --no-cache apk-tools &&  \
+# The openapi-generator creates a requirements file that specifies exactly Flask==2.1.1
+# However, using Flask 2.2.5 is also compatible, and resolves a CVE.
+# Accordingly, we relax their requirements file.
+RUN cat lib/server/requirements.txt && \
+    sed -i 's/Flask == 2\(.*\)$/Flask >= 2\1\nFlask < 3/' lib/server/requirements.txt && \
+    cat lib/server/requirements.txt && \
+    apk add --upgrade --no-cache apk-tools &&  \
 	apk update && \
 	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
 	apk -U upgrade --no-cache && \
+    pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
-    pip3 install --no-cache-dir -U 'setuptools<46.0.0' && \
-    pip3 install --no-cache-dir -r requirements.txt
+    pip3 list --format freeze && \
+    pip3 install --no-cache-dir -r requirements.txt && \
+    pip3 list --format freeze
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
