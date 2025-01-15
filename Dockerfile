@@ -34,14 +34,13 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3 as base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 as base
 WORKDIR /app
 COPY --from=codegen /app .
 COPY constraints.txt requirements.txt ./
 # The openapi-generator creates a requirements file that specifies exactly Flask==2.1.1
 # However, using Flask 2.2.5 is also compatible, and resolves a CVE.
 # Accordingly, we relax their requirements file.
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     cat lib/server/requirements.txt && \
     sed -i 's/Flask == 2\(.*\)$/Flask >= 2\1\nFlask < 3/' lib/server/requirements.txt && \
