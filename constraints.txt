@@ -35,6 +35,7 @@ PyYAML>=6.0.1,<6.1
 redis>=5.0,<5.1
 requests>=2.31,<2.32
 requests-oauthlib>=1.3.1,<1.4
+requests-retry-session>=0.1,<0.2
 rsa>=4.7.2,<4.8
 swagger-ui-bundle==0.0.9
 testtools>=2.3,<2.4
