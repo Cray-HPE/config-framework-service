@@ -1216,6 +1216,11 @@ components:
         description:
           type: string
           description: A user-defined description. This field is not used by CFS.
+        tenant_name:
+          type: string
+          description: The name of a tenant that owns this set of configuration.
+          example: blue-tenant
+          required: false
         last_updated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.

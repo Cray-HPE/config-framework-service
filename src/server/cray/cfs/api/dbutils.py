@@ -91,11 +91,13 @@ class DBWrapper():
         data = json.loads(datastr)
         return data
 
-    def get_all(self, limit=0, after_id="", data_filter=None):
+    def get_all(self, limit=0, after_id="", data_filters=None):
         """Get an array of data for all keys."""
 
         # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
         keys = set()
+        if not data_filters:
+            data_filters = []
         for key in self.client.scan_iter():
             keys.add(key.decode())
         if after_id:
@@ -120,9 +122,11 @@ class DBWrapper():
             if not skip:
                 data_str = self.client.get(key)
                 data = json.loads(data_str)
-                if not data_filter or data_filter(data):
-                    # filtering happens in get_all rather than after due to paging/memory constraints
-                    #   we can't load all data and then filter on the results
+                if not data_filters or all([data_filter(data) for data_filter in data_filters]):
+                    # If there are no data_filters, then we process it as a valid result,
+                    # alternatively, if there are any specified filters, ALL of them must be true for a given entry,
+                    # otherwise we do not process it. Filtering happens in get_all rather than after due to
+                    # paging/memory constraints we can't load all data and then filter on the results.
                     if page_full:
                         next_page_exists = True
                         break
