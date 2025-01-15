@@ -31,7 +31,7 @@ from requests.exceptions import HTTPError
 from core_client import exc_type_msg, PROTOCOL, retry_session_get
 from typing import Optional
 
-LOGGER = logging.getLogger('cfs.utils.multitenancy')
+LOGGER = logging.getLogger('cfs.api.utils.multitenancy')
 
 TENANT_HEADER = "Cray-Tenant-Name"
 SERVICE_NAME = 'cray-tapms/v1alpha3' # CASMCMS-9125: Currently when TAPMS bumps this version, it
