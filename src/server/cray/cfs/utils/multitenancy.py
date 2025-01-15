@@ -28,7 +28,7 @@ import hashlib
 
 import connexion
 from requests.exceptions import HTTPError
-from core_client import exc_type_msg, PROTOCOL, retry_session_get
+from cray.cfs.utils.core_client import exc_type_msg, PROTOCOL, retry_session_get
 from typing import Optional
 
 LOGGER = logging.getLogger('cfs.api.utils.multitenancy')
