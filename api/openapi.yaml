@@ -1220,7 +1220,6 @@ components:
           type: string
           description: The name of a tenant that owns this set of configuration.
           example: blue-tenant
-          readOnly: true
         last_updated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
