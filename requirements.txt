@@ -1,3 +1,6 @@
+--trusted-host arti.hpc.amslabs.hpecorp.net
+--trusted-host artifactory.algol60.net
+--index-url https://arti.hpc.amslabs.hpecorp.net:443/artifactory/api/pypi/pypi-remote/simple
 --extra-index-url http://artifactory.algol60.net/artifactory/csm-python-modules/simple
 -c constraints.txt
 -r lib/server/requirements.txt
