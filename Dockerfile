@@ -53,8 +53,8 @@ RUN cat lib/server/requirements.txt && \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -r requirements.txt && \
     pip3 list --format freeze
+COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
-COPY src/server/cray/cfs/utils           lib/server/cray/cfs/utils
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
      src/server/cray/cfs/api/dbutils.py \
@@ -63,6 +63,7 @@ COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/vault_utils.py \
      src/server/cray/cfs/api/migrations.py \
      lib/server/cray/cfs/api/
+COPY src/server/cray/cfs/utils           lib/server/cray/cfs/utils
 
 # Application Image
 FROM base as application
