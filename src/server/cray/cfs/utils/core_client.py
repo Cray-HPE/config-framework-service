@@ -26,7 +26,7 @@ import traceback
 import requests
 import requests_retry_session as rrs
 from functools import partial
-from typing import Iterator, Optional, Unpack
+from typing import Iterator, Optional
 
 
 PROTOCOL = 'http'
@@ -49,7 +49,7 @@ class RetrySessionManager(rrs.RetrySessionManager):
 
     def __init__(self,
                  protocol: str = PROTOCOL,
-                 **adapter_kwargs: Unpack[rrs.RequestsRetryAdapterArgs]):
+                 **adapter_kwargs:
         for key, value in DEFAULT_RETRY_ADAPTER_ARGS.items():
             if key not in adapter_kwargs:
                 adapter_kwargs[key] = value
