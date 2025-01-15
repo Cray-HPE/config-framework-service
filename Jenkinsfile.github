@@ -51,14 +51,12 @@ pipeline {
                 cloneCMSMetaTools()
             }
         }
-
         stage("Set Versions") {
             steps {
                 // This function is defined in cms-meta-tools:vars/setVersionFiles.groovy
                 setVersionFiles()
             }
         }
-
         stage("Build Prep") {
             steps {
                  withCredentials([usernamePassword(credentialsId: 'artifactory-algol60-readonly', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USERNAME')]) {
@@ -66,14 +64,12 @@ pipeline {
                     }
             }
         }
-
         stage("Lint") {
             steps {
                 sh "make lint"
             }
         }
-
-        stage("Build") {
+        stage("Build Image and Chart") {
             parallel {
                 stage('Image') {
                     environment {
@@ -81,11 +77,11 @@ pipeline {
                         DOCKER_ARGS = getDockerBuildArgs(name: env.NAME, description: env.DESCRIPTION, version: env.DOCKER_VERSION)
                     }
 
-                 withCredentials([usernamePassword(credentialsId: 'artifactory-algol60-readonly', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USERNAME')]) {
-                    sh "make image"
+                    steps {
+                        echo "Docker args are ${env.DOCKER_ARGS}"
+                        sh "make image"
                     }
                 }
-
                 stage('Chart') {
                     environment {
                         DOCKER_VERSION = sh(returnStdout: true, script: "head -1 .docker_version").trim()
