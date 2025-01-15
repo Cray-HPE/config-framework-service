@@ -82,7 +82,9 @@ pipeline {
                     }
 
                     steps {
-                        sh "make image"
+                        withCredentials([usernamePassword(credentialsId: 'artifactory-algol60-readonly', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USERNAME')]) {
+                            sh "make image"
+                        }
                     }
                 }
 
