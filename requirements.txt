@@ -1,5 +1,5 @@
 --trusted-host artifactory.algol60.net
---index-url http://artifactory.algol60.net/artifactory/csm-python-modules/simple
+--extra-index-url http://artifactory.algol60.net/artifactory/csm-python-modules/simple
 -c constraints.txt
 -r lib/server/requirements.txt
 

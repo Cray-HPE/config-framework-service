@@ -7,6 +7,7 @@ cffi>=1.12,<1.13
 chardet>=3.0,<3.1
 click>=8.1.7,<8.2
 clickclick>=20.10.2,<20.11
+connexion>=2.14.2,<2.15
 cryptography>=41.0,<41.1
 Flask>=2.2.5,<2.3
 google-auth>=2.16.3,<2.17
