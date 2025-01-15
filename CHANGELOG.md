@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9228: Added multitenancy features to the configurations endpoint.
 ### Changed
 - CASMCMS-9228: Converted database get features to support multiple filters
+- CASMCMS-9228: Updated base alpine image for a newer version of python
 ### Dependencies
 - CASMCMS-9288: Use centralized requests_retry_session
 
