@@ -25,6 +25,7 @@
 import functools
 import logging
 import hashlib
+import requests
 
 import connexion
 from requests.exceptions import HTTPError
