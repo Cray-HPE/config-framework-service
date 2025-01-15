@@ -37,7 +37,7 @@ from cray.cfs.api.controllers import sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
-from cray.cfs.utils.multitenancy import get_tenant_from_header, get_tenant_aware_key, reject_invalid_tenant
+from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
