@@ -52,7 +52,7 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
     pip3 list --format freeze && \
-    pip3 install --no-cache-dir -r requirements.txt && \
+    pip3 install --no-cache-dir -r requirements.txt --break-system-packages && \
     pip3 list --format freeze
 COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
