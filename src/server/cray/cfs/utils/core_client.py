@@ -29,7 +29,6 @@ from functools import partial
 from typing import Iterator, Optional, Unpack
 
 
-
 PROTOCOL = 'http'
 DEFAULT_RETRY_ADAPTER_ARGS = rrs.RequestsRetryAdapterArgs(
     retries=10,
