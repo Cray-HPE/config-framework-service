@@ -41,6 +41,7 @@ COPY constraints.txt requirements.txt ./
 # The openapi-generator creates a requirements file that specifies exactly Flask==2.1.1
 # However, using Flask 2.2.5 is also compatible, and resolves a CVE.
 # Accordingly, we relax their requirements file.
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     cat lib/server/requirements.txt && \
     sed -i 's/Flask == 2\(.*\)$/Flask >= 2\1\nFlask < 3/' lib/server/requirements.txt && \
@@ -52,7 +53,7 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
     pip3 list --format freeze && \
-    pip3 install --no-cache-dir -r requirements.txt --break-system-packages && \
+    pip3 install --no-cache-dir -r requirements.txt && \
     pip3 list --format freeze
 COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
