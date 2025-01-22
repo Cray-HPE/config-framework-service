@@ -245,21 +245,17 @@ def put_configuration_v3(configuration_id, drop_branches=False):
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
     LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
-    if all([requesting_tenant is not None,
-            existing_configuration.get('tenant_name', None) != requesting_tenant]):
-        return TENANT_FORBIDDEN_OPERATION
-
-    # If there is no associated tenant, then this is the global administrator. We will allow them to set the tenant_name
-    # so that they can create configurations for specific tenants. Otherwise, tenant_name is an immutable field that
-    # tenants are not allowed to modify via PUT.
-    if all([requesting_tenant is not None, #A tenant admin is requesting...
-            data.get('tenant_name', None) != requesting_tenant # The existing data already has an established tenant...
-            ]):
-        return IMMUTABLE_TENANT_NAME_FIELD
-
-    # The put request is valid, so append ownership to the datastructure.
-    if requesting_tenant:
+    if requesting_tenant is not None:
+        if all([existing_configuration,
+                existing_configuration.get('tenant_name', None) != requesting_tenant]):
+            return TENANT_FORBIDDEN_OPERATION
+        if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
+            return IMMUTABLE_TENANT_NAME_FIELD
         data['tenant_name'] = requesting_tenant
+    else:
+        # The global admin is requesting the change; they can do everything, including putting over other people's
+        # stuff.
+        pass
 
     for layer in iter_layers(data, include_additional_inventory=True):
         if 'clone_url' in layer and 'source' in layer:
@@ -342,20 +338,17 @@ def patch_configuration_v3(configuration_id):
     # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
-    if all([requesting_tenant is not None,
-            existing_configuration.get('tenant_name', '') != requesting_tenant]):
-        return TENANT_FORBIDDEN_OPERATION
-
-    # If there is no associated tenant, then this is the global administrator. We will allow them to set the tenant_name
-    # so that they can create configurations for specific tenants. Otherwise, tenant_name is an immutable field that
-    # tenants are not allowed to modify via PUT.
-    if all([requesting_tenant is not None,
-            data.get('tenant_name', '') != requesting_tenant]):
-        return IMMUTABLE_TENANT_NAME_FIELD
-
-    # The put request is valid, so append ownership to the datastructure.
-    if requesting_tenant:
+    if requesting_tenant is not None:
+        if all([existing_configuration,
+                existing_configuration.get('tenant_name', None) != requesting_tenant]):
+            return TENANT_FORBIDDEN_OPERATION
+        if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
+            return IMMUTABLE_TENANT_NAME_FIELD
         data['tenant_name'] = requesting_tenant
+    else:
+        # The global admin is requesting the change; they can do everything, including patching over other people's
+        # stuff.
+        pass
 
     try:
         data = _set_auto_fields(data)
