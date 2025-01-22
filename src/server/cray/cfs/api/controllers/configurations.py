@@ -243,18 +243,17 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id)
+    existing_configuration = DB.get(configuration_id) or {}
     if all([requesting_tenant,
-            existing_configuration is not None,
-            existing_configuration.get('tenant_name', '') != requesting_tenant]):
+            existing_configuration.get('tenant_name', None) != requesting_tenant]):
         return TENANT_FORBIDDEN_OPERATION
 
     # If there is no associated tenant, then this is the global administrator. We will allow them to set the tenant_name
     # so that they can create configurations for specific tenants. Otherwise, tenant_name is an immutable field that
     # tenants are not allowed to modify via PUT.
-    if all([requesting_tenant,
-            data.get('tenant_name', ''),
-            data.get('tenant_name', '') != requesting_tenant]):
+    if all([requesting_tenant is not None, #A tenant admin is requesting...
+            data.get('tenant_name', None) != requesting_tenant # The existing data already has an established tenant...
+            ]):
         return IMMUTABLE_TENANT_NAME_FIELD
 
     # The put request is valid, so append ownership to the datastructure.
