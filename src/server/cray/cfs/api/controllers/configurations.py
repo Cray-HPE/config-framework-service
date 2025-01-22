@@ -239,12 +239,12 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
     # subsequent data puts and permission checks.
-    requesting_tenant = get_tenant_from_header()
+    requesting_tenant = get_tenant_from_header() or None
 
     # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
-    if all([requesting_tenant,
+    if all([requesting_tenant is not None,
             existing_configuration.get('tenant_name', None) != requesting_tenant]):
         return TENANT_FORBIDDEN_OPERATION
 
@@ -336,21 +336,19 @@ def patch_configuration_v3(configuration_id):
 
     # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
     # subsequent data puts and permission checks.
-    requesting_tenant = get_tenant_from_header()
+    requesting_tenant = get_tenant_from_header() or None
 
     # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id)
-    if all([requesting_tenant,
-            existing_configuration,
+    existing_configuration = DB.get(configuration_id) or {}
+    if all([requesting_tenant is not None,
             existing_configuration.get('tenant_name', '') != requesting_tenant]):
         return TENANT_FORBIDDEN_OPERATION
 
     # If there is no associated tenant, then this is the global administrator. We will allow them to set the tenant_name
     # so that they can create configurations for specific tenants. Otherwise, tenant_name is an immutable field that
     # tenants are not allowed to modify via PUT.
-    if all([requesting_tenant,
-            data.get('tenant_name', ''),
+    if all([requesting_tenant is not None,
             data.get('tenant_name', '') != requesting_tenant]):
         return IMMUTABLE_TENANT_NAME_FIELD
 
@@ -399,12 +397,11 @@ def delete_configuration_v3(configuration_id):
                    "some components".format(configuration_id))
     # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
     # subsequent data puts and permission checks.
-    requesting_tenant = get_tenant_from_header()
+    requesting_tenant = get_tenant_from_header() or None
     # If the configuration already exists, and the tenant is not owned by the requesting delete tenant, then we cannot
     # allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id)
-    if all([requesting_tenant,
-            existing_configuration,
+    existing_configuration = DB.get(configuration_id) or {}
+    if all([requesting_tenant is not None,
             existing_configuration.get('tenant_name', '') != requesting_tenant]):
         return TENANT_FORBIDDEN_OPERATION
     return DB.delete(configuration_id), 204
