@@ -244,6 +244,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
     # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
+    LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
     if all([requesting_tenant is not None,
             existing_configuration.get('tenant_name', None) != requesting_tenant]):
         return TENANT_FORBIDDEN_OPERATION
