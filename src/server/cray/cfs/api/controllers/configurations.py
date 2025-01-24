@@ -304,7 +304,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 @dbutils.redis_error_handler
 def patch_configuration_v2(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCH /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCHv2 /configurations/id invoked put_configuration")
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -324,20 +324,28 @@ def patch_configuration_v2(configuration_id):
 @reject_invalid_tenant
 def patch_configuration_v3(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCH /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCHv3 /configurations/id invoked put_configuration")
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
             detail="Configuration {} could not be found".format(configuration_id))
     data = DB.get(configuration_id)
 
+    try:
+        data = _set_auto_fields(data)
+    except BranchConversionException as e:
+        return connexion.problem(
+            status=400, title="Error converting branch name to commit",
+            detail=str(e))
+
     # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
     # subsequent data puts and permission checks.
     requesting_tenant = get_tenant_from_header() or None
 
-    # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
+    # If the configuration already exists, and the tenant is not owned by the requesting patch tenant, then we cannot
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
+    LOGGER.debug("Requesting tenant: '%s' with data: '%s'" %(requesting_tenant, data))
     if requesting_tenant is not None:
         if all([existing_configuration,
                 existing_configuration.get('tenant_name', None) != requesting_tenant]):
@@ -349,13 +357,6 @@ def patch_configuration_v3(configuration_id):
         # The global admin is requesting the change; they can do everything, including patching over other people's
         # stuff.
         pass
-
-    try:
-        data = _set_auto_fields(data)
-    except BranchConversionException as e:
-        return connexion.problem(
-            status=400, title="Error converting branch name to commit",
-            detail=str(e))
 
     return DB.put(configuration_id, data), 200
 
@@ -377,6 +378,7 @@ def delete_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_invalid_tenant
 def delete_configuration_v3(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
