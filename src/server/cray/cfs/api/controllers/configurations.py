@@ -85,9 +85,7 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /configurations invoked get_configurations")
     called_parameters = locals()
-    tenant = get_tenant_from_header()
-    if not tenant:
-        tenant = None
+    tenant = get_tenant_from_header() or None
     configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id,
                                                                      tenant=tenant)
     response = {"configurations": configurations_data, "next": None}
@@ -179,7 +177,7 @@ def get_configuration_v3(configuration_id):
         return connexion.problem(status=404, title="Configuration not found",
                                         detail="Configuration {} could not be found".format(configuration_id))
     configuration_data = DB.get(configuration_id)
-    tenant = get_tenant_from_header()
+    tenant = get_tenant_from_header() or None
     if all([tenant,
             tenant != configuration_data.get('tenant_name', '')]):
         return TENANT_FORBIDDEN_OPERATION
@@ -254,7 +252,8 @@ def put_configuration_v3(configuration_id, drop_branches=False):
         data['tenant_name'] = requesting_tenant
     else:
         # The global admin is requesting the change; they can do everything, including putting over other people's
-        # stuff.
+        # stuff. This block is split out specifically for this comment, which is why we have it even though it is just
+        # a pass.
         pass
 
     for layer in iter_layers(data, include_additional_inventory=True):
