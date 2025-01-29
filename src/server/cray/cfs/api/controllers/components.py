@@ -24,7 +24,7 @@
 import connexion
 from copy import deepcopy
 from datetime import datetime
-from functools import partial
+from functools import lru_cache, partial
 import logging
 
 from cray.cfs.api import dbutils
@@ -50,6 +50,9 @@ STATUS = {
     STATUS_CONFIGURED: 'configured',
     STATUS_DEPRECATED: 'config_deprecated',
 }
+
+
+cfs_options = options.Options()
 
 
 @dbutils.redis_error_handler
@@ -152,14 +155,17 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
     component_filter = partial(_component_filter, config_details=config_details, configs=configs,
                                id_list=id_list, status_list=status_list, enabled=enabled,
                                config_name=config_name, tag_list=tag_list,
-                               default_batcher_retry_policy=options.Options().default_batcher_retry_policy)
+                               default_batcher_retry_policy=cfs_options.default_batcher_retry_policy,
+                               default_playbook=cfs_options.default_playbook)
     component_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=component_filter)
     return component_data_page, next_page_exists
 
 
 def _component_filter(component_data, config_details, configs,
-                      id_list, status_list, enabled, config_name, tag_list, default_batcher_retry_policy):
-    _set_status(component_data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy) # This sets the status both for filtering and for the response data
+                      id_list, status_list, enabled, config_name, tag_list, default_batcher_retry_policy, default_playbook):
+    LOGGER.debug("Starting to set status")
+    _set_status(component_data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy, default_playbook=default_playbook) # This sets the status both for filtering and for the response data
+    LOGGER.debug("Done setting status")
     if id_list or status_list or (enabled is not None) or config_name or tag_list:
         return _matches_filter(component_data, id_list, status_list, enabled, config_name, tag_list)
     else:
@@ -543,15 +549,15 @@ def _set_last_updated(data):
     return data
 
 
-def _set_status(data, configs, config_details, default_batcher_retry_policy=None):
+def _set_status(data, configs, config_details, default_batcher_retry_policy=None, default_playbook=None):
     if 'desired_config' in data:
-        data['configuration_status'] = STATUS[_get_status(data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy)]
+        data['configuration_status'] = STATUS[_get_status(data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy, default_playbook=default_playbook)]
     else:
         data['configuration_status'] = STATUS[STATUS_DEPRECATED]
     return data
 
 
-def _get_status(data, configs, config_details, default_batcher_retry_policy=None):
+def _get_status(data, configs, config_details, default_batcher_retry_policy=None, default_playbook=None):
     """
     Returns the configuration status of a component
 
@@ -566,7 +572,7 @@ def _get_status(data, configs, config_details, default_batcher_retry_policy=None
     max_retries = False
     retries = data.get('retry_policy')
     if retries is None:
-        retries = default_batcher_retry_policy if default_batcher_retry_policy is not None else options.Options().default_batcher_retry_policy
+        retries = default_batcher_retry_policy if default_batcher_retry_policy is not None else cfs_options.default_batcher_retry_policy
     retries = int(retries)
     if retries != -1 and data['error_count'] >= retries:
         # This component has hit it's retry limit
@@ -588,7 +594,15 @@ def _get_status(data, configs, config_details, default_batcher_retry_policy=None
 
     status = STATUS_CONFIGURED
     for layer in desired_state['layers']:
-        layer_status = _get_layer_status(layer, current_state, max_retries)
+        desired_clone_url = layer.get('clone_url', '')
+        desired_playbook = layer.get('playbook', '')
+        if not desired_playbook:
+            desired_playbook = default_playbook if default_playbook is not None else cfs_options.default_playbook
+        desired_commit = layer.get('commit', '')
+        if not (desired_commit and desired_clone_url and desired_playbook):
+            layer_status = STATUS_UNCONFIGURED
+        else:
+            layer_status = _get_layer_status(desired_clone_url, desired_playbook, desired_commit, current_state, max_retries, default_playbook=default_playbook)
         layer['status'] = STATUS[layer_status]
         status = min(status, layer_status)
     if (status == STATUS_PENDING) and max_retries:
@@ -600,16 +614,8 @@ def _get_status(data, configs, config_details, default_batcher_retry_policy=None
     return status
 
 
-def _get_layer_status(desired_state, current_state_layers, max_retries):
-    desired_clone_url = desired_state.get('clone_url', '')
-    desired_playbook = desired_state.get('playbook', '')
-    if not desired_playbook:
-        desired_playbook = options.Options().default_playbook
-    desired_commit = desired_state.get('commit', '')
-
-    if not (desired_commit and desired_clone_url and desired_playbook):
-        return STATUS_UNCONFIGURED
-
+@lru_cache(100)
+def _get_layer_status(desired_clone_url, desired_playbook, desired_commit, current_state_layers, max_retries):
     for current_state in current_state_layers:
         current_status = current_state.get('status', '')
         if all([desired_clone_url == current_state.get('clone_url', ''),
@@ -627,6 +633,7 @@ def _get_layer_status(desired_state, current_state_layers, max_retries):
     return STATUS_PENDING
 
 
+@lru_cache(100)
 def _get_current_state(data):
     config = data['state']
     if type(config) == dict:
@@ -643,7 +650,7 @@ def _get_desired_state(data, configs=None):
 
 
 def _set_link(data):
-    if options.Options().include_ara_links:
+    if cfs_options.include_ara_links:
         data["logs"] = f"{get_ara_ui_url()}/hosts?name={data['id']}"
     return data
 
