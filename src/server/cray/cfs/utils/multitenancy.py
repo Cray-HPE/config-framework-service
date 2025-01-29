@@ -77,22 +77,6 @@ def validate_tenant_exists(tenant: str) -> bool:
         return False
 
 
-def tenant_error_handler(func):
-    """Decorator for returning errors if there is an exception when calling tapms"""
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except InvalidTenantException as e:
-            LOGGER.debug("Invalid tenant: %s", exc_type_msg(e))
-            return connexion.problem(status=400,
-                                     title='Invalid tenant',
-                                     detail=str(e))
-
-    return wrapper
-
-
 def reject_invalid_tenant(func):
     """Decorator for preemptively validating the tenant exists"""
 
