@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@ import connexion
 import ujson as json
 import logging
 import redis
+from typing import Optional
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
@@ -91,46 +92,42 @@ class DBWrapper():
         data = json.loads(datastr)
         return data
 
-    def get_all(self, limit=0, after_id="", data_filter=None):
-        """Get an array of data for all keys."""
 
-        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key.decode())
-        if after_id:
-            keys.add(after_id) # This fixes the case where the record being referenced has been deleted.
-        # Sorting the keys guarantees a consistent order when paging
-        sorted_keys = sorted(list(keys))
+    def iter_values(self, start_after_key: Optional[str] = None):
+        """
+        Iterate through every item in the database. Parse each item as JSON and yield it.
+        If start_after_key is specified, skip any keys that are lexically <= the specified key.
+        """
+        all_keys = sorted({k.decode() for k in self.client.scan_iter()})
+        if start_after_key is not None:
+            all_keys = [k for k in all_keys if k > start_after_key]
+        while all_keys:
+            for datastr in self.client.mget(all_keys[:500]):
+                yield json.loads(datastr) if datastr else None
+            all_keys = all_keys[500:]
+
+
+    def get_all(self, limit=0, after_id=None, data_filter=None):
+        """Get an array of data for all keys."""
 
         if limit < 0:
             limit = 0
-        skip = False
-        if after_id:
-            skip = True
         page_full = False
         next_page_exists = False
-
         data_page = []
-        for key in sorted_keys:
-            if skip and key == after_id:
-                # This marks the starting point of a page when after_id is specified
-                skip = False
-                continue
-            if not skip:
-                data_str = self.client.get(key)
-                data = json.loads(data_str)
-                if not data_filter or data_filter(data):
-                    # filtering happens in get_all rather than after due to paging/memory constraints
-                    #   we can't load all data and then filter on the results
-                    if page_full:
-                        next_page_exists = True
-                        break
-                    else:
-                        data_page.append(data)
-                        if limit and len(data_page) >= limit:
-                            page_full = True
+        for data in self.iter_values(after_id):
+            if not data_filter or data_filter(data):
+                # filtering happens in get_all rather than after due to paging/memory constraints
+                #   we can't load all data and then filter on the results
+                if page_full:
+                    next_page_exists = True
+                    break
+                else:
+                    data_page.append(data)
+                    if limit and len(data_page) >= limit:
+                        page_full = True
         return data_page, next_page_exists
+
 
     def get_keys(self):
         keys = set()
