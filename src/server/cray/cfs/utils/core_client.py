@@ -42,20 +42,6 @@ retry_session_manager = partial(rrs.retry_session_manager,
                                 **DEFAULT_RETRY_ADAPTER_ARGS)
 
 
-class RetrySessionManager(rrs.RetrySessionManager):
-    """
-    Just sets the default values we use for our requests sessions
-    """
-
-    def __init__(self,
-                 protocol: str = PROTOCOL,
-                 **adapter_kwargs):
-        for key, value in DEFAULT_RETRY_ADAPTER_ARGS.items():
-            if key not in adapter_kwargs:
-                adapter_kwargs[key] = value
-        super().__init__(protocol=protocol, **adapter_kwargs)
-
-
 def retry_session(
     session: Optional[requests.Session] = None,
     protocol: Optional[str] = None,
