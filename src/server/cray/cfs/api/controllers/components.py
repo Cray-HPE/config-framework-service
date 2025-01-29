@@ -151,14 +151,15 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=config_details, configs=configs,
                                id_list=id_list, status_list=status_list, enabled=enabled,
-                               config_name=config_name, tag_list=tag_list)
+                               config_name=config_name, tag_list=tag_list,
+                               default_batcher_retry_policy=options.Options().default_batcher_retry_policy)
     component_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=component_filter)
     return component_data_page, next_page_exists
 
 
 def _component_filter(component_data, config_details, configs,
-                      id_list, status_list, enabled, config_name, tag_list):
-    _set_status(component_data, configs, config_details) # This sets the status both for filtering and for the response data
+                      id_list, status_list, enabled, config_name, tag_list, default_batcher_retry_policy):
+    _set_status(component_data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy) # This sets the status both for filtering and for the response data
     if id_list or status_list or (enabled is not None) or config_name or tag_list:
         return _matches_filter(component_data, id_list, status_list, enabled, config_name, tag_list)
     else:
@@ -542,15 +543,15 @@ def _set_last_updated(data):
     return data
 
 
-def _set_status(data, configs, config_details):
+def _set_status(data, configs, config_details, default_batcher_retry_policy=None):
     if 'desired_config' in data:
-        data['configuration_status'] = STATUS[_get_status(data, configs, config_details)]
+        data['configuration_status'] = STATUS[_get_status(data, configs, config_details, default_batcher_retry_policy=default_batcher_retry_policy)]
     else:
         data['configuration_status'] = STATUS[STATUS_DEPRECATED]
     return data
 
 
-def _get_status(data, configs, config_details):
+def _get_status(data, configs, config_details, default_batcher_retry_policy=None):
     """
     Returns the configuration status of a component
 
@@ -565,7 +566,7 @@ def _get_status(data, configs, config_details):
     max_retries = False
     retries = data.get('retry_policy')
     if retries is None:
-        retries = options.Options().default_batcher_retry_policy
+        retries = default_batcher_retry_policy if default_batcher_retry_policy is not None else options.Options().default_batcher_retry_policy
     retries = int(retries)
     if retries != -1 and data['error_count'] >= retries:
         # This component has hit it's retry limit
