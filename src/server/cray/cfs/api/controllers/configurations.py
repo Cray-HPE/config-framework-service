@@ -239,7 +239,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
     # subsequent data puts and permission checks.
     requesting_tenant = get_tenant_from_header() or None
 
-    # If the configuration already exists, and the tenant is not owned by the requesting put tenant, then we cannot
+    # If the configuration already exists, and the configuration is not owned by the requesting put tenant, then we cannot
     # allow them to overwrite the existing data for this key.
     existing_configuration = DB.get(configuration_id) or {}
     LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
