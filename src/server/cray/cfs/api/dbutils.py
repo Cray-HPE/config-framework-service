@@ -93,7 +93,7 @@ class DBWrapper():
         return data
 
 
-    def iter_values(self, start_after_key: Optional[str] = None):
+    def iter_values(self, start_after_key: Optional[str]=None, batch_size=500):
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
@@ -109,13 +109,18 @@ class DBWrapper():
 
     def get_all(self, limit=0, after_id=None, data_filter=None):
         """Get an array of data for all keys."""
-
+        batch_size=0
         if limit < 0:
             limit = 0
+        elif limit > 20000:
+            batch_size = limit % 20000
+        if batch_size <= 0:
+            batch_size=500
+        LOGGER.debug("batch_size=%d", batch_size)
         page_full = False
         next_page_exists = False
         data_page = []
-        for data in self.iter_values(after_id):
+        for data in self.iter_values(after_id, batch_size):
             if not data_filter or data_filter(data):
                 # filtering happens in get_all rather than after due to paging/memory constraints
                 #   we can't load all data and then filter on the results

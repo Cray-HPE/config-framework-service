@@ -149,9 +149,15 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
     Allows filtering using a comma separated list of ids.
     """
     configs = configurations.Configurations()
-    component_filter = partial(_component_filter, config_details=config_details, configs=configs,
-                               id_list=id_list, status_list=status_list, enabled=enabled,
-                               config_name=config_name, tag_list=tag_list)
+    if limit >= 40000 and not id_list and not status_list and enabled is None and not config_name and not tag_list:
+        LOGGER.debug("Filter bypassed")
+        component_filter = partial(_set_status, config_details=config_details, configs=configs)
+    else:
+        LOGGER.debug("Filter in place")
+        component_filter = partial(_component_filter, config_details=config_details, configs=configs,
+                                    id_list=id_list, status_list=status_list, enabled=enabled,
+                                    config_name=config_name, tag_list=tag_list)
+
     component_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=component_filter)
     return component_data_page, next_page_exists
 
