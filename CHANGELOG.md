@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.16] - 01/29/2025
+### Changed
+- CASMCMS-9263: Make database scanning more performant
+- CASMCMS-9263: Remove unnecessary calculations when filtering components
+
 ## [1.18.15] - 11/22/2024
 ### Fixed
 - CASMCMS-9219: Use v7.8.0 of `openapi-generator-cli`; bump other dependency versions to accomodate that (and to resolve CVEs).
