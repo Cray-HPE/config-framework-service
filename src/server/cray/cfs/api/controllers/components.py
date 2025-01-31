@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -159,24 +159,17 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
 
 def _component_filter(component_data, config_details, configs,
                       id_list, status_list, enabled, config_name, tag_list):
+    # Before bothering to set status, check the filters which do not require it.
+    if id_list and not component_data.get("id") in id_list:
+        return False
+    if enabled is not None and component_data.get('enabled') != enabled:
+        return False
+    if config_name and component_data.get('desired_config') != config_name:
+        return False
+    if tag_list and any([component_data.get('tags', {}).get(k) != v for k, v in tag_list]):
+        return False
     _set_status(component_data, configs, config_details) # This sets the status both for filtering and for the response data
-    if id_list or status_list or (enabled is not None) or config_name or tag_list:
-        return _matches_filter(component_data, id_list, status_list, enabled, config_name, tag_list)
-    else:
-        # No filter is being used so all components are valid
-        return True
-
-
-def _matches_filter(data, id_list, status_list, enabled, config_name, tag_list):
-    if id_list and not data.get("id") in id_list:
-        return False
-    if status_list and not data.get('configuration_status') in status_list:
-        return False
-    if enabled is not None and data.get('enabled') != enabled:
-        return False
-    if config_name and data.get('desired_config') != config_name:
-        return False
-    if tag_list and any([data.get('tags', {}).get(k) != v for k, v in tag_list]):
+    if status_list and not component_data.get('configuration_status') in status_list:
         return False
     return True
 

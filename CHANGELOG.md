@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9228: Added common core utilities from BOS' for retry resiliency and tapms tenancy functions
 - CASMCMS-9228: Added multitenancy features to the configurations endpoint.
 ### Changed
+- CASMCMS-9263: Make database scanning more performant
+- CASMCMS-9263: Remove unnecessary calculations when filtering components
 - CASMCMS-9228: Converted database get features to support multiple filters
 ### Dependencies
 - CASMCMS-9288: Use centralized requests_retry_session
+
+## [1.24.0] - 01/13/2025
+### Changed
+- CASMCMS-9150: Update API autoscaler `apiVersion` to support upgraded Kubernetes in CSM 1.7.
 
 ## [1.23.5] - 11/15/2024
 ### Changed
