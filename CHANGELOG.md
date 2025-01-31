@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.6] - 01/29/2025
+### Changed
+- CASMCMS-9263: Make database scanning more performant
+- CASMCMS-9263: Remove unnecessary calculations when filtering components
+
 ## [1.23.5] - 11/15/2024
 ### Changed
 - CASMCMS-9211: Improve performance of configuration delete operation.
