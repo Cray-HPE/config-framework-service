@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -108,24 +108,26 @@ def get_components_data(id_list=[], status_list=[], enabled=None, config_name=""
         response = DB.get_all()
     opts = options.Options()
     configs = configurations.Configurations()
-    response = [_set_status(r, opts, configs, config_details) for r in response if r]
+    set_status = partial(_set_status, options=opts, configs=configs, config_details=config_details)
     if status_list or (enabled is not None) or config_name or tag_list:
-        response = [r for r in response if _matches_filter(r, status_list, enabled,
-                                                           config_name, tag_list)]
-    return response
+        return [r for r in response if _matches_filter(r, status_list, enabled,
+                                                           config_name, tag_list, set_status)]
+    return [set_status(r) for r in response]
 
 
-def _matches_filter(data, status, enabled, config_name, tags):
-    data_status = data.get('configurationStatus', '')
-    if status and not any([data_status == s for s in status]):
-        return False
+def _matches_filter(data, status, enabled, config_name, tags, set_status):
+    # Before bothering to set status, check the filters which do not require it.
     if enabled is not None and data.get('enabled', None) != enabled:
         return False
     if config_name and data.get('desiredConfig', '') != config_name:
         return False
     if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
         return False
-    return True
+    set_status(data)
+    if not status:
+        return True
+    data_status = data.get('configurationStatus', '')
+    return any([data_status == s for s in status])
 
 
 @dbutils.redis_error_handler
@@ -222,15 +224,15 @@ def patch_v2_components_dict(data):
         for component_id in id_list:
             component_data = DB.get(component_id)
             if component_data:
-                components.append(set_status(component_data))
+                components.append(component_data)
     else:
         # TODO: On large scale systems, this response may be too large
         # and require paging to be implemented
-        components = [ set_status(component_data) for component_data in DB.get_all() ]
+        components = DB.get_all()
 
     matches_filter = partial(_matches_filter, status=status_list,
                              enabled=filters.get("enabled", None),
-                             config_name=filters.get("configName", None), tags=tag_list)
+                             config_name=filters.get("configName", None), tags=tag_list, set_status=set_status)
     response = []
     patch = data.get("patch", {})
     if "id" in patch:

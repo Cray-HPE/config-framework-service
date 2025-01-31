@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -91,14 +91,17 @@ class DBWrapper():
 
     def get_all(self):
         """Get an array of data for all keys."""
-        data = []
-        keys = self.client.keys()
-        if keys:
-            for key in keys:
-                datastr = self.client.get(key)
-                single_data = json.loads(datastr)
-                data.append(single_data)
-        return data
+        return [ data for data in self.iter_values() ]
+
+    def iter_values(self):
+        """
+        Iterate through every item in the database. Parse each item as JSON and yield it.
+        """
+        all_keys = sorted({k.decode() for k in self.client.scan_iter()})
+        while all_keys:
+            for datastr in self.client.mget(all_keys[:500]):
+                yield json.loads(datastr) if datastr else None
+            all_keys = all_keys[500:]
 
     def put(self, key, new_data):
         """Put data in to the database, replacing any old data."""
