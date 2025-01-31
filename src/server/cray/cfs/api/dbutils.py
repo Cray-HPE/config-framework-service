@@ -102,9 +102,9 @@ class DBWrapper():
         if start_after_key is not None:
             all_keys = [k for k in all_keys if k > start_after_key]
         while all_keys:
-            for datastr in self.client.mget(all_keys[:500]):
+            for datastr in self.client.mget(all_keys[:batch_size]):
                 yield json.loads(datastr) if datastr else None
-            all_keys = all_keys[500:]
+            all_keys = all_keys[batch_size:]
 
 
     def get_all(self, limit=0, after_id=None, data_filter=None):
