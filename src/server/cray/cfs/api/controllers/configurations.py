@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,12 +37,34 @@ from cray.cfs.api.controllers import sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
+from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
 SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+def _get_filtered_configurations(tenant):
+    response = DB.get_all()
+    if any([tenant]):
+        response = [r for r in response if _matches_filter(r, tenant)]
+    return response
+
+
+def _matches_filter(data, tenant):
+    if tenant and tenant != data.get("tenant_name"):
+        return False
+    return True
+
+# Common Multitenancy specific connection responses
+TENANT_FORBIDDEN_OPERATION = connexion.problem(
+    status=403, title="Forbidden operation.",
+    detail="Tenant does not own the requested resources and is forbidden from making changes."
+)
+IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
+    status=403, title="Forbidden operation.",
+    detail="Modification to existing field 'tenant_name' is not permitted."
+)
 
 @dbutils.redis_error_handler
 def get_configurations_v2(in_use=None):
@@ -58,11 +80,14 @@ def get_configurations_v2(in_use=None):
 
 @dbutils.redis_error_handler
 @options.defaults(limit="default_page_size")
+@reject_invalid_tenant
 def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /configurations invoked get_configurations")
     called_parameters = locals()
-    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id)
+    tenant = get_tenant_from_header() or None
+    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id,
+                                                                     tenant=tenant)
     response = {"configurations": configurations_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -72,18 +97,23 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
 
 
 @options.defaults(limit="default_page_size")
-def _get_configurations_data(in_use=None, limit=1, after_id=""):
+def _get_configurations_data(in_use=None, limit=1, after_id="", tenant=None):
+    data_filters = []
     # CASMCMS-9197: Only specify a filter if we are actually filtering
     if in_use is not None:
-        configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list())
-    else:
-        configuration_filter = None
-    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=configuration_filter)
+        data_filters.append(partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list()))
+    if tenant:
+        # In the event a tenant is not set, the super administrator should be able to view configurations owned by ALL
+        # tenants. As such, we only reduce the effective set of configurations down when a tenant admin is requesting.
+        data_filters.append(partial(_tenancy_filter, tenant=tenant))
+    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=data_filters)
     return configuration_data_page, next_page_exists
 
 
 def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
     """
+    The purpose of this function is to filter CFS configurations that are referenced by any defined component.
+
     If in_use is true:
         Returns True if the name of the specified configuration is in in_use_list,
         Returns False otherwise
@@ -93,6 +123,13 @@ def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: C
         Returns False otherwise
     """
     return (configuration_data["name"] in in_use_list) == in_use
+
+
+def _tenancy_filter(configuration_data: dict, tenant: str) -> bool:
+    """
+    The purpose of this function is to reduce the total number of configurations to just those owned by an individual tenant.
+    """
+    return configuration_data.get('tenant_name', '') == tenant
 
 
 def _get_in_use_list():
@@ -132,13 +169,18 @@ def get_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_invalid_tenant
 def get_configuration_v3(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /configurations/id invoked get_configuration")
     if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+        return connexion.problem(status=404, title="Configuration not found",
+                                        detail="Configuration {} could not be found".format(configuration_id))
+    configuration_data = DB.get(configuration_id)
+    tenant = get_tenant_from_header() or None
+    if all([tenant,
+            tenant != configuration_data.get('tenant_name', '')]):
+        return TENANT_FORBIDDEN_OPERATION
     return DB.get(configuration_id), 200
 
 
@@ -182,6 +224,7 @@ def put_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_invalid_tenant
 def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /configurations/id invoked put_configuration")
@@ -191,6 +234,27 @@ def put_configuration_v3(configuration_id, drop_branches=False):
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
+
+    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
+    # subsequent data puts and permission checks.
+    requesting_tenant = get_tenant_from_header() or None
+
+    # If the configuration already exists, and the configuration is not owned by the requesting put tenant, then we cannot
+    # allow them to overwrite the existing data for this key.
+    existing_configuration = DB.get(configuration_id) or {}
+    LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
+    if requesting_tenant is not None:
+        if all([existing_configuration,
+                existing_configuration.get('tenant_name', None) != requesting_tenant]):
+            return TENANT_FORBIDDEN_OPERATION
+        if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
+            return IMMUTABLE_TENANT_NAME_FIELD
+        data['tenant_name'] = requesting_tenant
+    else:
+        # The global admin is requesting the change; they can do everything, including putting over other people's
+        # stuff. This block is split out specifically for this comment, which is why we have it even though it is just
+        # a pass.
+        pass
 
     for layer in iter_layers(data, include_additional_inventory=True):
         if 'clone_url' in layer and 'source' in layer:
@@ -239,7 +303,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 @dbutils.redis_error_handler
 def patch_configuration_v2(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCH /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCHv2 /configurations/id invoked put_configuration")
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -256,9 +320,10 @@ def patch_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_invalid_tenant
 def patch_configuration_v3(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCH /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCHv3 /configurations/id invoked put_configuration")
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -271,6 +336,26 @@ def patch_configuration_v3(configuration_id):
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
             detail=str(e))
+
+    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
+    # subsequent data puts and permission checks.
+    requesting_tenant = get_tenant_from_header() or None
+
+    # If the configuration already exists, and the tenant is not owned by the requesting patch tenant, then we cannot
+    # allow them to overwrite the existing data for this key.
+    existing_configuration = DB.get(configuration_id) or {}
+    LOGGER.debug("Requesting tenant: '%s' with data: '%s'" %(requesting_tenant, data))
+    if requesting_tenant is not None:
+        if all([existing_configuration,
+                existing_configuration.get('tenant_name', None) != requesting_tenant]):
+            return TENANT_FORBIDDEN_OPERATION
+        if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
+            return IMMUTABLE_TENANT_NAME_FIELD
+        data['tenant_name'] = requesting_tenant
+    else:
+        # The global admin is requesting the change; they can do everything, including patching over other people's
+        # stuff.
+        pass
 
     return DB.put(configuration_id, data), 200
 
@@ -292,6 +377,7 @@ def delete_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_invalid_tenant
 def delete_configuration_v3(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
@@ -304,6 +390,15 @@ def delete_configuration_v3(configuration_id):
             status=400, title="Configuration is in use.",
             detail="Configuration {} is referenced by the desired state of"
                    "some components".format(configuration_id))
+    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
+    # subsequent data puts and permission checks.
+    requesting_tenant = get_tenant_from_header() or None
+    # If the configuration already exists, and the tenant is not owned by the requesting delete tenant, then we cannot
+    # allow them to overwrite the existing data for this key.
+    existing_configuration = DB.get(configuration_id) or {}
+    if all([requesting_tenant is not None,
+            existing_configuration.get('tenant_name', '') != requesting_tenant]):
+        return TENANT_FORBIDDEN_OPERATION
     return DB.delete(configuration_id), 204
 
 

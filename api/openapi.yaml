@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1216,6 +1216,10 @@ components:
         description:
           type: string
           description: A user-defined description. This field is not used by CFS.
+        tenant_name:
+          type: string
+          description: The name of a tenant that owns this set of configuration.
+          example: blue-tenant
         last_updated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.

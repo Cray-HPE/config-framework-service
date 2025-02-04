@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -668,8 +668,9 @@ def _validate_ansible_passthrough(passthrough):
 
 @options.defaults(limit="default_page_size")
 def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list, limit=1, after_id=""):
-    session_filter = _get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list)
-    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=session_filter)
+    filters = []
+    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list))
+    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
     return session_data_page, next_page_exists
 
 

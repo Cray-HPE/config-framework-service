@@ -92,33 +92,35 @@ class DBWrapper():
         data = json.loads(datastr)
         return data
 
-
     def iter_values(self, start_after_key: Optional[str] = None):
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
         """
         all_keys = sorted({k.decode() for k in self.client.scan_iter()})
-        if start_after_key is not None:
+        if start_after_key:
             all_keys = [k for k in all_keys if k > start_after_key]
         while all_keys:
             for datastr in self.client.mget(all_keys[:500]):
                 yield json.loads(datastr) if datastr else None
             all_keys = all_keys[500:]
-
-
-    def get_all(self, limit=0, after_id=None, data_filter=None):
+      
+    def get_all(self, limit=0, after_id==None, data_filters=None):
         """Get an array of data for all keys."""
 
+        if not data_filters:
+            data_filters = []
         if limit < 0:
             limit = 0
         page_full = False
         next_page_exists = False
         data_page = []
         for data in self.iter_values(after_id):
-            if not data_filter or data_filter(data):
-                # filtering happens in get_all rather than after due to paging/memory constraints
-                #   we can't load all data and then filter on the results
+            if not data_filters or all([data_filter(data) for data_filter in data_filters]):
+                # If there are no data_filters, then we process it as a valid result,
+                # alternatively, if there are any specified filters, ALL of them must be true for a given entry,
+                # otherwise we do not process it. Filtering happens in get_all rather than after due to
+                # paging/memory constraints we can't load all data and then filter on the results.
                 if page_full:
                     next_page_exists = True
                     break
@@ -127,7 +129,6 @@ class DBWrapper():
                     if limit and len(data_page) >= limit:
                         page_full = True
         return data_page, next_page_exists
-
 
     def get_keys(self):
         keys = set()
