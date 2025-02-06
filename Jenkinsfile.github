@@ -102,7 +102,7 @@ pipeline {
 
             steps {
                 script {
-                    publishCsmDockerImage(image: env.NAME, tag: env.DOCKER_VERSION, isStable: env.IS_STABLE)
+                    publishCsmDockerImageIgnoreSnykPythonWerkzeug6808933(image: env.NAME, tag: env.DOCKER_VERSION, isStable: env.IS_STABLE)
                     publishCsmHelmCharts(component: env.NAME, chartsPath: "${WORKSPACE}/kubernetes/.packaged", isStable: env.IS_STABLE)
                 }
             }
