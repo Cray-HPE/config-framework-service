@@ -105,7 +105,7 @@ class DBWrapper():
                 yield json.loads(datastr) if datastr else None
             all_keys = all_keys[500:]
       
-    def get_all(self, limit=0, after_id==None, data_filters=None):
+    def get_all(self, limit=0, after_id=None, data_filters=None):
         """Get an array of data for all keys."""
 
         if not data_filters:
