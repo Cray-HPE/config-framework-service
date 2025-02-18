@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 02/18/2025
+### Added
+- CASMCMS-9228: Added common core utilities from BOS' for retry resiliency and tapms tenancy functions
+- CASMCMS-9228: Added multitenancy features to the configurations endpoint.
+
+### Changed
+- CASMCMS-9228: Converted database get features to support multiple filters
+- CASMCMS-9274: Prevent [`SNYK-PYTHON-WERKZEUG-6808933`](https://security.snyk.io/vuln/SNYK-PYTHON-WERKZEUG-6808933) from causing builds to fail.
+
+### Dependencies
+- CASMCMS-9288: Use centralized requests_retry_session
+- CASMCMS-9282
+  - Bump Alpine version from 3.15 to 3.21, because 3.15 no longer receives security patches
+  - Use Python venv inside Docker image.
+  - Bump Python dependencies for move to Python 3.12
+
 ## [1.25.0] - 01/31/2025
 ### Changed
 - CASMCMS-9263: Make database scanning more performant

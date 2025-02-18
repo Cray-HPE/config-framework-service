@@ -1,3 +1,5 @@
+--trusted-host artifactory.algol60.net
+--extra-index-url http://artifactory.algol60.net/artifactory/csm-python-modules/simple
 -c constraints.txt
 -r lib/server/requirements.txt
 
@@ -7,6 +9,7 @@ redis
 kafka-python
 ujson
 hvac
+requests-retry-session
 
 # The purpose of this file is to contain python runtime requirements
 # for controller code, e.g., code authored by developers, as opposed to

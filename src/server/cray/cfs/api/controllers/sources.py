@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -60,11 +60,10 @@ def get_sources_v3(in_use=None, limit=1, after_id=""):
 @options.defaults(limit="default_page_size")
 def _get_sources_data(in_use=None, limit=1, after_id=""):
     # CASMCMS-9197: Only specify a filter if we are actually filtering
+    filters = []
     if in_use is not None:
-        source_filter = partial(_source_filter, in_use=in_use, in_use_list=_get_in_use_list())
-    else:
-        source_filter = None
-    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=source_filter)
+        filters.append(partial(_source_filter, in_use=in_use, in_use_list=_get_in_use_list()))
+    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
     return source_data_page, next_page_exists
 
 
