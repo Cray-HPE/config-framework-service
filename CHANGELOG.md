@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Removed
+- CASMCMS-9228: Deprecate tenant specific patch logic; rely solely on push.
 
 ## [1.26.0] - 02/18/2025
 ### Added
