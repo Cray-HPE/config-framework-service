@@ -330,7 +330,7 @@ def delete_configuration_v2(configuration_id):
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of"
+            detail="Configuration {} is referenced by the desired state of "
                    "some components".format(configuration_id))
     return DB.delete(configuration_id), 204
 
@@ -347,7 +347,7 @@ def delete_configuration_v3(configuration_id):
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of"
+            detail="Configuration {} is referenced by the desired state of "
                    "some components".format(configuration_id))
     # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
     # subsequent data puts and permission checks.
