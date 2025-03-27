@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -142,7 +142,7 @@ def delete_configuration(configuration_id):
     if configuration_id in _get_in_use_list():
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of"
+            detail="Configuration {} is referenced by the desired state of "
                    "some components".format(configuration_id))
     return DB.delete(configuration_id), 204
 

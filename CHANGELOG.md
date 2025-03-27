@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - CASMCMS-9274: Prevent [`SNYK-PYTHON-WERKZEUG-6808933`](https://security.snyk.io/vuln/SNYK-PYTHON-WERKZEUG-6808933) from causing builds to fail.
 
+### Fixed
+- Added missing spaces in two error messages.
+
 ## [1.12.12] - 01/31/2025
 ### Changed
 - CASMCMS-9263: Make database scanning more performant
