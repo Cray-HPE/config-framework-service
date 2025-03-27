@@ -5,11 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Changed
 - CASMCMS-9263: Make database scanning more performant
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
+- Added missing spaces in two error messages.
 
 ## [1.23.8] - 05/18/2026
 ### Added
