@@ -235,6 +235,27 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
+    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
+    # subsequent data puts and permission checks.
+    requesting_tenant = get_tenant_from_header() or None
+
+    # If the configuration already exists, and the configuration is not owned by the requesting put tenant, then we cannot
+    # allow them to overwrite the existing data for this key.
+    existing_configuration = DB.get(configuration_id) or {}
+    LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
+    if requesting_tenant is not None:
+        if all([existing_configuration,
+                existing_configuration.get('tenant_name', None) != requesting_tenant]):
+            return TENANT_FORBIDDEN_OPERATION
+        if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
+            return IMMUTABLE_TENANT_NAME_FIELD
+        data['tenant_name'] = requesting_tenant
+    else:
+        # The global admin is requesting the change; they can do everything, including putting over other people's
+        # stuff. This block is split out specifically for this comment, which is why we have it even though it is just
+        # a pass.
+        pass
+
     for layer in iter_layers(data, include_additional_inventory=True):
         if 'clone_url' in layer and 'source' in layer:
             return connexion.problem(

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Added missing spaces in two error messages.
+- CASMCMS-9461: Restored accidentally-removed code in v3 configurations PUT endpoint that handled tenant information
 
 ## [1.26.1]
 ### Removed
