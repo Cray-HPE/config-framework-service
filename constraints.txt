@@ -18,8 +18,8 @@ itsdangerous>=2.1.2,<2.2
 Jinja2>=3.0.3,<3.1
 jsonschema>=4.23,<4.24
 kafka-python>=2.0,<2.1
-# CSM 1.6 moved to Kubernetes 1.24, so use client v24.x to ensure compatability
-kubernetes>=24.2,<24.3
+# CSM 1.7 uses Kubernetes 1.32, so use client v32.x to ensure compatability
+kubernetes>=32.0.1,<33.0
 lazy-object-proxy>=1.3,<1.4
 MarkupSafe>=2.1.5,<2.2
 mccabe>=0.6.1,<0.7

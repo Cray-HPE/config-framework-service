@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9463: Enforce tenancy restrictions on v3 configurations PATCH endpoint
 - CASMCMS-9464: Document new API error responses introduced with tenancy support
 
+### Dependencies
+- Bump `kubernetes` version to match CSM 1.7
+
 ## [1.26.1]
 ### Removed
 - CASMCMS-9228: Deprecate tenant specific patch logic; rely solely on push.
