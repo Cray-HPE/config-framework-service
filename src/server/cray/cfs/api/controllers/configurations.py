@@ -330,6 +330,11 @@ def patch_configuration_v3(configuration_id):
             detail="Configuration {} could not be found".format(configuration_id))
     data = DB.get(configuration_id)
 
+    tenant = get_tenant_from_header() or None
+    if all([tenant,
+            tenant != data.get('tenant_name', '')]):
+        return TENANT_FORBIDDEN_OPERATION
+
     try:
         data = _set_auto_fields(data)
     except BranchConversionException as e:
