@@ -369,6 +369,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    ForbiddenOperation:
+      description: The operation being attempted is not permitted.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
     ResourceNotFound:
       description: The resource was not found.
       content:
@@ -2864,6 +2870,10 @@ paths:
       responses:
         200:
           $ref: '#/components/responses/V3ConfigurationData'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     put:
@@ -2889,6 +2899,8 @@ paths:
           $ref: '#/components/responses/V3ConfigurationData'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
     patch:
       summary: Update the commits for a configuration
       tags:
@@ -2902,6 +2914,8 @@ paths:
           $ref: '#/components/responses/V3ConfigurationData'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     delete:
@@ -2919,6 +2933,8 @@ paths:
           $ref: '#/components/responses/ResourceDeleted'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     parameters:

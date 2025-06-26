@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9461: Restored accidentally-removed code in v3 configurations PUT endpoint that handled tenant information
 - CASMCMS-9462: Document tenant header parameter in API spec
 - CASMCMS-9463: Enforce tenancy restrictions on v3 configurations PATCH endpoint
+- CASMCMS-9464: Document new API error responses introduced with tenancy support
 
 ## [1.26.1]
 ### Removed
