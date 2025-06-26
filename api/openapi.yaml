@@ -115,6 +115,19 @@ servers:
   description: The production CFS API server
 
 components:
+  parameters:
+    V3TenantHeaderParam:
+      name: Cray-Tenant-Name
+      in: header
+      description: |
+        Tenant name.
+
+        Requests with a non-empty tenant name will restict the context of the operation to configurations owned by that tenant.
+
+        Requests with an empty tenant name, or that omit this parameter, will have no such context restrictions.
+      required: false
+      schema:
+        $ref: '#/components/schemas/TenantName'
   requestBodies:
     V2SessionCreateRequest:
       description: A JSON object for creating Config Framework Sessions
@@ -356,6 +369,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    ForbiddenOperation:
+      description: The operation being attempted is not permitted.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
     ResourceNotFound:
       description: The resource was not found.
       content:
@@ -401,6 +420,11 @@ components:
         kafka_status:
           type: string
       additionalProperties: false
+    TenantName:
+      type: string
+      description: Name of a tenant. Used for multi-tenancy. An empty string means no tenant.
+      example: "vcluster-my-tenant1"
+      maxLength: 127
     V3NextData:
       description: Information for requesting the next page of data
       type: object
@@ -2807,6 +2831,7 @@ paths:
         ConfigurationArray.
       operationId: get_configurations_v3
       parameters:
+        - $ref: '#/components/parameters/V3TenantHeaderParam'
         - name: limit
           schema:
             type: integer
@@ -2845,6 +2870,10 @@ paths:
       responses:
         200:
           $ref: '#/components/responses/V3ConfigurationData'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     put:
@@ -2870,6 +2899,8 @@ paths:
           $ref: '#/components/responses/V3ConfigurationData'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
     patch:
       summary: Update the commits for a configuration
       tags:
@@ -2883,6 +2914,8 @@ paths:
           $ref: '#/components/responses/V3ConfigurationData'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     delete:
@@ -2900,9 +2933,12 @@ paths:
           $ref: '#/components/responses/ResourceDeleted'
         400:
           $ref: '#/components/responses/BadRequest'
+        403:
+          $ref: '#/components/responses/ForbiddenOperation'
         404:
           $ref: '#/components/responses/ResourceNotFound'
     parameters:
+      - $ref: '#/components/parameters/V3TenantHeaderParam'
       - name: configuration_id
         in: path
         description: Name of the target configuration
