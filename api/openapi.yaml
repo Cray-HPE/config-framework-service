@@ -115,6 +115,19 @@ servers:
   description: The production CFS API server
 
 components:
+  parameters:
+    V3TenantHeaderParam:
+      name: Cray-Tenant-Name
+      in: header
+      description: |
+        Tenant name.
+
+        Requests with a non-empty tenant name will restict the context of the operation to configurations owned by that tenant.
+
+        Requests with an empty tenant name, or that omit this parameter, will have no such context restrictions.
+      required: false
+      schema:
+        $ref: '#/components/schemas/TenantName'
   requestBodies:
     V2SessionCreateRequest:
       description: A JSON object for creating Config Framework Sessions
@@ -401,6 +414,11 @@ components:
         kafka_status:
           type: string
       additionalProperties: false
+    TenantName:
+      type: string
+      description: Name of a tenant. Used for multi-tenancy. An empty string means no tenant.
+      example: "vcluster-my-tenant1"
+      maxLength: 127
     V3NextData:
       description: Information for requesting the next page of data
       type: object
@@ -2807,6 +2825,7 @@ paths:
         ConfigurationArray.
       operationId: get_configurations_v3
       parameters:
+        - $ref: '#/components/parameters/V3TenantHeaderParam'
         - name: limit
           schema:
             type: integer
@@ -2903,6 +2922,7 @@ paths:
         404:
           $ref: '#/components/responses/ResourceNotFound'
     parameters:
+      - $ref: '#/components/parameters/V3TenantHeaderParam'
       - name: configuration_id
         in: path
         description: Name of the target configuration
