@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies
+- Update `requests-retry-session` version
+
 ## [1.26.2] - 06/26/2025
 ### Fixed
 - Added missing spaces in two error messages.
