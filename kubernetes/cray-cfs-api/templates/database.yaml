@@ -140,6 +140,14 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: cray-cfs-api-migration
+  {{/* Sysmgmt health namespace - Victoria Metrics */}}
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: sysmgmt-health
+    ports:
+      - protocol: TCP
+        port: 15020
   podSelector:
     matchLabels:
       app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
