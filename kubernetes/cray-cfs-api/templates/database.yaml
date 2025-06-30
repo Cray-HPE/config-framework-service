@@ -140,6 +140,9 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: cray-cfs-api-migration
+    ports:
+      - protocol: TCP
+        port: 15020
   podSelector:
     matchLabels:
       app.kubernetes.io/name: "{{ include "cray-service.name" . }}-db"
