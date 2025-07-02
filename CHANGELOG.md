@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.3] - 07/02/2025
 ### Dependencies
 - Update `requests-retry-session` version
 
