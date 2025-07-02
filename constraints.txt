@@ -37,7 +37,10 @@ requests>=2.31,<2.32
 requests-oauthlib>=1.3.1,<1.4
 requests-retry-session>=0.5,<0.6    ; python_version < '3.9'
 requests-retry-session>=1.0,<1.1    ; python_version >= '3.9' and python_version < '3.10'
-requests-retry-session>=2.0,<2.1    ; python_version >= '3.10'
+requests-retry-session>=2.0,<2.1    ; python_version >= '3.10' and python_version < '3.11'
+requests-retry-session>=3.0,<3.1    ; python_version >= '3.11' and python_version < '3.12'
+requests-retry-session>=4.0,<4.1    ; python_version >= '3.12' and python_version < '3.13'
+requests-retry-session>=5.0,<5.1    ; python_version >= '3.13'
 rsa>=4.7.2,<4.8
 swagger-ui-bundle==0.0.9
 testtools>=2.3,<2.4
