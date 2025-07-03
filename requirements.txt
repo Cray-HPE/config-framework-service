@@ -5,7 +5,7 @@
 
 kubernetes
 requests
-redis
+redis[hiredis]
 kafka-python
 ujson
 hvac

@@ -77,7 +77,7 @@ class DBWrapper():
             LOGGER.debug("Creating database connection"
                          "host: %s port: %s database: %s",
                          DB_HOST, DB_PORT, db_id)
-            return redis.Redis(host=DB_HOST, port=DB_PORT, db=db_id)
+            return redis.Redis(host=DB_HOST, port=DB_PORT, db=db_id, protocol=3)
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
                          db_id, err)

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,5 +45,5 @@ annotations:
     - name: cray-cfs
       image: artifactory.algol60.net/csm-docker/S-T-A-B-L-E/cray-cfs:0.0.0-docker
     - name: redis
-      image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:5.0-alpine
+      image: artifactory.algol60.net/csm-docker/stable/docker.io/library/redis:7.2-alpine
   artifacthub.io/license: MIT
