@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.4] - 07/03/2025
+### Changed
+- Use `redis` `RESP3` protocol
+
+### Dependencies
+- Update `redis` to match version used by BOS, to reduce superfluous images in CSM
+
 ## [1.26.3] - 07/02/2025
 ### Dependencies
 - Update `requests-retry-session` version
