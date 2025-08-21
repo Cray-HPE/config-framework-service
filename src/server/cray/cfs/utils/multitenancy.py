@@ -92,3 +92,19 @@ def reject_invalid_tenant(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+def reject_tenancy_for_unsupported_api(func):
+    """Decorator for rejecting requests with a tenant header for unsupported APIs"""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        tenant = get_tenant_from_header()
+        if tenant:
+            LOGGER.debug("Rejecting request with tenant header for unsupported API")
+            return connexion.problem(
+                status=400,
+                title="Unsupported API",
+                detail=str("This API does not support multi-tenancy"))
+        return func(*args, **kwargs)
+
+    return wrapper

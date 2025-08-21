@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CASMCMS-9505: Reject multi-tenancy for unsupported API version /v2/configurations.
+
 ## [1.27.0] - 07/03/2025
 ### Changed
 - Use `redis` `RESP3` protocol

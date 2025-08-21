@@ -37,7 +37,7 @@ from cray.cfs.api.controllers import sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
-from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant
+from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant, reject_tenancy_for_unsupported_api
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
@@ -158,6 +158,7 @@ def _config_in_use(config_name: str) -> bool:
     return False
 
 @dbutils.redis_error_handler
+@reject_tenancy_for_unsupported_api
 def get_configuration_v2(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /configurations/id invoked get_configuration")
@@ -185,6 +186,7 @@ def get_configuration_v3(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_tenancy_for_unsupported_api
 def put_configuration_v2(configuration_id):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /configurations/id invoked put_configuration")
@@ -301,6 +303,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
 
 @dbutils.redis_error_handler
+@reject_tenancy_for_unsupported_api
 def patch_configuration_v2(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCHv2 /configurations/id invoked put_configuration")
@@ -346,6 +349,7 @@ def patch_configuration_v3(configuration_id):
 
 
 @dbutils.redis_error_handler
+@reject_tenancy_for_unsupported_api
 def delete_configuration_v2(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
