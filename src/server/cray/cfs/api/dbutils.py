@@ -174,25 +174,16 @@ class DBWrapper():
         for key in sorted_keys:
             data_str = self.client.get(key)
             data = json.loads(data_str)
-            if not data:
-                # Skip null values -- this means it was deleted after we retrieved our
-                # list of keys. We cannot just write the patch data for this key, because
-                # the patch data may not include all required fields for this object.
-                continue
-            if data_filter and not data_filter(data):
-                # filtering happens in patch_all rather than after due to paging/memory constraints
+            if not data_filter or data_filter(data):
+                # filtering happens in get_all rather than after due to paging/memory constraints
                 #   we can't load all data and then filter on the results
-                # A filter was set, and this data does not match it, so skip it.
-                continue
-            # Reaching here means that the data is not null, and either no data filter is set
-            # or a data filter is set and this data matches it
-            data = self._update(data, patch)
-            if update_handler:
-                data = update_handler(data)
-            data_str = json.dumps(data)
-            self.client.set(key, data_str)
-            # Decode the key into a UTF-8 string, so the list will be JSON serializable
-            patched_id_list.append(key.decode('utf-8'))
+                data = self._update(data, patch)
+                if update_handler:
+                    data = update_handler(data)
+                data_str = json.dumps(data)
+                self.client.set(key, data_str)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                patched_id_list.append(key.decode('utf-8'))
         return patched_id_list
 
     def _update(self, data, new_data):
@@ -220,33 +211,13 @@ class DBWrapper():
         deleted_id_list = []
         for key in sorted_keys:
             data_str = self.client.get(key)
-            if not data_str:
-                # No data under this key, so skip it
-                continue
             data = json.loads(data_str)
-            if not data:
-                # No data under this key, so skip it
-                continue
-            if data_filter and not data_filter(data):
-                # A filter was set, and this data does not match it, so skip it.
-                continue
-            # Reaching here means that the data is not null, and either no data filter is set
-            # or a data filter is set and this data matches it
-
-            # Use getdel rather than just delete, because it is possible that this entry has
-            # been deleted since our earlier get call.
-            data = self.client.getdel(key)
-            if not data:
-                # This means that our function here did not actually delete this entry -- it
-                # was deleted in the short window betweeen our get call and our getdel
-                # call. In this case, we should skip the rest of this function, since we did
-                # not actually delete it ourselves.
-                continue
-            # If we get here, it means we are actually the ones that deleted it.
-            if deletion_handler:
-                deletion_handler(data)
-            # Decode the key into a UTF-8 string, so the list will be JSON serializable
-            deleted_id_list.append(key.decode('utf-8'))
+            if not data_filter or data_filter(data):
+                self.client.delete(key)
+                if deletion_handler:
+                    deletion_handler(data)
+                # Decode the key into a UTF-8 string, so the list will be JSON serializable
+                deleted_id_list.append(key.decode('utf-8'))
         return deleted_id_list
 
     def info(self):
