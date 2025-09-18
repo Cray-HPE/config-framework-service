@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- CASMCMS-9538: Fix race condition problems
+    - CASMCMS-9553: Make DBWrapper.iter_values smart enough to handle the case where
+      a DB entry is deleted while it is executing.
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
 - Added missing spaces in two error messages.
 

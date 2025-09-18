@@ -102,7 +102,12 @@ class DBWrapper():
             all_keys = [k for k in all_keys if k > start_after_key]
         while all_keys:
             for datastr in self.client.mget(all_keys[:500]):
-                yield json.loads(datastr) if datastr else None
+                if not datastr:
+                    # If datastr is empty/None, that means that the entry was
+                    # deleted after the key was returned by the mget call.
+                    # In that case, we just skip it.
+                    continue
+                yield json.loads(datastr)
             all_keys = all_keys[500:]
 
     def get_all(self, limit=0, after_id=None, data_filters=None):
