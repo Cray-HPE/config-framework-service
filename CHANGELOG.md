@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- CASMCMS-9538: Fix race condition problems
+
 ## [1.27.0] - 07/03/2025
 ### Changed
 - Use `redis` `RESP3` protocol
