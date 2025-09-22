@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9538: Fix race condition problems
     - CASMCMS-9553: Make DBWrapper.iter_values smart enough to handle the case where
       a DB entry is deleted while it is executing.
+    - CASMCMS-9556: Consolidate duplicate DBWrapper code
 
 ## [1.27.0] - 07/03/2025
 ### Changed
