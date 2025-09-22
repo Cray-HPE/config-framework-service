@@ -92,14 +92,33 @@ class DBWrapper():
         data = json.loads(datastr)
         return data
 
+    def get_keys(self, start_after_key: Optional[str] = None) -> list[str]:
+        """
+        Returns a sorted list of all keys (as str) in the database.
+        If start_after_key is specified, only keys lexically after the
+        specified key will be returned.
+        """
+        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
+        # Using count=500 significantly improves the performance, by limiting the number
+        # of network calls to the database
+        keys = { key.decode('utf-8') for key in self.client.scan_iter(count=500) }
+        if start_after_key is None:
+            return sorted(keys)
+        # Add the start_after_key to the set, as it may not be in there already
+        keys.add(start_after_key)
+        # Make a sorted list from the set
+        sorted_keys = sorted(keys)
+        # Find the index of start_after_key
+        i = sorted_keys.index(start_after_key)
+        # Return the list starting after that index
+        return sorted_keys[i+1:]
+
     def iter_values(self, start_after_key: Optional[str] = None):
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
         """
-        all_keys = sorted({k.decode() for k in self.client.scan_iter()})
-        if start_after_key:
-            all_keys = [k for k in all_keys if k > start_after_key]
+        all_keys = self.get_keys(start_after_key=start_after_key)
         while all_keys:
             for datastr in self.client.mget(all_keys[:500]):
                 if not datastr:
@@ -135,14 +154,6 @@ class DBWrapper():
                         page_full = True
         return data_page, next_page_exists
 
-    def get_keys(self):
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key)
-        # Sorting the keys guarantees a consistent order when paging
-        sorted_keys = sorted(list(keys))
-        return sorted_keys
-
     def put(self, key, new_data):
         """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
@@ -164,14 +175,8 @@ class DBWrapper():
 
     def patch_all(self, data_filter, patch, update_handler=None):
         """Patch multiple resources in the database."""
-        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key)
-        # Sorting the keys guarantees a consistent order when paging
-        sorted_keys = sorted(list(keys))
         patched_id_list = []
-        for key in sorted_keys:
+        for key in self.get_keys():
             data_str = self.client.get(key)
             data = json.loads(data_str)
             if not data_filter or data_filter(data):
@@ -182,8 +187,7 @@ class DBWrapper():
                     data = update_handler(data)
                 data_str = json.dumps(data)
                 self.client.set(key, data_str)
-                # Decode the key into a UTF-8 string, so the list will be JSON serializable
-                patched_id_list.append(key.decode('utf-8'))
+                patched_id_list.append(key)
         return patched_id_list
 
     def _update(self, data, new_data):
@@ -201,23 +205,15 @@ class DBWrapper():
 
     def delete_all(self, data_filter, deletion_handler=None):
         """Delete multiple resources in the database."""
-        # Redis SCAN operations can produce duplicate results.  Using a set fixes this.
-        keys = set()
-        for key in self.client.scan_iter():
-            keys.add(key)
-        # Sorting the keys guarantees a consistent order when paging
-        sorted_keys = sorted(list(keys))
-
         deleted_id_list = []
-        for key in sorted_keys:
+        for key in self.get_keys():
             data_str = self.client.get(key)
             data = json.loads(data_str)
             if not data_filter or data_filter(data):
                 self.client.delete(key)
                 if deletion_handler:
                     deletion_handler(data)
-                # Decode the key into a UTF-8 string, so the list will be JSON serializable
-                deleted_id_list.append(key.decode('utf-8'))
+                deleted_id_list.append(key)
         return deleted_id_list
 
     def info(self):
