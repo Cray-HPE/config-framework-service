@@ -21,19 +21,40 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-import connexion
-import ujson as json
-import logging
-import redis
-from typing import Optional
 
+from collections.abc import Callable, Generator, Iterable
+import functools
+import logging
+from typing import Any, Literal, Optional, ParamSpec, TypeVar, Union
+
+import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
+import redis
+import ujson as json
 
 from cray.cfs.api.models.base_model import Model as BaseModel
 
+# Definitions for type hinting
+type JsonData = bool | str | None | int | float | list[JsonData] | dict[str, JsonData]
+type JsonDict = dict[str, JsonData]
+type JsonList = list[JsonData]
+# All CFS database entries are dicts that are stored in JSON.
+type DbEntry = JsonDict
+type DbKey = Union[str, bytes]
+DatabaseNames = Literal["options", "sessions", "components", "configurations", "sources"]
+type DbIdentifier = Union[DatabaseNames, int]
+type DataFilter = Callable[[DbEntry], bool]
+type UpdateHandler = Callable[[DbEntry], DbEntry]
+type DeletionHandler = Callable[[DbEntry], None]
+
 LOGGER = logging.getLogger(__name__)
-DATABASES = ["options", "sessions", "components", "configurations", "sources"]  # Index is the db id.
+DATABASES: list[DatabaseNames] = ["options",
+                                  "sessions",
+                                  "components",
+                                  "configurations",
+                                  "sources"]  # Index is the db id.
 
 try:
     config.load_incluster_config()
@@ -47,7 +68,7 @@ DB_HOST = svc_obj.spec.cluster_ip
 DB_PORT = 6379
 
 
-class DBWrapper():
+class DBWrapper:
     """A wrapper around a Redis database connection
 
     The handles creating the Redis client and provides REST-like methods for
@@ -57,21 +78,21 @@ class DBWrapper():
     and can be safely shared by multiple threads.
     """
 
-    def __init__(self, db):
+    def __init__(self, db: DbIdentifier) -> None:
         db_id = self._get_db_id(db)
         self.client = self._get_client(db_id)
 
-    def __contains__(self, key):
+    def __contains__(self, key: DbKey) -> bool:
         return self.client.exists(key)
 
-    def _get_db_id(self, db):
+    def _get_db_id(self, db: DbIdentifier) -> int:
         """Converts a db name to the id used by Redis."""
         if isinstance(db, int):
             return db
         else:
             return DATABASES.index(db)
 
-    def _get_client(self, db_id):
+    def _get_client(self, db_id: int) -> redis.client.Redis:
         """Create a connection with the database."""
         try:
             LOGGER.debug("Creating database connection"
@@ -84,8 +105,8 @@ class DBWrapper():
             raise
 
     # The following methods act like REST calls for single items
-    def get(self, key):
-        """Get the data for the given key."""
+    def get(self, key: DbKey) -> Optional[DbEntry]:
+        """Get the data for the given key, or None if the entry does not exist."""
         datastr = self.client.get(key)
         if not datastr:
             return None
@@ -113,7 +134,7 @@ class DBWrapper():
         # Return the list starting after that index
         return sorted_keys[i+1:]
 
-    def iter_values(self, start_after_key: Optional[str] = None):
+    def iter_values(self, start_after_key: Optional[str] = None) -> Generator[DbEntry, None, None]:
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
@@ -129,7 +150,11 @@ class DBWrapper():
                 yield json.loads(datastr)
             all_keys = all_keys[500:]
 
-    def get_all(self, limit=0, after_id=None, data_filters=None):
+    def get_all(
+        self, limit: int = 0,
+        after_id: Optional[str] = None,
+        data_filters: Optional[Iterable[DataFilter]] = None
+    ) -> tuple[list[DbEntry], bool]:
         """Get an array of data for all keys."""
 
         if not data_filters:
@@ -154,13 +179,17 @@ class DBWrapper():
                         page_full = True
         return data_page, next_page_exists
 
-    def put(self, key, new_data):
+    def put(self, key: DbKey, new_data: DbEntry) -> Optional[DbEntry]:
         """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
         return self.get(key)
 
-    def patch(self, key, new_data, update_handler=None):
+    def patch(
+        self, key: DbKey,
+        new_data: DbEntry,
+        update_handler: Optional[UpdateHandler] = None
+    ) -> Optional[DbEntry]:
         """Patch data in the database."""
         """update_handler provides a way to operate on the full patched data"""
         data_str = self.client.get(key)
@@ -173,7 +202,11 @@ class DBWrapper():
         data = self.get(key)
         return data
 
-    def patch_all(self, data_filter, patch, update_handler=None):
+    def patch_all(
+        self, data_filter: DataFilter,
+        patch: JsonDict,
+        update_handler: Optional[UpdateHandler] = None
+    ) -> list[str]:
         """Patch multiple resources in the database."""
         patched_id_list = []
         for key in self.get_keys():
@@ -190,7 +223,7 @@ class DBWrapper():
                 patched_id_list.append(key)
         return patched_id_list
 
-    def _update(self, data, new_data):
+    def _update(self, data: JsonDict, new_data: JsonDict) -> JsonDict:
         """Recursively patches JSON to allow sub-fields to be patched."""
         for k, v in new_data.items():
             if isinstance(v, dict):
@@ -199,11 +232,14 @@ class DBWrapper():
                 data[k] = v
         return data
 
-    def delete(self, key):
+    def delete(self, key: DbKey) -> None:
         """Deletes data from the database."""
         self.client.delete(key)
 
-    def delete_all(self, data_filter, deletion_handler=None):
+    def delete_all(
+        self, data_filter: DataFilter,
+        deletion_handler: Optional[DeletionHandler] = None
+    ) -> list[str]:
         """Delete multiple resources in the database."""
         deleted_id_list = []
         for key in self.get_keys():
@@ -216,14 +252,19 @@ class DBWrapper():
                 deleted_id_list.append(key)
         return deleted_id_list
 
-    def info(self):
+    def info(self) -> dict:
         """Returns the database info."""
         return self.client.info()
 
 
-def redis_error_handler(func):
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def redis_error_handler(func: Callable[P, R]) -> Callable[P, R|CxResponse]:
     """Decorator for returning better errors if Redis is unreachable"""
-    def wrapper(*args, **kwargs):
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | CxResponse:
         try:
             if 'body' in kwargs:
                 # Our get/patch functions don't take body, but the **kwargs
@@ -231,23 +272,25 @@ def redis_error_handler(func):
                 del kwargs['body']
             return func(*args, **kwargs)
         except redis.exceptions.ConnectionError as e:
-            LOGGER.error('Unable to connect to the Redis database: {}'.format(e))
+            LOGGER.error('Unable to connect to the Redis database: %s', e)
             return connexion.problem(
-                status=503, title='Unable to connect to the Redis database',
+                status=503,
+                title='Unable to connect to the Redis database',
                 detail=str(e))
+
     return wrapper
 
 
-def get_wrapper(db):
+def get_wrapper(db: DbIdentifier) -> DBWrapper:
     """Returns a database object."""
     return DBWrapper(db)
 
 
-def convert_data_to_v2(data, model_type):
+def convert_data_to_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
     """
-    When exporting from a model with to_dict, all keys are in snake_case.  However the model contains the information
-        on the keys in the api spec.  This gives the ability to make the data match the given model/spec, which
-        is useful when translating between the v2 and v3 api.
+    When exporting from a model with to_dict, all keys are in snake_case.  However the model
+        contains the information on the keys in the api spec.  This gives the ability to make the
+        data match the given model/spec, which is useful when translating between the v2 and v3 api
     Data must start in the v3 format exported by model().to_dict()
     """
     result = {}
@@ -259,7 +302,7 @@ def convert_data_to_v2(data, model_type):
     return result
 
 
-def _convert_data_to_v2(data, data_type):
+def _convert_data_to_v2(data: JsonDict, data_type: Any) -> JsonDict:
     if not isinstance(data_type, type):
         # Special case where the data_type is a "typing" object.  e.g typing.Dict
         if not data:
@@ -277,11 +320,11 @@ def _convert_data_to_v2(data, data_type):
     return data
 
 
-def convert_data_from_v2(data, model_type):
+def convert_data_from_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
     """
-    When exporting from a model with to_dict, all keys are in snake_case.  However the model contains the information
-        on the keys in the api spec.  This gives the ability to make the data match the given model/spec, which
-        is useful when translating between the v2 and v3 api.
+    When exporting from a model with to_dict, all keys are in snake_case.  However the model
+        contains the information on the keys in the api spec.  This gives the ability to make the
+        data match the given model/spec, which is useful when translating between the v2 and v3 api
     Data must start in the v3 format exported by model().to_dict()
     """
     result = {}
@@ -293,7 +336,7 @@ def convert_data_from_v2(data, model_type):
     return result
 
 
-def _convert_data_from_v2(data, data_type):
+def _convert_data_from_v2(data: JsonDict, data_type: Any) -> JsonDict:
     if not isinstance(data_type, type):
         # Special case where the data_type is a "typing" object.  e.g typing.Dict
         if not data:
