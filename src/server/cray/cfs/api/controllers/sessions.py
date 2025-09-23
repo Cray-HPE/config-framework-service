@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 import argparse
 import datetime
 from functools import partial
@@ -98,14 +99,14 @@ def create_session_v2():  # noqa: E501
 
     if session_create.name in DB:
         return connexion.problem(
-            detail="A session with the name {} already exists".format(session_create.name),
+            detail=f"A session with the name {session_create.name} already exists",
             status=409,
             title="Conflicting session name"
         )
 
     if v2_session_configuration not in CONFIG_DB:
         return connexion.problem(
-            detail="No configurations exist named {}".format(v2_session_configuration),
+            detail=f"No configurations exist named {v2_session_configuration}",
             status=400,
             title="Invalid configuration"
         )
@@ -164,14 +165,14 @@ def create_session_v3():  # noqa: E501
 
     if session_create.name in DB:
         return connexion.problem(
-            detail="A session with the name {} already exists".format(session_create.name),
+            detail=f"A session with the name {session_create.name} already exists",
             status=409,
             title="Conflicting session name"
         )
 
-    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):
+    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):  # noqa: E501
         return connexion.problem(
-            detail="No configurations exist named {}".format(session_create.configuration_name),
+            detail=f"No configurations exist named {session_create.configuration_name}",
             status=400,
             title="Invalid configuration"
         )
@@ -467,7 +468,7 @@ def get_session_v2(session_name):  # noqa: E501
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
+            detail=f"Session {session_name} could not be found")
     return convert_session_to_v2(DB.get(session_name)), 200
 
 
@@ -487,7 +488,7 @@ def get_session_v3(session_name):  # noqa: E501
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
+            detail=f"Session {session_name} could not be found")
     session_data = DB.get(session_name)
     _set_link(session_data)
     return session_data, 200
@@ -509,7 +510,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -519,7 +520,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
+            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")  # noqa: E501
     return [convert_session_to_v2(session) for session in sessions_data], 200
 
 
@@ -541,7 +542,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -583,7 +584,7 @@ def patch_session_v2(session_name):
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
+            detail=f"Session {session_name} could not be found")
     data = dbutils.convert_data_from_v2(data, V2Session)
     # CASMCMS-9627: To minimize changes, only update the V3 API.
     # This is fine because that is what cfs-operator uses. This also allows
@@ -609,9 +610,8 @@ def patch_session_v3(session_name):
     LOGGER.debug("PATCH /v3/sessions/id invoked patch_session")
     try:
         data = connexion.request.get_json()
-        for key in data.keys():
-            if key != 'status':
-                raise Exception('Only status can be updated after session creation')
+        if any(key != 'status' for key in data.keys()):
+            raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
@@ -622,7 +622,7 @@ def patch_session_v3(session_name):
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
+            detail=f"Session {session_name} could not be found")
     try:
         response_data = _patch_session(session_name, data, job_update_restrictions=True)
     except JobFieldAlreadySet as err:
@@ -722,10 +722,10 @@ def _validate_session_target(target):
     if not target:
         # Use dynamic inventory by default
         return None
-    elif target.definition in ('repo', 'dynamic'):
+    if target.definition in ('repo', 'dynamic'):
         if target.groups:
             return connexion.problem(
-                detail="'{}' target definitions must not contain groups specifications.".format(target.definition),  # noqa: E501
+                detail=f"'{target.definition}' target definitions must not contain groups specifications.",  # noqa: E501
                 status=status,
                 title=title
             )
@@ -736,7 +736,7 @@ def _validate_session_target(target):
                 title=title,
                 detail="At least one target group must be specified."
             )
-        if any([getattr(grp, 'members', None) is None for grp in target.groups]):
+        if any(getattr(grp, 'members', None) is None for grp in target.groups):
             # Although members is required for a group, swagger is not checking if another
             # data type such as a string or array is passed instead of an object
             return connexion.problem(
@@ -744,13 +744,13 @@ def _validate_session_target(target):
                 title=title,
                 detail="Groups must be an object with the members property."
             )
-        if any([grp.members == [] for grp in target.groups]):
+        if any(grp.members == [] for grp in target.groups):
             return connexion.problem(
                 status=status,
                 title=title,
                 detail="Group member lists must not be empty."
             )
-        if any([member == "" for grp in target.groups for member in grp.members]):  # noqa: E501
+        if any(member == "" for grp in target.groups for member in grp.members):  # noqa: E501
             return connexion.problem(
                 status=status,
                 title=title,
@@ -769,7 +769,7 @@ def _validate_session_target(target):
                 return connexion.problem(
                     status=status,
                     title=title,
-                    detail="The following Image target group member(s) are not valid UUIDs: %s." % naughty_list  # noqa: E501
+                    detail=f"The following Image target group member(s) are not valid UUIDs: {naughty_list}."  # noqa: E501
                 )
     else:
         # Model validation will handle this case
@@ -807,7 +807,7 @@ def _validate_ansible_passthrough(passthrough):
         parser.parse_args(passthrough_arguments)
     except Exception as e:
         return connexion.problem(
-            detail="Error validating ansible-passthrough: {}".format(e),  # noqa: E501
+            detail=f"Error validating ansible-passthrough: {e}",
             status=400,
             title='Bad Request'
         )
@@ -815,10 +815,13 @@ def _validate_ansible_passthrough(passthrough):
 
 
 @options.defaults(limit="default_page_size")
-def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list, limit=1, after_id=""):
+def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list,
+                           limit=1, after_id=""):
     filters = []
-    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list))
-    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
+    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
+                                       tag_list))
+    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                     data_filters=filters)
     return session_data_page, next_page_exists
 
 
@@ -829,31 +832,33 @@ def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
         try:
             max_start = _age_to_timestamp(age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse age: %s', age)
             raise ParsingException(e) from e
     if min_age:
         try:
             max_start = _age_to_timestamp(min_age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse min_age: %s', min_age)
             raise ParsingException(e) from e
     if max_age:
         try:
             min_start = _age_to_timestamp(max_age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse max_age: %s', max_age)
             raise ParsingException(e) from e
-    session_filter = partial(_session_filter, min_start=min_start, max_start=max_start, status=status,
-                             name_contains=name_contains, succeeded=succeeded, tag_list=tag_list)
+    session_filter = partial(_session_filter, min_start=min_start, max_start=max_start,
+                             status=status, name_contains=name_contains,
+                             succeeded=succeeded, tag_list=tag_list)
     return session_filter
 
 
-def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded, tag_list):
+def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded,
+                    tag_list):
     if any([min_start, max_start, status, name_contains, succeeded, tag_list]):
-        return _matches_filter(session_data, min_start, max_start, status, name_contains, succeeded, tag_list)
-    else:
-        # No filter is being used so all components are valid
-        return True
+        return _matches_filter(session_data, min_start, max_start, status, name_contains,
+                               succeeded, tag_list)
+    # No filter is being used so all components are valid
+    return True
 
 
 def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags):
@@ -873,7 +878,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     if max_start and (not session_start or session_start > max_start):
         return False
-    if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
+    if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
         return False
     return True
 
@@ -881,7 +886,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
 def _age_to_timestamp(age):
     delta = {}
     for interval in ['weeks', 'days', 'hours', 'minutes']:
-        result = re.search('(\d+)\w*{}'.format(interval[0]), age, re.IGNORECASE)
+        result = re.search(rf'(\d+)\w*{interval[0]}', age, re.IGNORECASE)
         if result:
             delta[interval] = int(result.groups()[0])
     delta = datetime.timedelta(**delta)
