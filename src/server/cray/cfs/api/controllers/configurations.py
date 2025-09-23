@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 from collections.abc import Container
 from datetime import datetime
 from functools import partial
@@ -52,8 +53,12 @@ def get_configurations_v2(in_use=None):
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
-    return [convert_configuration_to_v2(configuration) for configuration in configurations_data], 200
+            detail="The response size exceeds the default_page_size.  "
+                   "Use the v3 API to page through the results.")
+    return (
+        [convert_configuration_to_v2(configuration)for configuration in configurations_data],
+        200
+    )
 
 
 @dbutils.redis_error_handler
@@ -63,7 +68,9 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /configurations invoked get_configurations")
     called_parameters = locals()
-    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id)
+    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use,
+                                                                     limit=limit,
+                                                                     after_id=after_id)
     response = {"configurations": configurations_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -77,14 +84,18 @@ def _get_configurations_data(in_use=None, limit=1, after_id=""):
     data_filters = []
     # CASMCMS-9197: Only specify a filter if we are actually filtering
     if in_use is not None:
-        data_filters.append(partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list()))
-    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=data_filters)
+        data_filters.append(partial(_configuration_filter, in_use=in_use,
+                                    in_use_list=_get_in_use_list()))
+    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                           data_filters=data_filters)
     return configuration_data_page, next_page_exists
 
 
-def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
+def _configuration_filter(configuration_data: dict, in_use: bool,
+                          in_use_list: Container[str]) -> bool:
     """
-    The purpose of this function is to filter CFS configurations that are referenced by any defined component.
+    The purpose of this function is to filter CFS configurations that are referenced by any
+    defined component.
 
     If in_use is true:
         Returns True if the name of the specified configuration is in in_use_list,
@@ -101,7 +112,7 @@ def _get_in_use_list():
     in_use_list = set()
     for component in _iter_components_data():
         desired_state = component.get('desired_state', '')
-        if desired_state and type(desired_state) == str:
+        if desired_state and isinstance(desired_state, str):
             in_use_list.add(desired_state)
     return list(in_use_list)
 
@@ -110,8 +121,7 @@ def _iter_components_data():
     next_parameters = {}
     while True:
         data, _ = components.get_components_v3(**next_parameters)
-        for component in data["components"]:
-            yield component
+        yield from data["components"]
         next_parameters = data["next"]
         if not next_parameters:
             break
@@ -130,7 +140,7 @@ def get_configuration_v2(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     return convert_configuration_to_v2(DB.get(configuration_id)), 200
 
 
@@ -142,7 +152,7 @@ def get_configuration_v3(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     return DB.get(configuration_id), 200
 
 
@@ -207,14 +217,14 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             return connexion.problem(
                 status=400, title="Error handling source",
                 detail='Either source or clone_url must be specified for each layer.')
-        if layer.get("source") and layer.get("source") not in SOURCES_DB:
-            return connexion.problem(
-                status=400, title="Source does not exist",
-                detail=f"The source {layer['source']} does not exist.")
         if 'branch' in layer and 'commit' in layer:
             return connexion.problem(
                 status=400, title="Error handling branches",
                 detail='Only branch or commit should be specified for each layer, not both.')
+        if layer.get("source") and layer.get("source") not in SOURCES_DB:
+            return connexion.problem(
+                status=400, title="Source does not exist",
+                detail=f"The source {layer['source']} does not exist.")
 
     try:
         data = _set_auto_fields(data)
@@ -235,8 +245,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     if drop_branches:
         for layer in iter_layers(data, include_additional_inventory=True):
-            if "branch" in layer:
-                del(layer["branch"])
+            layer.pop("branch", None)
 
     data['name'] = configuration_id
     return DB.put(configuration_id, data), 200
@@ -250,7 +259,7 @@ def patch_configuration_v2(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     data = DB.get(configuration_id)
     try:
         data = _set_auto_fields(data)
@@ -270,7 +279,7 @@ def patch_configuration_v3(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     data = DB.get(configuration_id)
 
     try:
@@ -291,12 +300,12 @@ def delete_configuration_v2(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of "
-                   "some components".format(configuration_id))
+            detail=f"Configuration {configuration_id} is referenced by the desired state of "
+                   "some components")
     return DB.delete(configuration_id), 204
 
 
@@ -308,22 +317,19 @@ def delete_configuration_v3(configuration_id):
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
+            detail=f"Configuration {configuration_id} could not be found")
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of "
-                   "some components".format(configuration_id))
+            detail=f"Configuration {configuration_id} is referenced by the desired state of "
+                   "some components")
     return DB.delete(configuration_id), 204
 
 
 def iter_layers(config_data, include_additional_inventory=True):
-    if include_additional_inventory and config_data.get("additional_inventory"):
-        for layer in (config_data.get('layers') + [config_data.get('additional_inventory')]):
-            yield layer
-    else:
-        for layer in config_data.get('layers'):
-            yield layer
+    yield from config_data.get('layers')
+    if include_additional_inventory and (add_inv := config_data.get("additional_inventory")):
+        yield add_inv
 
 
 def _set_auto_fields(data):
@@ -331,10 +337,10 @@ def _set_auto_fields(data):
     try:
         data = _convert_branches_to_commits(data)
     except BranchConversionException as e:
-        LOGGER.error(f"Error converting branch name to commit: {e}")
+        LOGGER.error("Error converting branch name to commit: %s", e)
         raise
     except Exception as e:
-        LOGGER.exception(f"Unexpected error converting branch name to commit: {e}")
+        LOGGER.exception("Unexpected error converting branch name to commit: %s", e)
         raise BranchConversionException(e) from e
     return data
 
@@ -376,15 +382,14 @@ def _get_commit_id(repo_url, branch, source=None):
     Raises:
       BranchConversionException -- for errors encountered calling git
     """
+    split_url = repo_url.split('/')
+    repo_name = split_url[-1].split('.')[0]
     with tempfile.TemporaryDirectory(dir='/tmp') as tmp_dir:
-        repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
-
-        split_url = repo_url.split('/')
         try:
             username, password = _get_git_credentials(source)
         except Exception as e:
-            LOGGER.error(f"Error retrieving git credentials: {e}")
+            LOGGER.error("Error retrieving git credentials: %s", e)
             raise
         ssl_info = _get_ssl_info(source, tmp_dir)
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
@@ -393,12 +398,12 @@ def _get_commit_id(repo_url, branch, source=None):
             creds_file.write(creds_url)
 
         config_command = 'git config --file .gitconfig credential.helper store'.split()
-        clone_command = 'git clone {}'.format(repo_url).split()
-        checkout_command = 'git checkout {}'.format(branch).split()
+        clone_command = f'git clone {repo_url}'.split()
+        checkout_command = f'git checkout {branch}'.split()
         parse_command = 'git rev-parse HEAD'.split()
         try:
-            # Setting HOME lets us keep the .git-credentials file in the temp directory rather than the
-            # HOME shared by all threads/calls.
+            # Setting HOME lets us keep the .git-credentials file in the temp directory rather
+            # than the HOME shared by all threads/calls.
             subprocess.check_call(config_command, cwd=tmp_dir,
                                   env={'HOME': tmp_dir, 'GIT_SSL_CAINFO': ssl_info},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -408,11 +413,12 @@ def _get_commit_id(repo_url, branch, source=None):
             subprocess.check_call(checkout_command, cwd=repo_dir,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             output = subprocess.check_output(parse_command, cwd=repo_dir)
-            commit = output.decode("utf-8").strip()
-            LOGGER.info('Translated git branch {} to commit {}'.format(branch, commit))
-            return commit
         except subprocess.CalledProcessError as e:
-            raise BranchConversionException(f"Failed interacting with the specified clone_url: {e}") from e
+            raise BranchConversionException(
+                f"Failed interacting with the specified clone_url: {e}") from e
+    commit = output.decode("utf-8").strip()
+    LOGGER.info('Translated git branch %s to commit %s', branch, commit)
+    return commit
 
 
 def _get_git_credentials(source=None):
@@ -430,37 +436,37 @@ def _get_git_credentials(source=None):
         username = secret["username"]
         password = secret["password"]
     except Exception as e:
-        raise BranchConversionException(f"Error reading username and password from secret: {e}") from e
+        raise BranchConversionException(
+            f"Error reading username and password from secret: {e}") from e
     return username, password
 
 
 def _get_ssl_info(source=None, tmp_dir=""):
-    if source and source.get("ca_cert"):
-        cert_info = source.get("ca_cert")
-        configmap_name = cert_info["configmap_name"]
-        configmap_namespace = cert_info.get("configmap_namespace")
-        if configmap_namespace:
-            response = get_kubernetes_configmap(configmap_name, configmap_namespace)
-        else:
-            response = get_kubernetes_configmap(configmap_name)
-        data = response.data
-        file_name = list(data.keys())[0]
-        file_path = os.path.join(tmp_dir, file_name)
-        with open(file_path, 'w') as f:
-            f.write(data[file_name])
-        return file_path
-    else:
+    if not source or not (cert_info := source.get("ca_cert")):
         return os.environ['GIT_SSL_CAINFO']
+    configmap_name = cert_info["configmap_name"]
+    configmap_namespace = cert_info.get("configmap_namespace")
+    if configmap_namespace:
+        response = get_kubernetes_configmap(configmap_name, configmap_namespace)
+    else:
+        response = get_kubernetes_configmap(configmap_name)
+    data = response.data
+    file_name = list(data.keys())[0]
+    file_path = os.path.join(tmp_dir, file_name)
+    with open(file_path, 'w') as f:
+        f.write(data[file_name])
+    return file_path
 
 
-class Configurations(object):
+class Configurations:
+    """Helper class for other endpoints that need access to configurations"""
+
     def __init__(self):
         # Some callers call the get_config method without checking if the configuration name is
         # set. If it is not set, calling the database will always just return None, so we can
         # save ourselves the network traffic of a database call here.
         self.configs = { "": None, None: None }
 
-    """Helper class for other endpoints that need access to configurations"""
     def get_config(self, key):
         if key not in self.configs:
             self.configs[key] = DB.get(key)
