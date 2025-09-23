@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 from collections.abc import Container
 from datetime import datetime
 from functools import partial
@@ -47,7 +48,8 @@ def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
     LOGGER.debug("GET /sources invoked get_sources_v3")
     called_parameters = locals()
-    sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit, after_id=after_id)
+    sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit,
+                                                       after_id=after_id)
     response = {"sources": sources_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -62,7 +64,8 @@ def _get_sources_data(in_use=None, limit=1, after_id=""):
     filters = []
     if in_use is not None:
         filters.append(partial(_source_filter, in_use=in_use, in_use_list=_get_in_use_list()))
-    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
+    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                    data_filters=filters)
     return source_data_page, next_page_exists
 
 
@@ -96,8 +99,7 @@ def _iter_configurations_data():
     next_parameters = {}
     while True:
         data, _ = configurations.get_configurations_v3(**next_parameters)
-        for component in data["configurations"]:
-            yield component
+        yield from data["configurations"]
         next_parameters = data["next"]
         if not next_parameters:
             break
@@ -107,12 +109,12 @@ def _iter_configurations_data():
 @options.refresh_options_update_loglevel
 def get_source_v3(source_id):
     """Used by the GET /sources/{source_id} API operation"""
-    LOGGER.debug(f"GET /sources/{source_id} invoked get_source_v3")
+    LOGGER.debug("GET /sources/%s invoked get_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
             status=404, title="Source not found",
-            detail="Source {} could not be found".format(source_id))
+            detail=f"Source {source_id} could not be found")
     return DB.get(source_id), 200
 
 
@@ -145,7 +147,7 @@ def post_source_v3():
 
     if data["name"] in DB:
         return connexion.problem(
-            detail="A source with the name {} already exists".format(data["name"]),
+            detail=f"A source with the name {data["name"]} already exists",
             status=409,
             title="Conflicting source name"
         )
@@ -158,12 +160,12 @@ def post_source_v3():
 @options.refresh_options_update_loglevel
 def patch_source_v3(source_id):
     """Used by the PATCH /sources/{source_id} API operation"""
-    LOGGER.debug(f"PATCH /sources/{source_id} invoked patch_source_v3")
+    LOGGER.debug("PATCH /sources/%s invoked patch_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
             status=404, title="Source not found.",
-            detail="Source {} could not be found".format(source_id))
+            detail=f"Source {source_id} could not be found")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -184,7 +186,7 @@ def patch_source_v3(source_id):
 @options.refresh_options_update_loglevel
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
-    LOGGER.debug(f"POST /sources/{source_id} invoked restore_source_v3")
+    LOGGER.debug("POST /sources/%s invoked restore_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     try:
         data = connexion.request.get_json()
@@ -198,7 +200,7 @@ def restore_source_v3(source_id):
 
     if data["name"] in DB:
         return connexion.problem(
-            detail="A source with the name {} already exists".format(data["name"]),
+            detail=f"A source with the name {data["name"]} already exists",
             status=409,
             title="Conflicting source name"
         )
@@ -207,15 +209,15 @@ def restore_source_v3(source_id):
 
 
 def _validate_source(source):
-    source_credentials = source.get("credentials")
-    if source_credentials:
-        source_credentials_type = source_credentials.get("authentication_method")
-        if not source_credentials_type or source_credentials_type == "password":
-            if not (source_credentials.get("username") and source_credentials.get("password")):
-                return connexion.problem(
-                    status=400, title="Invalid credentials",
-                    detail="Both username and password must be provided for password authentication credentials")
-    return None
+    if not (source_credentials := source.get("credentials")):
+        return None
+    if source_credentials.get("authentication_method", "password") != "password":
+        return None
+    if source_credentials.get("username") and source_credentials.get("password"):
+        return None
+    return connexion.problem(
+        status=400, title="Invalid credentials",
+        detail="Both username and password must be provided for password authentication credentials")
 
 
 def _update_credentials_secret(source):
@@ -250,16 +252,16 @@ def _clean_credentials_data(data):
 @options.refresh_options_update_loglevel
 def delete_source_v3(source_id):
     """Used by the DELETE /sources/{source_id} API operation"""
-    LOGGER.debug(f"DELETE /sources/{source_id} invoked delete_source_v3")
+    LOGGER.debug("DELETE /sources/%s invoked delete_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
             status=404, title="Source not found",
-            detail="Source {} could not be found".format(source_id))
+            detail=f"Source {source_id} could not be found")
     if source_id in _get_in_use_list():
         return connexion.problem(
             status=400, title="Source is in use.",
-            detail="Source {} is referenced by some configurations".format(source_id))
+            detail=f"Source {source_id} is referenced by some configurations")
     source = DB.get(source_id)
     source_credentials = source.get("credentials", {})
     if source_credentials and source_credentials.get("secret_name"):

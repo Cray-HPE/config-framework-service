@@ -25,7 +25,7 @@
 from collections.abc import Callable, Generator, Iterable
 import functools
 import logging
-from typing import Any, Literal, Optional, ParamSpec, TypeVar, Union
+from typing import Any, Literal, Optional, ParamSpec, TypeVar
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -42,9 +42,9 @@ type JsonDict = dict[str, JsonData]
 type JsonList = list[JsonData]
 # All CFS database entries are dicts that are stored in JSON.
 type DbEntry = JsonDict
-type DbKey = Union[str, bytes]
+type DbKey = str | bytes
 DatabaseNames = Literal["options", "sessions", "components", "configurations", "sources"]
-type DbIdentifier = Union[DatabaseNames, int]
+type DbIdentifier = DatabaseNames | int
 type DataFilter = Callable[[DbEntry], bool]
 type UpdateHandler = Callable[[DbEntry], DbEntry]
 type DeletionHandler = Callable[[DbEntry], None]
@@ -87,17 +87,14 @@ class DBWrapper:
 
     def _get_db_id(self, db: DbIdentifier) -> int:
         """Converts a db name to the id used by Redis."""
-        if isinstance(db, int):
-            return db
-        else:
-            return DATABASES.index(db)
+        return db if isinstance(db, int) else DATABASES.index(db)
 
     def _get_client(self, db_id: int) -> redis.client.Redis:
         """Create a connection with the database."""
+        LOGGER.debug("Creating database connection"
+                     "host: %s port: %s database: %s",
+                     DB_HOST, DB_PORT, db_id)
         try:
-            LOGGER.debug("Creating database connection"
-                         "host: %s port: %s database: %s",
-                         DB_HOST, DB_PORT, db_id)
             return redis.Redis(host=DB_HOST, port=DB_PORT, db=db_id, protocol=3)
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
@@ -142,12 +139,13 @@ class DBWrapper:
         all_keys = self.get_keys(start_after_key=start_after_key)
         while all_keys:
             for datastr in self.client.mget(all_keys[:500]):
-                if not datastr:
+                data = json.loads(datastr) if datastr else None
+                if data is None:
                     # If datastr is empty/None, that means that the entry was
                     # deleted after the key was returned by the mget call.
                     # In that case, we just skip it.
                     continue
-                yield json.loads(datastr)
+                yield data
             all_keys = all_keys[500:]
 
     def get_all(
@@ -159,24 +157,25 @@ class DBWrapper:
 
         if not data_filters:
             data_filters = []
-        if limit < 0:
-            limit = 0
+        limit = max(limit, 0)
         page_full = False
         next_page_exists = False
         data_page = []
         for data in self.iter_values(after_id):
-            if not data_filters or all([data_filter(data) for data_filter in data_filters]):
-                # If there are no data_filters, then we process it as a valid result,
-                # alternatively, if there are any specified filters, ALL of them must be true for a given entry,
-                # otherwise we do not process it. Filtering happens in get_all rather than after due to
-                # paging/memory constraints we can't load all data and then filter on the results.
-                if page_full:
-                    next_page_exists = True
-                    break
-                else:
-                    data_page.append(data)
-                    if limit and len(data_page) >= limit:
-                        page_full = True
+            # Data filtering happens here rather than after; due to
+            # paging/memory constraints, we can't load all data and then filter on the results.
+            if data_filters and not all(data_filter(data) for data_filter in data_filters):
+                # If there are data filters specified, and this data does not match all of them,
+                # then skip it
+                continue
+            # This means either there are no data filters, or there are data filters and this
+            # data matches all of them.
+            if page_full:
+                next_page_exists = True
+                break
+            data_page.append(data)
+            if limit and len(data_page) >= limit:
+                page_full = True
         return data_page, next_page_exists
 
     def put(self, key: DbKey, new_data: DbEntry) -> Optional[DbEntry]:
@@ -190,8 +189,10 @@ class DBWrapper:
         new_data: DbEntry,
         update_handler: Optional[UpdateHandler] = None
     ) -> Optional[DbEntry]:
-        """Patch data in the database."""
-        """update_handler provides a way to operate on the full patched data"""
+        """
+        Patch data in the database.
+        update_handler provides a way to operate on the full patched data
+        """
         data_str = self.client.get(key)
         data = json.loads(data_str)
         data = self._update(data, new_data)
@@ -199,8 +200,7 @@ class DBWrapper:
             data = update_handler(data)
         data_str = json.dumps(data)
         self.client.set(key, data_str)
-        data = self.get(key)
-        return data
+        return self.get(key)
 
     def patch_all(
         self, data_filter: DataFilter,
@@ -212,15 +212,17 @@ class DBWrapper:
         for key in self.get_keys():
             data_str = self.client.get(key)
             data = json.loads(data_str)
-            if not data_filter or data_filter(data):
-                # filtering happens in get_all rather than after due to paging/memory constraints
-                #   we can't load all data and then filter on the results
-                data = self._update(data, patch)
-                if update_handler:
-                    data = update_handler(data)
-                data_str = json.dumps(data)
-                self.client.set(key, data_str)
-                patched_id_list.append(key)
+            # Data filtering happens here rather than after due to paging/memory constraints;
+            # we can't load all data and then filter on the results
+            if data_filter and not data_filter(data):
+                # This data does not match our filter, so skip it
+                continue
+            data = self._update(data, patch)
+            if update_handler:
+                data = update_handler(data)
+            data_str = json.dumps(data)
+            self.client.set(key, data_str)
+            patched_id_list.append(key)
         return patched_id_list
 
     def _update(self, data: JsonDict, new_data: JsonDict) -> JsonDict:
@@ -245,11 +247,13 @@ class DBWrapper:
         for key in self.get_keys():
             data_str = self.client.get(key)
             data = json.loads(data_str)
-            if not data_filter or data_filter(data):
-                self.client.delete(key)
-                if deletion_handler:
-                    deletion_handler(data)
-                deleted_id_list.append(key)
+            if data_filter and not data_filter(data):
+                # This data does not match our filter, so skip it
+                continue
+            self.client.delete(key)
+            if deletion_handler:
+                deletion_handler(data)
+            deleted_id_list.append(key)
         return deleted_id_list
 
     def info(self) -> dict:
@@ -265,11 +269,10 @@ def redis_error_handler(func: Callable[P, R]) -> Callable[P, R|CxResponse]:
 
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | CxResponse:
+        # Our get/patch functions don't take body, but the **kwargs
+        # in the arguments to this wrapper cause it to get passed.
+        kwargs.pop('body', None)
         try:
-            if 'body' in kwargs:
-                # Our get/patch functions don't take body, but the **kwargs
-                # in the arguments to this wrapper cause it to get passed.
-                del kwargs['body']
             return func(*args, **kwargs)
         except redis.exceptions.ConnectionError as e:
             LOGGER.error('Unable to connect to the Redis database: %s', e)
@@ -307,10 +310,10 @@ def _convert_data_to_v2(data: JsonDict, data_type: Any) -> JsonDict:
         # Special case where the data_type is a "typing" object.  e.g typing.Dict
         if not data:
             return data
-        elif data_type.__origin__ == list:
+        if data_type.__origin__ == list:
             return [_convert_data_to_v2(item_data, data_type.__args__[0])
                     for item_data in data]
-        elif data_type.__origin__ == dict:
+        if data_type.__origin__ == dict:
             return {key: _convert_data_to_v2(item_data, data_type.__args__[1])
                     for key, item_data in data.items()}
     elif issubclass(data_type, BaseModel):
@@ -341,10 +344,10 @@ def _convert_data_from_v2(data: JsonDict, data_type: Any) -> JsonDict:
         # Special case where the data_type is a "typing" object.  e.g typing.Dict
         if not data:
             return data
-        elif data_type.__origin__ == list:
+        if data_type.__origin__ == list:
             return [_convert_data_from_v2(item_data, data_type.__args__[0])
                     for item_data in data]
-        elif data_type.__origin__ == dict:
+        if data_type.__origin__ == dict:
             return {key: _convert_data_from_v2(item_data, data_type.__args__[1])
                     for key, item_data in data.items()}
     elif issubclass(data_type, BaseModel):

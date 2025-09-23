@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 from collections.abc import Callable
 import functools
 import logging
@@ -131,9 +132,9 @@ def _check_defaults(data):
     if not data:
         data = {}
         put = True
-    for key in DEFAULTS:
+    for key, value in DEFAULTS.items():
         if key not in data:
-            data[key] = DEFAULTS[key]
+            data[key] = value
             put = True
     if put:
         return DB.put(OPTIONS_KEY, data)
@@ -218,11 +219,10 @@ class Options:
         except KeyError as e:
             if default is not None:
                 LOGGER.warning(
-                    'Option {} has not been initialized.  Defaulting to {}'.format(key, default))
+                    'Option %s has not been initialized.  Defaulting to %s', key, default)
                 return default
-            else:
-                LOGGER.error('Option {} has not been initialized.'.format(key))
-                raise e
+            LOGGER.error('Option %s has not been initialized.', key)
+            raise e
 
     @property
     def batcher_check_interval(self):
@@ -326,9 +326,9 @@ def defaults(**default_kwargs):
         def wrapped_f(*args, **kwargs):
             options = Options()
             options.refresh()
-            for key in default_kwargs:
+            for key, value in default_kwargs.items():
                 if key not in kwargs:
-                    kwargs[key] = getattr(options, default_kwargs[key])
+                    kwargs[key] = getattr(options, value)
             return f(*args, **kwargs)
         return wrapped_f
     return wrap
