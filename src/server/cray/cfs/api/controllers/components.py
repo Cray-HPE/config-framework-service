@@ -80,14 +80,15 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
-    components_data, next_page_exists = get_components_data(id_list=id_list, status_list=status_list, enabled=enabled,
-                                                            config_name=config_name, config_details=config_details,
-                                                            tag_list=tag_list)
+    components_data, next_page_exists = get_components_data(
+                                            id_list=id_list, status_list=status_list,
+                                            enabled=enabled, config_name=config_name,
+                                            config_details=config_details, tag_list=tag_list)
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
@@ -99,8 +100,8 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
-def get_components_v3(ids="", status="", enabled=None, config_name="", state_details=False, config_details=False,
-                      tags="", limit=1, after_id=""):
+def get_components_v3(ids="", status="", enabled=None, config_name="", state_details=False,
+                      config_details=False, tags="", limit=1, after_id=""):
     called_parameters = locals()
     LOGGER.debug("GET /components invoked get_components")
     id_list = []
@@ -124,14 +125,16 @@ def get_components_v3(ids="", status="", enabled=None, config_name="", state_det
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
-    components_data, next_page_exists = get_components_data(id_list=id_list, status_list=status_list, enabled=enabled,
-                                                            config_name=config_name, config_details=config_details,
-                                                            tag_list=tag_list, limit=limit, after_id=after_id)
+    components_data, next_page_exists = get_components_data(
+                                            id_list=id_list, status_list=status_list,
+                                            enabled=enabled, config_name=config_name,
+                                            config_details=config_details, tag_list=tag_list,
+                                            limit=limit, after_id=after_id)
     for component in components_data:
         _set_link(component)
         if not state_details:
@@ -145,18 +148,25 @@ def get_components_v3(ids="", status="", enabled=None, config_name="", state_det
 
 
 @options.defaults(limit="default_page_size")
-def get_components_data(id_list=[], status_list=[], enabled=None, config_name="",
-                        config_details=False, tag_list=[], limit=1, after_id=""):
+def get_components_data(id_list=None, status_list=None, enabled=None, config_name="",
+                        config_details=False, tag_list=None, limit=1, after_id=""):
     """Used by the GET /components API operation=
 
     Allows filtering using a comma separated list of ids.
     """
+    if id_list is None:
+        id_list = []
+    if status_list is None:
+        status_list = []
+    if tag_list is None:
+        tag_list = []
     configs = configurations.Configurations()
     filters = []
     filters.append(partial(_component_filter, config_details=config_details, configs=configs,
                                id_list=id_list, status_list=status_list, enabled=enabled,
                                config_name=config_name, tag_list=tag_list))
-    component_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
+    component_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                       data_filters=filters)
     return component_data_page, next_page_exists
 
 
@@ -169,9 +179,10 @@ def _component_filter(component_data, config_details, configs,
         return False
     if config_name and component_data.get('desired_config') != config_name:
         return False
-    if tag_list and any([component_data.get('tags', {}).get(k) != v for k, v in tag_list]):
+    if tag_list and any(component_data.get('tags', {}).get(k) != v for k, v in tag_list):
         return False
-    _set_status(component_data, configs, config_details) # This sets the status both for filtering and for the response data
+    _set_status(component_data, configs, config_details) # This sets the status both for filtering
+                                                         # and for the response data
     if status_list and not component_data.get('configuration_status') in status_list:
         return False
     return True
@@ -233,12 +244,11 @@ def patch_components_v2():
     data = connexion.request.get_json()
     if isinstance(data, list):
         return patch_v2_components_list(data)
-    elif isinstance(data, dict):
+    if isinstance(data, dict):
         return patch_v2_components_dict(data)
-    else:
-        return connexion.problem(
-           status=400, title="Error parsing the data provided.",
-           detail="Unexpected data type {}".format(str(type(data))))
+    return connexion.problem(
+       status=400, title="Error parsing the data provided.",
+       detail=f"Unexpected data type {type(data)}")
 
 
 def patch_v2_components_list(data):
@@ -249,7 +259,7 @@ def patch_v2_components_list(data):
             if component_id not in DB:
                 return connexion.problem(
                     status=404, title="Component not found.",
-                    detail="Component {} could not be found".format(component_id))
+                    detail=f"Component {component_id} could not be found")
             components.append((component_id, component_data))
     except Exception as err:
         return connexion.problem(
@@ -287,7 +297,7 @@ def patch_v2_components_dict(data):
         try:
             tag_list = [tuple(tag.split('=')) for tag in filters.get("tags", None).split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -306,13 +316,13 @@ def patch_v2_components_dict(data):
 
     response = []
     patch = data.get("patch", {})
-    if "id" in patch:
-        del patch["id"]
+    patch.pop("id", None)
     patch = dbutils.convert_data_from_v2(patch, V2Component)
     patch = _set_auto_fields(patch)
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=False, configs=configs,
-                               id_list=[], status_list=status_list, enabled=filters.get("enabled", None),
+                               id_list=[], status_list=status_list,
+                               enabled=filters.get("enabled", None),
                                config_name=filters.get("config_name", None), tag_list=tag_list)
     for component_data in components:
         if component_filter(component_data):
@@ -329,12 +339,11 @@ def patch_components_v3():
     data = connexion.request.get_json()
     if isinstance(data, list):
         return patch_v3_components_list(data)
-    elif isinstance(data, dict):
+    if isinstance(data, dict):
         return patch_v3_components_dict(data)
-    else:
-        return connexion.problem(
-           status=400, title="Error parsing the data provided.",
-           detail="Unexpected data type {}".format(str(type(data))))
+    return connexion.problem(
+       status=400, title="Error parsing the data provided.",
+       detail=f"Unexpected data type {type(data)}")
 
 
 def patch_v3_components_list(data):
@@ -345,7 +354,7 @@ def patch_v3_components_list(data):
             if component_id not in DB:
                 return connexion.problem(
                     status=404, title="Component not found.",
-                    detail="Component {} could not be found".format(component_id))
+                    detail=f"Component {component_id} could not be found")
             components.append((component_id, component_data))
     except Exception as err:
         return connexion.problem(
@@ -383,7 +392,7 @@ def patch_v3_components_dict(data):
         try:
             tag_list = [tuple(tag.split('=')) for tag in filters.get("tags", None).split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -391,11 +400,11 @@ def patch_v3_components_dict(data):
 
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=False, configs=configs,
-                               id_list=id_list, status_list=status_list, enabled=filters.get("enabled", None),
+                               id_list=id_list, status_list=status_list,
+                               enabled=filters.get("enabled", None),
                                config_name=filters.get("config_name", None), tag_list=tag_list)
     patch = data.get("patch", {})
-    if "id" in patch:
-        del patch["id"]
+    patch.pop("id", None)
     patch = _set_auto_fields(patch)
     component_ids = DB.patch_all(component_filter, patch, _update_handler)
     response = {"component_ids": component_ids}
@@ -410,7 +419,7 @@ def get_component_v2(component_id, config_details=False):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     component = DB.get(component_id)
     configs = configurations.Configurations()
     component = _set_status(component, configs, config_details)
@@ -426,7 +435,7 @@ def get_component_v3(component_id, state_details=False, config_details=False):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     component = DB.get(component_id)
     configs = configurations.Configurations()
     component = _set_status(component, configs, config_details)
@@ -477,7 +486,7 @@ def patch_component_v2(component_id):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -498,7 +507,7 @@ def patch_component_v3(component_id):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -517,7 +526,7 @@ def delete_component_v2(component_id):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     return DB.delete(component_id), 204
 
 
@@ -529,24 +538,25 @@ def delete_component_v3(component_id):
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
-            detail="Component {} could not be found".format(component_id))
+            detail=f"Component {component_id} could not be found")
     return DB.delete(component_id), 204
 
 
 def _set_auto_fields(data):
     data = _set_last_updated(data)
-    if ('desired_state' in data or 'desired_config' in data or data.get('state') == [])\
-            and 'error_count' not in data:
+    if 'error_count' in data:
+        return data
+    if 'desired_state' in data or 'desired_config' in data or data.get('state') == []:
         data['error_count'] = 0
     return data
 
 
 def _set_last_updated(data):
-    if 'state' in data and type(data['state']) == list:
+    if isinstance(data.get('state'), list):
         for layer in data['state']:
             if 'last_updated' not in layer:
                 layer['last_updated'] = datetime.now().strftime(TIME_FORMAT)
-    if 'desired_state' in data and type(data['desired_state']) == dict:
+    if isinstance(data.get('desired_state'), dict):
         data['desired_state']['last_updated'] = datetime.now().strftime(TIME_FORMAT)
     return data
 
@@ -577,7 +587,7 @@ def _get_status(data, configs, config_details):
         retries = options.Options().default_batcher_retry_policy
     retries = int(retries)
     if retries != -1 and data['error_count'] >= retries:
-        # This component has hit it's retry limit
+        # This component has hit its retry limit
         max_retries = True
 
     current_state = _get_current_state(data)
@@ -589,8 +599,7 @@ def _get_status(data, configs, config_details):
     if not desired_state:
         if not current_state:
             return STATUS_UNCONFIGURED
-        else:
-            return STATUS_CONFIGURED
+        return STATUS_CONFIGURED
 
     desired_state = deepcopy(desired_state)
 
@@ -619,27 +628,27 @@ def _get_layer_status(desired_state, current_state_layers, max_retries):
         return STATUS_UNCONFIGURED
 
     for current_state in current_state_layers:
+        if desired_clone_url != current_state.get('clone_url', ''):
+            continue
+        if desired_playbook != current_state.get('playbook', ''):
+            continue
+        if desired_commit != current_state.get('commit', ''):
+            continue
         current_status = current_state.get('status', '')
-        if all([desired_clone_url == current_state.get('clone_url', ''),
-                desired_playbook == current_state.get('playbook', ''),
-                desired_commit == current_state.get('commit', '')]):
-            if current_status == 'failed':
-                if max_retries:
-                    return STATUS_FAILED
-                else:
-                    return STATUS_PENDING
-            if current_status == 'incomplete' :
-                # Set for successful nodes when any_errors_fatal causes a playbook to exit early.
-                return STATUS_PENDING
-            return STATUS_CONFIGURED
+        if current_status == 'failed':
+            if max_retries:
+                return STATUS_FAILED
+            return STATUS_PENDING
+        if current_status == 'incomplete' :
+            # Set for successful nodes when any_errors_fatal causes a playbook to exit early.
+            return STATUS_PENDING
+        return STATUS_CONFIGURED
     return STATUS_PENDING
 
 
 def _get_current_state(data):
     config = data['state']
-    if type(config) == dict:
-        config = [config]
-    return config
+    return [config] if isinstance(config, dict) else config
 
 
 def _get_desired_state(data, configs=None):
@@ -673,22 +682,26 @@ def _tag_cleanup_handler(data):
 
 
 def _state_append_handler(data):
-    if 'state_append' in data:
-        state_append = data['state_append']
-        if type(data['state']) != list:
-            data['state'] = []
-        if 'last_updated' not in state_append:
-            state_append['last_updated'] = datetime.now().strftime(TIME_FORMAT)
-        state_append = _convert_component_layer_to_v3(state_append)
-        new_state = []
-        # If this configuration was previously applied, update the layer rather than just appending
-        for layer in data['state']:
-            if not (layer['clone_url'] == state_append['clone_url'] and
-                    layer['playbook'] == state_append['playbook']):
-                new_state.append(layer)
-        new_state.append(state_append)
-        data['state'] = new_state
-        del data['state_append']
+    if 'state_append' not in data:
+        return data
+    state_append = data['state_append']
+    if not isinstance(data['state'], list):
+        LOGGER.info("Clearing non-list state field in data: %s", data)
+        data['state'] = []
+    if 'last_updated' not in state_append:
+        state_append['last_updated'] = datetime.now().strftime(TIME_FORMAT)
+    state_append = _convert_component_layer_to_v3(state_append)
+    new_state = []
+    # If this configuration was previously applied, update the layer rather than just appending
+    for layer in data['state']:
+        if (
+            layer['clone_url'] != state_append['clone_url'] or
+            layer['playbook'] != state_append['playbook']
+        ):
+            new_state.append(layer)
+    new_state.append(state_append)
+    data['state'] = new_state
+    del data['state_append']
     return data
 
 
@@ -707,7 +720,8 @@ def convert_component_to_v3(data):
 
 
 def _convert_component_layer_to_v2(layer):
-    if "status" in layer and layer["status"] != "applied":
+    if layer.get("status", "applied") != "applied":
+        # This means "status" field is in layer, and it is not set to "applied"
         layer["commit"] = f"{layer['commit']}_{layer['status']}"
         del layer["status"]
     return layer
