@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,10 +21,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+import functools
 import logging
-import connexion
 import threading
 import time
+
+import connexion
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.models.v2_options import V2Options
@@ -89,9 +91,9 @@ def _check_defaults(data):
     if not data:
         data = {}
         put = True
-    for key in DEFAULTS:
+    for key, value in DEFAULTS.items():
         if key not in data:
-            data[key] = DEFAULTS[key]
+            data[key] = value
             put = True
     if put:
         return DB.put(OPTIONS_KEY, data)
@@ -165,11 +167,10 @@ class Options:
         except KeyError as e:
             if default is not None:
                 LOGGER.warning(
-                    'Option {} has not been initialized.  Defaulting to {}'.format(key, default))
+                    'Option %s has not been initialized.  Defaulting to %s', key, default)
                 return default
-            else:
-                LOGGER.error('Option {} has not been initialized.'.format(key))
-                raise e
+            LOGGER.error('Option %s has not been initialized.', key)
+            raise e
 
     @property
     def batcher_check_interval(self):
@@ -215,13 +216,14 @@ class Options:
 def update_log_level(new_level_str):
     new_level = logging.getLevelName(new_level_str.upper())
     current_level = LOGGER.getEffectiveLevel()
-    if current_level != new_level:
-        LOGGER.log(current_level, 'Changing logging level from {} to {}'.format(
-            logging.getLevelName(current_level), logging.getLevelName(new_level)))
-        logger = logging.getLogger()
-        logger.setLevel(new_level)
-        LOGGER.log(new_level, 'Logging level changed from {} to {}'.format(
-            logging.getLevelName(current_level), logging.getLevelName(new_level)))
+    if current_level == new_level:
+        return
+    LOGGER.log(current_level, 'Changing logging level from %s to %s',
+        logging.getLevelName(current_level), logging.getLevelName(new_level))
+    logger = logging.getLogger()
+    logger.setLevel(new_level)
+    LOGGER.log(new_level, 'Logging level changed from %s to %s',
+        logging.getLevelName(current_level), logging.getLevelName(new_level))
 
 
 def periodically_refresh_options():
@@ -247,12 +249,13 @@ def defaults(**default_kwargs):
     Allows controller functions to specify parameters that have defaults stored in options
     """
     def wrap(f):
+        @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             options = Options()
             options.refresh()
-            for key in default_kwargs:
+            for key, value in default_kwargs.items():
                 if key not in kwargs:
-                    kwargs[key] = getattr(options, default_kwargs[key])
+                    kwargs[key] = getattr(options, value)
             return f(*args, **kwargs)
         return wrapped_f
     return wrap
