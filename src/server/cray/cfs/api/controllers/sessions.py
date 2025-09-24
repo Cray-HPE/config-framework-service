@@ -316,13 +316,13 @@ def _delete_session(session_name):  # noqa: E501
 
     :rtype: None
     """
-    session = DB.get(session_name)
-    if not session:
+    LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
+    session = DB.get_delete(session_name)
+    if session is None:
+        LOGGER.debug("_delete_session: '%s' not found in database", session_name)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
-    DB.delete(session_name)
     LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
     KAFKA.produce(event_type='DELETE', data=session)
     LOGGER.debug("_delete_session: Kafka DELETE event sent for '%s'", session_name)

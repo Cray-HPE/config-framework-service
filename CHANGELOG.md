@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       a DB entry is deleted while it is executing.
     - CASMCMS-9556: Consolidate duplicate DBWrapper code
     - CASMCMS-9557: Add basic type annotations to dbutils
+    - CASMCMS-9559: Add `get_delete` method to the DB wrapper
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
 - Added missing spaces in two error messages.
 
