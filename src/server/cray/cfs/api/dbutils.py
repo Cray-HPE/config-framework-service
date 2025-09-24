@@ -105,10 +105,15 @@ class DBWrapper:
     def get(self, key: DbKey) -> Optional[DbEntry]:
         """Get the data for the given key, or None if the entry does not exist."""
         datastr = self.client.get(key)
-        if not datastr:
-            return None
-        data = json.loads(datastr)
-        return data
+        return json.loads(datastr) if datastr else None
+
+    def get_delete(self, key: DbKey) -> Optional[DbEntry]:
+        """
+        Get the data for the given key from the database, and delete it from the DB.
+        Returns the data (or None if the entry does not exist).
+        """
+        datastr = self.client.getdel(key)
+        return json.loads(datastr) if datastr else None
 
     def get_keys(self, start_after_key: Optional[str] = None) -> list[str]:
         """
