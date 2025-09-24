@@ -79,7 +79,7 @@ def create_session_v2():  # noqa: E501
     :rtype: V2Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v2/sessions invoked create_session")
+    LOGGER.debug("POST /v2/sessions invoked create_session_v2")
     try:
         data = connexion.request.get_json()
         LOGGER.debug("Create session: %s", data)
@@ -151,7 +151,7 @@ def create_session_v3():  # noqa: E501
     :rtype: V3Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v3/sessions invoked create_session")
+    LOGGER.debug("POST /v3/sessions invoked create_session_v3")
     try:
         data = connexion.request.get_json()
         LOGGER.debug("Create session: %s", data)
@@ -286,7 +286,7 @@ def delete_session_v2(session_name):  # noqa: E501
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
+    LOGGER.debug("DELETE /v2/sessions/%s invoked delete_session_v2", session_name)
     return _delete_session(session_name)
 
 
@@ -302,7 +302,7 @@ def delete_session_v3(session_name):  # noqa: E501
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v3/sessions/id invoked delete_session")
+    LOGGER.debug("DELETE /v3/sessions/%s invoked delete_session_v3", session_name)
     return _delete_session(session_name)
 
 
@@ -464,7 +464,7 @@ def get_session_v2(session_name):  # noqa: E501
 
     :rtype: V2Session
     """
-    LOGGER.debug("GET /v2/sessions/id invoked get_session")
+    LOGGER.debug("GET /v2/sessions/%s invoked get_session_v2", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -484,7 +484,7 @@ def get_session_v3(session_name):  # noqa: E501
 
     :rtype: V3Session
     """
-    LOGGER.debug("GET /v3/sessions/id invoked get_session")
+    LOGGER.debug("GET /v3/sessions/%s invoked get_session_v3", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -504,7 +504,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 
     :rtype: List[V2Session]
     """
-    LOGGER.debug("GET /v2/sessions invoked get_sessions")
+    LOGGER.debug("GET /v2/sessions invoked get_sessions_v2")
     tag_list = []
     if tags:
         try:
@@ -535,7 +535,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
     :rtype: List[V3Session]
     """
-    LOGGER.debug("GET /v3/sessions invoked get_sessions")
+    LOGGER.debug("GET /v3/sessions invoked get_sessions_v3")
     called_parameters = locals()
     tag_list = []
     if tags:
@@ -568,12 +568,11 @@ def patch_session_v2(session_name):
     Updates a V2Session # noqa: E501
     :rtype: V2Session
     """
-    LOGGER.debug("PATCH /v2/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v2/sessions/%s invoked patch_session_v2", session_name)
     try:
         data = connexion.request.get_json()
-        for key in data.keys():
-            if key != 'status':
-                raise Exception('Only status can be updated after session creation')
+        if any(key != 'status' for key in data):
+            raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
@@ -607,10 +606,10 @@ def patch_session_v3(session_name):
 
     :rtype: V3Session
     """
-    LOGGER.debug("PATCH /v3/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v3/sessions/%s invoked patch_session_v3", session_name)
     try:
         data = connexion.request.get_json()
-        if any(key != 'status' for key in data.keys()):
+        if any(key != 'status' for key in data):
             raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
