@@ -47,7 +47,7 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 @options.defaults(limit="default_page_size")
 def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
-    LOGGER.debug("GET /sources invoked get_sources_v3")
+    LOGGER.debug("GET /v3/sources invoked get_sources_v3")
     called_parameters = locals()
     sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit,
                                                        after_id=after_id)
@@ -109,7 +109,7 @@ def _iter_configurations_data():
 @dbutils.redis_error_handler
 def get_source_v3(source_id):
     """Used by the GET /sources/{source_id} API operation"""
-    LOGGER.debug("GET /sources/%s invoked get_source_v3", source_id)
+    LOGGER.debug("GET /v3/sources/%s invoked get_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
@@ -121,7 +121,7 @@ def get_source_v3(source_id):
 @dbutils.redis_error_handler
 def post_source_v3():
     """Used by the POST /sources/ API operation"""
-    LOGGER.debug("POST /sources/ invoked post_source_v3")
+    LOGGER.debug("POST /v3/sources invoked post_source_v3")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -158,7 +158,7 @@ def post_source_v3():
 @dbutils.redis_error_handler
 def patch_source_v3(source_id):
     """Used by the PATCH /sources/{source_id} API operation"""
-    LOGGER.debug("PATCH /sources/%s invoked patch_source_v3", source_id)
+    LOGGER.debug("PATCH /v3/sources/%s invoked patch_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
@@ -183,7 +183,7 @@ def patch_source_v3(source_id):
 @dbutils.redis_error_handler
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
-    LOGGER.debug("POST /sources/%s invoked restore_source_v3", source_id)
+    LOGGER.debug("POST /v3/sources/%s invoked restore_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     try:
         data = connexion.request.get_json()
@@ -248,7 +248,7 @@ def _clean_credentials_data(data):
 @dbutils.redis_error_handler
 def delete_source_v3(source_id):
     """Used by the DELETE /sources/{source_id} API operation"""
-    LOGGER.debug("DELETE /sources/%s invoked delete_source_v3", source_id)
+    LOGGER.debug("DELETE /v3/sources/%s invoked delete_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(

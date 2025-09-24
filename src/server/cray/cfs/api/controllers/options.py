@@ -67,7 +67,7 @@ def cleanup_old_options():
 @dbutils.redis_error_handler
 def get_options_v2():
     """Used by the GET /options API operation"""
-    LOGGER.debug("GET /options invoked get_options")
+    LOGGER.debug("GET /v2/options invoked get_options_v2")
     data = get_options_data()
     response = convert_options_to_v2(data)
     return response, 200
@@ -76,7 +76,7 @@ def get_options_v2():
 @dbutils.redis_error_handler
 def get_options_v3():
     """Used by the GET /options API operation"""
-    LOGGER.debug("GET /options invoked get_options")
+    LOGGER.debug("GET /v3/options invoked get_options_v3")
     response = get_options_data()
     return response, 200
 
@@ -103,7 +103,7 @@ def _check_defaults(data):
 @dbutils.redis_error_handler
 def patch_options_v2():
     """Used by the PATCH /options API operation"""
-    LOGGER.debug("PATCH /options invoked patch_options")
+    LOGGER.debug("PATCH /v2/options invoked patch_options_v2")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -120,7 +120,7 @@ def patch_options_v2():
 @dbutils.redis_error_handler
 def patch_options_v3():
     """Used by the PATCH /options API operation"""
-    LOGGER.debug("PATCH /options invoked patch_options")
+    LOGGER.debug("PATCH /v3/options invoked patch_options_v3")
     try:
         data = connexion.request.get_json()
     except Exception as err:
