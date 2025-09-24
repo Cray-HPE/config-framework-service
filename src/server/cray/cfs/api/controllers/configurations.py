@@ -70,7 +70,7 @@ IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
 @options.refresh_options_update_loglevel
 def get_configurations_v2(in_use=None):
     """Used by the GET /configurations API operation"""
-    LOGGER.debug("GET /configurations invoked get_configurations")
+    LOGGER.debug("GET /v2/configurations invoked get_configurations_v2")
     configurations_data, next_page_exists = _get_configurations_data(in_use=in_use)
     if next_page_exists:
         return connexion.problem(
@@ -89,7 +89,7 @@ def get_configurations_v2(in_use=None):
 @options.defaults(limit="default_page_size")
 def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
-    LOGGER.debug("GET /configurations invoked get_configurations")
+    LOGGER.debug("GET /v3/configurations invoked get_configurations_v3")
     called_parameters = locals()
     tenant = get_tenant_from_header() or None
     configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit,
@@ -173,7 +173,7 @@ def _config_in_use(config_name: str) -> bool:
 @options.refresh_options_update_loglevel
 def get_configuration_v2(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
-    LOGGER.debug("GET /configurations/id invoked get_configuration")
+    LOGGER.debug("GET /v2/configurations/%s invoked get_configuration_v2", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -186,7 +186,7 @@ def get_configuration_v2(configuration_id):
 @options.refresh_options_update_loglevel
 def get_configuration_v3(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
-    LOGGER.debug("GET /configurations/id invoked get_configuration")
+    LOGGER.debug("GET /v3/configurations/%s invoked get_configuration_v3", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(status=404, title="Configuration not found",
                                  detail=f"Configuration {configuration_id} could not be found")
@@ -202,7 +202,7 @@ def get_configuration_v3(configuration_id):
 @options.refresh_options_update_loglevel
 def put_configuration_v2(configuration_id):
     """Used by the PUT /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PUT /configurations/id invoked put_configuration")
+    LOGGER.debug("PUT /v2/configurations/%s invoked put_configuration_v2", configuration_id)
     try:
         data = connexion.request.get_json()
         data = convert_configuration_to_v3(data)
@@ -243,7 +243,7 @@ def put_configuration_v2(configuration_id):
 @options.refresh_options_update_loglevel
 def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PUT /configurations/id invoked put_configuration")
+    LOGGER.debug("PUT /v3/configurations/%s invoked put_configuration_v3", configuration_id)
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -320,7 +320,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 @options.refresh_options_update_loglevel
 def patch_configuration_v2(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCHv2 /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -341,7 +341,7 @@ def patch_configuration_v2(configuration_id):
 @options.refresh_options_update_loglevel
 def patch_configuration_v3(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCHv3 /configurations/id invoked put_configuration")
+    LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -367,7 +367,7 @@ def patch_configuration_v3(configuration_id):
 @options.refresh_options_update_loglevel
 def delete_configuration_v2(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
-    LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
+    LOGGER.debug("DELETE /v2/configurations/%s invoked delete_configuration_v2", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",
@@ -385,7 +385,7 @@ def delete_configuration_v2(configuration_id):
 @options.refresh_options_update_loglevel
 def delete_configuration_v3(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
-    LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
+    LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
     if configuration_id not in DB:
         return connexion.problem(
             status=404, title="Configuration not found",

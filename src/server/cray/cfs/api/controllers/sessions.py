@@ -64,7 +64,7 @@ def create_session_v2():  # noqa: E501
     :rtype: V2Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v2/sessions invoked create_session")
+    LOGGER.debug("POST /v2/sessions invoked create_session_v2")
     try:
         data = connexion.request.get_json()
         LOGGER.debug("Create content: %s", data)
@@ -133,7 +133,7 @@ def create_session_v3():  # noqa: E501
     :rtype: V3Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v3/sessions invoked create_session")
+    LOGGER.debug("POST /v3/sessions invoked create_session_v3")
     try:
         data = connexion.request.get_json()
         LOGGER.debug("Create content: %s", data)
@@ -229,7 +229,7 @@ def delete_session_v2(session_name):  # noqa: E501
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
+    LOGGER.debug("DELETE /v2/sessions/%s invoked delete_session_v2", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -252,7 +252,7 @@ def delete_session_v3(session_name):  # noqa: E501
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v3/sessions/id invoked delete_session")
+    LOGGER.debug("DELETE /v3/sessions/%s invoked delete_session_v3", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -288,7 +288,7 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions")
+    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
     tag_list = []
     if tags:
         try:
@@ -303,16 +303,15 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
         sessions_data, _ = _get_filtered_sessions(age=age, min_age=min_age, max_age=max_age,
                                                   status=status, name_contains=name_contains,
                                                   succeeded=succeeded, tag_list=tag_list)
-        for session in sessions_data:
-            session_name = session['name']
-            DB.delete(session_name)
-            _kafka.produce(event_type='DELETE', data=session)
     except ParsingException as err:
         return connexion.problem(
             detail=str(err),
             status=400,
             title='Error parsing age field'
         )
+    for session in sessions_data:
+        DB.delete(session['name'])
+        _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
 
@@ -341,7 +340,7 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions")
+    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions_v3")
     tag_list = []
     if tags:
         try:
@@ -356,14 +355,14 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
         session_filter = _get_session_filter(age=age, min_age=min_age, max_age=max_age,
                                              status=status, name_contains=name_contains,
                                              succeeded=succeeded, tag_list=tag_list)
-        deletion_handler = partial(_kafka.produce, event_type='DELETE')
-        session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     except ParsingException as err:
         return connexion.problem(
             detail=str(err),
             status=400,
             title='Error parsing age field'
         )
+    deletion_handler = partial(_kafka.produce, event_type='DELETE')
+    session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     response = {"session_ids": session_ids}
     return response, 200
 
@@ -380,7 +379,7 @@ def get_session_v2(session_name):  # noqa: E501
 
     :rtype: V2Session
     """
-    LOGGER.debug("GET /v2/sessions/id invoked get_session")
+    LOGGER.debug("GET /v2/sessions/%s invoked get_session_v2", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -400,7 +399,7 @@ def get_session_v3(session_name):  # noqa: E501
 
     :rtype: V3Session
     """
-    LOGGER.debug("GET /v3/sessions/id invoked get_session")
+    LOGGER.debug("GET /v3/sessions/%s invoked get_session_v3", session_name)
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -420,7 +419,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 
     :rtype: List[V2Session]
     """
-    LOGGER.debug("GET /v2/sessions invoked get_sessions")
+    LOGGER.debug("GET /v2/sessions invoked get_sessions_v2")
     tag_list = []
     if tags:
         try:
@@ -451,7 +450,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
     :rtype: List[V3Session]
     """
-    LOGGER.debug("GET /v3/sessions invoked get_sessions")
+    LOGGER.debug("GET /v3/sessions invoked get_sessions_v3")
     called_parameters = locals()
     tag_list = []
     if tags:
@@ -485,12 +484,11 @@ def patch_session_v2(session_name):
 
     :rtype: V2Session
     """
-    LOGGER.debug("PATCH /v2/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v2/sessions/%s invoked patch_session_v2", session_name)
     try:
         data = connexion.request.get_json()
-        for key in data.keys():
-            if key != 'status':
-                raise Exception('Only status can be updated after session creation')
+        if any(key != 'status' for key in data):
+            raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
@@ -514,10 +512,10 @@ def patch_session_v3(session_name):
 
     :rtype: V3Session
     """
-    LOGGER.debug("PATCH /v3/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v3/sessions/%s invoked patch_session_v3", session_name)
     try:
         data = connexion.request.get_json()
-        if any(key != 'status' for key in data.keys()):
+        if any(key != 'status' for key in data):
             raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
