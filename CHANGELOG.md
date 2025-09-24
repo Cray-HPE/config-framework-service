@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       a DB entry is deleted while it is executing.
     - CASMCMS-9556: Consolidate duplicate DBWrapper code
     - CASMCMS-9557: Add basic type annotations to dbutils
+    - CASMCMS-9559: Add `get_delete` method to the DB wrapper
 
 ## [1.27.0] - 07/03/2025
 ### Changed

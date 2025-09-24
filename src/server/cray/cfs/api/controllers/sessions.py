@@ -227,12 +227,11 @@ def delete_session_v2(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v2/sessions/%s invoked delete_session_v2", session_name)
-    if session_name not in DB:
+    session = DB.get_delete(session_name)
+    if session is None:
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    session = DB.get(session_name)
-    DB.delete(session_name)
     _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
@@ -249,12 +248,11 @@ def delete_session_v3(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v3/sessions/%s invoked delete_session_v3", session_name)
-    if session_name not in DB:
+    session = DB.get_delete(session_name)
+    if session is None:
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    session = DB.get(session_name)
-    DB.delete(session_name)
     _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
