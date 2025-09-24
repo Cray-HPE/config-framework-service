@@ -58,7 +58,7 @@ STATUS = {
 def get_components_v2(ids="", status="", enabled=None, config_name="", config_details=False,
                    tags=""):
     """Used by the GET /components API operation for the v2 api"""
-    LOGGER.debug("GET /components invoked get_components")
+    LOGGER.debug("GET /v2/components invoked get_components_v2")
     id_list = []
     status_list = []
     tag_list = []
@@ -103,7 +103,7 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
 def get_components_v3(ids="", status="", enabled=None, config_name="", state_details=False,
                       config_details=False, tags="", limit=1, after_id=""):
     called_parameters = locals()
-    LOGGER.debug("GET /components invoked get_components")
+    LOGGER.debug("GET /v3/components invoked get_components_v3")
     id_list = []
     status_list = []
     tag_list = []
@@ -192,7 +192,7 @@ def _component_filter(component_data, config_details, configs,
 @options.refresh_options_update_loglevel
 def put_components_v2():
     """Used by the PUT /components API operation"""
-    LOGGER.debug("PUT /components invoked put_components")
+    LOGGER.debug("PUT /v2/components invoked put_components_v2")
     try:
         data = connexion.request.get_json()
         components = []
@@ -216,7 +216,7 @@ def put_components_v2():
 @options.refresh_options_update_loglevel
 def put_components_v3():
     """Used by the PUT /components API operation"""
-    LOGGER.debug("PUT /components invoked put_components")
+    LOGGER.debug("PUT /v3/components invoked put_components_v3")
     try:
         data = connexion.request.get_json()
         components = []
@@ -240,7 +240,7 @@ def put_components_v3():
 @options.refresh_options_update_loglevel
 def patch_components_v2():
     """Used by the PATCH /components API operation"""
-    LOGGER.debug("PATCH /components invoked patch_components")
+    LOGGER.debug("PATCH /v2/components invoked patch_components_v2")
     data = connexion.request.get_json()
     if isinstance(data, list):
         return patch_v2_components_list(data)
@@ -335,7 +335,7 @@ def patch_v2_components_dict(data):
 @options.refresh_options_update_loglevel
 def patch_components_v3():
     """Used by the PATCH /components API operation"""
-    LOGGER.debug("PATCH /components invoked patch_components")
+    LOGGER.debug("PATCH /v3/components invoked patch_components_v3")
     data = connexion.request.get_json()
     if isinstance(data, list):
         return patch_v3_components_list(data)
@@ -415,7 +415,7 @@ def patch_v3_components_dict(data):
 @options.refresh_options_update_loglevel
 def get_component_v2(component_id, config_details=False):
     """Used by the GET /components/{component_id} API operation"""
-    LOGGER.debug("GET /components/id invoked get_component")
+    LOGGER.debug("GET /v2/components/%s invoked get_component_v2", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
@@ -431,7 +431,7 @@ def get_component_v2(component_id, config_details=False):
 @options.refresh_options_update_loglevel
 def get_component_v3(component_id, state_details=False, config_details=False):
     """Used by the GET /components/{component_id} API operation"""
-    LOGGER.debug("GET /components/id invoked get_component")
+    LOGGER.debug("GET /v3/components/%s invoked get_component_v3", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
@@ -449,7 +449,7 @@ def get_component_v3(component_id, state_details=False, config_details=False):
 @options.refresh_options_update_loglevel
 def put_component_v2(component_id):
     """Used by the PUT /components/{component_id} API operation"""
-    LOGGER.debug("PUT /components/id invoked put_component")
+    LOGGER.debug("PUT /v2/components/%s invoked put_component_v2", component_id)
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -466,7 +466,7 @@ def put_component_v2(component_id):
 @options.refresh_options_update_loglevel
 def put_component_v3(component_id):
     """Used by the PUT /components/{component_id} API operation"""
-    LOGGER.debug("PUT /components/id invoked put_component")
+    LOGGER.debug("PUT /v3/components/%s invoked put_component_v3", component_id)
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -482,7 +482,7 @@ def put_component_v3(component_id):
 @options.refresh_options_update_loglevel
 def patch_component_v2(component_id):
     """Used by the PATCH /components/{component_id} API operation"""
-    LOGGER.debug("PATCH /components/id invoked patch_component")
+    LOGGER.debug("PATCH /v2/components/%s invoked patch_component_v2", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
@@ -503,7 +503,7 @@ def patch_component_v2(component_id):
 @options.refresh_options_update_loglevel
 def patch_component_v3(component_id):
     """Used by the PATCH /components/{component_id} API operation"""
-    LOGGER.debug("PATCH /components/id invoked patch_component")
+    LOGGER.debug("PATCH /v3/components/%s invoked patch_component_v3", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
@@ -522,7 +522,7 @@ def patch_component_v3(component_id):
 @options.refresh_options_update_loglevel
 def delete_component_v2(component_id):
     """Used by the DELETE /components/{component_id} API operation"""
-    LOGGER.debug("DELETE /components/id invoked delete_component")
+    LOGGER.debug("DELETE /v2/components/%s invoked delete_component_v2", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
@@ -534,7 +534,7 @@ def delete_component_v2(component_id):
 @options.refresh_options_update_loglevel
 def delete_component_v3(component_id):
     """Used by the DELETE /components/{component_id} API operation"""
-    LOGGER.debug("DELETE /components/id invoked delete_component")
+    LOGGER.debug("DELETE /v3/components/%s invoked delete_component_v3", component_id)
     if component_id not in DB:
         return connexion.problem(
             status=404, title="Component not found.",
