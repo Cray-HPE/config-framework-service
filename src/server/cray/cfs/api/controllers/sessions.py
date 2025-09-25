@@ -28,6 +28,7 @@ from functools import partial
 import logging
 import re
 import shlex
+from typing import final, Optional, TypedDict, Union
 from uuid import UUID
 
 import connexion
@@ -60,6 +61,16 @@ class JobFieldAlreadySet(Exception):
             f"current value: {actual_job}, patch value: {patch_job}"
         )
 
+# Marked as final because we do not intend to subclass this. It doesn't really
+# matter at this point, but if type checking is ever properly added, this helps
+# the type checker.
+@final
+class SessionIdListDict(TypedDict):
+    """
+    Used for type hinting the v3 session endpoints which return ID list dicts
+    """
+    session_ids: list[str]
+
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
@@ -74,7 +85,7 @@ def _init(topic='cfs-session-events'):
 def create_session_v2():  # noqa: E501
     """Create a Config Framework Session
 
-    Creates a new V2Session # noqa: E501
+    Creates a new V2Session
 
     :rtype: V2Session
     """
@@ -146,7 +157,7 @@ def create_session_v2():  # noqa: E501
 def create_session_v3():  # noqa: E501
     """Create a Config Framework Session
 
-    Creates a new V3Session # noqa: E501
+    Creates a new V3Session
 
     :rtype: V3Session
     """
@@ -279,8 +290,6 @@ def _finish_session_create(data):
 def delete_session_v2(session_name):  # noqa: E501
     """Delete Config Framework Session
 
-     # noqa: E501
-
     :param session_name: Config Framework Session name
     :type session_name: str
 
@@ -294,8 +303,6 @@ def delete_session_v2(session_name):  # noqa: E501
 @options.refresh_options_update_loglevel
 def delete_session_v3(session_name):  # noqa: E501
     """Delete Config Framework Session
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
@@ -331,11 +338,14 @@ def _delete_session(session_name):  # noqa: E501
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v2(age=None, min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
+def delete_sessions_v2(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> Union[tuple[None, 204], CxResponse]:
     """Delete Config Framework Sessions
-
-     # noqa: E501
 
     :param age: An age filter in the form 1d.
     :type age: str
@@ -374,11 +384,14 @@ def delete_sessions_v2(age=None, min_age=None, max_age=None,
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v3(age=None, min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
+def delete_sessions_v3(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> Union[tuple[SessionIdListDict, 200], CxResponse]:
     """Delete Config Framework Sessions
-
-     # noqa: E501
 
     :param age: An age filter in the form 1d.
     :type age: str
@@ -404,8 +417,13 @@ def delete_sessions_v3(age=None, min_age=None, max_age=None,
                           succeeded=succeeded, tags=tags)
 
 
-def delete_sessions(age, min_age, max_age,
-                    status, name_contains, succeeded, tags):
+def delete_sessions(age: Optional[str],
+                    min_age: Optional[str],
+                    max_age: Optional[str],
+                    status: Optional[str],
+                    name_contains: Optional[str],
+                    succeeded: Optional[str],
+                    tags: Optional[str]) -> Union[tuple[SessionIdListDict, 200], CxResponse]:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -457,8 +475,6 @@ def delete_sessions(age, min_age, max_age,
 def get_session_v2(session_name):  # noqa: E501
     """Config Framework Session Details
 
-     # noqa: E501
-
     :param session_name: Config Framework Session name
     :type session_name: str
 
@@ -476,8 +492,6 @@ def get_session_v2(session_name):  # noqa: E501
 @options.refresh_options_update_loglevel
 def get_session_v3(session_name):  # noqa: E501
     """Config Framework Session Details
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
@@ -499,8 +513,6 @@ def get_session_v3(session_name):  # noqa: E501
 def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
-
-     # noqa: E501
 
     :rtype: List[V2Session]
     """
@@ -530,8 +542,6 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None, limit=1, after_id=""):  # noqa: E501
     """List Config Framework Sessions
-
-     # noqa: E501
 
     :rtype: List[V3Session]
     """
