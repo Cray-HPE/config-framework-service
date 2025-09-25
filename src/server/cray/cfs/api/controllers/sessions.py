@@ -27,9 +27,11 @@ from functools import partial
 import logging
 import re
 import shlex
+from typing import final, Optional, TypedDict
 from uuid import UUID
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 import dateutil
 
 from cray.cfs.api import dbutils
@@ -46,6 +48,16 @@ DB = dbutils.get_wrapper(db='sessions')
 CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
 _kafka = None
+
+# Marked as final because we do not intend to subclass this. It doesn't really
+# matter at this point, but if type checking is ever properly added, this helps
+# the type checker.
+@final
+class SessionIdListDict(TypedDict):
+    """
+    Used for type hinting the v3 session endpoints which return ID list dicts
+    """
+    session_ids: list[str]
 
 
 def _init(topic='cfs-session-events'):
@@ -258,8 +270,13 @@ def delete_session_v3(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
-def delete_sessions_v2(age=None,  min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):
+def delete_sessions_v2(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> tuple[None, 204] | CxResponse:
     """Delete Config Framework Sessions
 
      # noqa: E501
@@ -282,35 +299,31 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
     :rtype: None
     """
     LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
-    tag_list = []
-    if tags:
-        try:
-            tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
-            for tag in tag_list:
-                assert len(tag) == 2
-        except Exception as err:
-            return connexion.problem(
-                status=400, title="Error parsing the tags provided.",
-                detail=str(err))
-    try:
-        sessions_data, _ = _get_filtered_sessions(age=age, min_age=min_age, max_age=max_age,
-                                                  status=status, name_contains=name_contains,
-                                                  succeeded=succeeded, tag_list=tag_list)
-    except ParsingException as err:
-        return connexion.problem(
-            detail=str(err),
-            status=400,
-            title='Error parsing age field'
-        )
-    for session in sessions_data:
-        DB.delete(session['name'])
-        _kafka.produce(event_type='DELETE', data=session)
-    return None, 204
+    # This endpoint is the same as the v3 version except for what it returns when successful:
+    # the v3 endpoint returns 204 status and a dict containing the deleted IDs
+    # the v2 endpoint returns 200 status and None
+    #
+    # Because of this, both endpoints use a common function to do the actual work.
+    response, status_code = delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                                           status=status, name_contains=name_contains,
+                                           succeeded=succeeded, tags=tags)
+    if status_code == 200:
+        # This means it was successful. The v2 endpoint returns None, 204 in this case.
+        return None, 204
+
+    # This means there was an error, in which case the v2 and v3 endpoints are the same in
+    # in terms of the response.
+    return response, status_code
 
 
 @dbutils.redis_error_handler
-def delete_sessions_v3(age=None,  min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):
+def delete_sessions_v3(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> tuple[SessionIdListDict, 200] | CxResponse:
     """Delete Config Framework Sessions
 
      # noqa: E501
@@ -330,9 +343,44 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
     :param tags: A filter on session tags
     :type tags: bool
 
-    :rtype: None
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
     """
     LOGGER.debug("DELETE /v3/sessions invoked delete_sessions_v3")
+    return delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                          status=status, name_contains=name_contains,
+                          succeeded=succeeded, tags=tags)
+
+
+def delete_sessions(age: Optional[str],
+                    min_age: Optional[str],
+                    max_age: Optional[str],
+                    status: Optional[str],
+                    name_contains: Optional[str],
+                    succeeded: Optional[str],
+                    tags: Optional[str]) -> tuple[SessionIdListDict, 200] | CxResponse:
+    """Delete Config Framework Sessions
+
+     # noqa: E501
+
+    :param age: An age filter in the form 1d.
+    :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
+    :param status: A session status filter
+    :type status: str
+    :param name_contains: A filter on session names
+    :type name_contains: str
+    :param succeeded: A filter on session success
+    :type succeeded: bool
+    :param tags: A filter on session tags
+    :type tags: bool
+
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
+    """
     tag_list = []
     if tags:
         try:
