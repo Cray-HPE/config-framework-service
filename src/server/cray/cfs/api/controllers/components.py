@@ -26,8 +26,10 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 import logging
+from typing import final, Literal, NewType, Optional, TypedDict
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
@@ -51,6 +53,62 @@ STATUS = {
     STATUS_CONFIGURED: 'configured',
     STATUS_DEPRECATED: 'config_deprecated',
 }
+
+# For rudimentary type annotation
+
+# Marked as final because we do not intend to subclass this. It doesn't really
+# matter at this point, but if type checking is ever properly added, this helps
+# the type checker.
+@final
+class ComponentIdListDict(TypedDict):
+    """
+    Used for type hinting the v3 endpoints which return ID list dicts
+    """
+    component_ids: list[str]
+
+
+V2ComponentData = NewType("V2ComponentData", dbutils.JsonDict)
+V3ComponentData = NewType("V3ComponentData", dbutils.JsonDict)
+
+V3FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured', '']
+V2FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured']
+
+@final
+class V2ComponentsFilter(TypedDict, total=False):
+    """
+    total is False because all of these fields are optional (at least one
+    must be specified, but it doesn't matter which)
+    """
+    ids: str
+    status: V2FilterStatus
+    enabled: bool
+    configName: str
+    tags: str
+
+
+@final
+class V3ComponentsFilter(TypedDict, total=False):
+    """
+    total is False because all of these fields are optional (at least one
+    must be specified, but it doesn't matter which)
+    """
+    ids: str
+    status: V3FilterStatus
+    enabled: bool
+    config_name: str
+    tags: str
+
+
+@final
+class V2ComponentsUpdate(TypedDict):
+    patch: V2ComponentData
+    filters: V2ComponentsFilter
+
+
+@final
+class V3ComponentsUpdate(TypedDict):
+    patch: V3ComponentData
+    filters: V3ComponentsFilter
 
 
 @dbutils.redis_error_handler
@@ -170,8 +228,14 @@ def get_components_data(id_list=None, status_list=None, enabled=None, config_nam
     return component_data_page, next_page_exists
 
 
-def _component_filter(component_data, config_details, configs,
-                      id_list, status_list, enabled, config_name, tag_list):
+def _component_filter(component_data: V3ComponentData,
+                      config_details: Optional[bool],
+                      configs: configurations.Configurations,
+                      id_list: list[str],
+                      status_list: list[V3FilterStatus],
+                      enabled: Optional[bool],
+                      config_name: Optional[str],
+                      tag_list: list[str]) -> bool:
     # Before bothering to set status, check the filters which do not require it.
     if id_list and not component_data.get("id") in id_list:
         return False
@@ -238,7 +302,7 @@ def put_components_v3():
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v2():
+def patch_components_v2() -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v2/components invoked patch_components_v2")
     data = connexion.request.get_json()
@@ -251,7 +315,9 @@ def patch_components_v2():
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v2_components_list(data):
+def patch_v2_components_list(
+    data: list[V2ComponentData]
+) -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
     try:
         components = []
         for component_data in data:
@@ -274,7 +340,9 @@ def patch_v2_components_list(data):
     return response, 200
 
 
-def patch_v2_components_dict(data):
+def patch_v2_components_dict(
+    data: V2ComponentsUpdate
+) -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
@@ -303,37 +371,26 @@ def patch_v2_components_dict(data):
                 status=400, title="Error parsing the tags provided.",
                 detail=str(err))
 
-    components = []
-    if id_list:
-        for component_id in id_list:
-            component_data = DB.get(component_id)
-            if component_data:
-                components.append(component_data)
-    else:
-        # On large scale systems, this response may be too large
-        # use v3 for smaller responses
-        components = DB.get_all()[0]
-
-    response = []
-    patch = data.get("patch", {})
-    patch.pop("id", None)
-    patch = dbutils.convert_data_from_v2(patch, V2Component)
-    patch = _set_auto_fields(patch)
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=False, configs=configs,
-                               id_list=[], status_list=status_list,
+                               id_list=id_list, status_list=status_list,
                                enabled=filters.get("enabled", None),
-                               config_name=filters.get("config_name", None), tag_list=tag_list)
-    for component_data in components:
-        if component_filter(component_data):
-            response_data = DB.patch(component_data["id"], patch, _update_handler)
-            response.append(convert_component_to_v2(response_data))
+                               config_name=filters.get("configName", None), tag_list=tag_list)
+
+    v2_patch = data.get("patch", {})
+    v2_patch.pop("id", None)
+    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = _set_auto_fields(v3_patch)
+
+    response = []
+    for _, v3_patched_comp in DB.patch_all_entries(component_filter, v3_patch, _update_handler):
+        response.append(convert_component_to_v2(v3_patched_comp))
     return response, 200
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v3():
+def patch_components_v3() -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v3/components invoked patch_components_v3")
     data = connexion.request.get_json()
@@ -346,7 +403,9 @@ def patch_components_v3():
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v3_components_list(data):
+def patch_v3_components_list(
+    data: list[V3ComponentData]
+) -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
     try:
         components = []
         for component_data in data:
@@ -369,7 +428,9 @@ def patch_v3_components_list(data):
     return response, 200
 
 
-def patch_v3_components_dict(data):
+def patch_v3_components_dict(
+    data: V3ComponentsUpdate
+) -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
@@ -705,14 +766,14 @@ def _state_append_handler(data):
     return data
 
 
-def convert_component_to_v2(data):
+def convert_component_to_v2(data: V3ComponentData) -> V2ComponentData:
     converted_state = [_convert_component_layer_to_v2(layer) for layer in data["state"]]
     data["state"] = converted_state
     data = dbutils.convert_data_to_v2(data, V2Component)
     return data
 
 
-def convert_component_to_v3(data):
+def convert_component_to_v3(data: V2ComponentData) -> V3ComponentData:
     data = dbutils.convert_data_from_v2(data, V2Component)
     converted_state = [_convert_component_layer_to_v3(layer) for layer in data["state"]]
     data["state"] = converted_state
