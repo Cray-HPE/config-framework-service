@@ -28,7 +28,7 @@ from functools import partial
 import logging
 import re
 import shlex
-from typing import final, Optional, TypedDict
+from typing import final, Literal, Optional, TypedDict
 from uuid import UUID
 
 import connexion
@@ -277,7 +277,7 @@ def delete_sessions_v2(age: Optional[str] = None,
                        status: Optional[str] = None,
                        name_contains: Optional[str] = None,
                        succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> tuple[None, 204] | CxResponse:
+                       tags: Optional[str] = None) -> tuple[None, Literal[204]] | CxResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -323,7 +323,7 @@ def delete_sessions_v3(age: Optional[str] = None,
                        status: Optional[str] = None,
                        name_contains: Optional[str] = None,
                        succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> tuple[SessionIdListDict, 200] | CxResponse:
+                       tags: Optional[str] = None) -> tuple[SessionIdListDict, Literal[200]] | CxResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -356,7 +356,7 @@ def delete_sessions(age: Optional[str],
                     status: Optional[str],
                     name_contains: Optional[str],
                     succeeded: Optional[str],
-                    tags: Optional[str]) -> tuple[SessionIdListDict, 200] | CxResponse:
+                    tags: Optional[str]) -> tuple[SessionIdListDict, Literal[200]] | CxResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
