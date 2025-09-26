@@ -207,13 +207,15 @@ class DBWrapper:
         self.client.set(key, data_str)
         return self.get(key)
 
-    def patch_all(
+    def patch_all_entries(
         self, data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler] = None
-    ) -> list[str]:
-        """Patch multiple resources in the database."""
-        patched_id_list = []
+    ) -> Generator[tuple[str, DbEntry], None, None]:
+        """
+        Patch multiple resources in the database.
+        For each entry that is patched, yield a tuple of its key and its data.
+        """
         for key in self.get_keys():
             data_str = self.client.get(key)
             data = json.loads(data_str)
@@ -227,8 +229,17 @@ class DBWrapper:
                 data = update_handler(data)
             data_str = json.dumps(data)
             self.client.set(key, data_str)
-            patched_id_list.append(key)
-        return patched_id_list
+            yield (key, data)
+
+    def patch_all(
+        self, data_filter: DataFilter,
+        patch: JsonDict,
+        update_handler: Optional[UpdateHandler] = None
+    ) -> list[str]:
+        """Patch multiple resources in the database."""
+        return [ k for k, _ in self.patch_all_entries(data_filter=data_filter,
+                                                      patch=patch,
+                                                      update_handler=update_handler) ]
 
     def _update(self, data: JsonDict, new_data: JsonDict) -> JsonDict:
         """Recursively patches JSON to allow sub-fields to be patched."""
