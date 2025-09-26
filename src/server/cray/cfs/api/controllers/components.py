@@ -30,6 +30,7 @@ from typing import final, Literal, NewType, Optional, TypedDict, Union
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
@@ -109,6 +110,9 @@ class V2ComponentsUpdate(TypedDict):
 class V3ComponentsUpdate(TypedDict):
     patch: V3ComponentData
     filters: V3ComponentsFilter
+
+V2PatchComponentsResponse: TypeAlias = Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]
+V3PatchComponentsResponse: TypeAlias = Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]
 
 
 @dbutils.redis_error_handler
@@ -302,7 +306,7 @@ def put_components_v3():
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v2() -> Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]:
+def patch_components_v2() -> V2PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v2/components invoked patch_components_v2")
     data = connexion.request.get_json()
@@ -315,9 +319,7 @@ def patch_components_v2() -> Union[tuple[list[V2ComponentData], Literal[200]], C
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v2_components_list(
-    data: list[V2ComponentData]
-) -> Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]:
+def patch_v2_components_list(data: list[V2ComponentData]) -> V2PatchComponentsResponse:
     try:
         components = []
         for component_data in data:
@@ -340,9 +342,7 @@ def patch_v2_components_list(
     return response, 200
 
 
-def patch_v2_components_dict(
-    data: V2ComponentsUpdate
-) -> Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]:
+def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
@@ -390,7 +390,7 @@ def patch_v2_components_dict(
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v3() -> Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]:
+def patch_components_v3() -> V3PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v3/components invoked patch_components_v3")
     data = connexion.request.get_json()
@@ -403,9 +403,7 @@ def patch_components_v3() -> Union[tuple[ComponentIdListDict, Literal[200]], CxR
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v3_components_list(
-    data: list[V3ComponentData]
-) -> Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]:
+def patch_v3_components_list(data: list[V3ComponentData]) -> V3PatchComponentsResponse:
     try:
         components = []
         for component_data in data:
@@ -428,9 +426,7 @@ def patch_v3_components_list(
     return response, 200
 
 
-def patch_v3_components_dict(
-    data: V3ComponentsUpdate
-) -> Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]:
+def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
