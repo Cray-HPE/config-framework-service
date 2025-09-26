@@ -28,7 +28,7 @@ from functools import partial
 import logging
 import re
 import shlex
-from typing import final, Optional, TypedDict, Union
+from typing import final, Literal, Optional, TypedDict, Union
 from uuid import UUID
 
 import connexion
@@ -338,13 +338,15 @@ def _delete_session(session_name):  # noqa: E501
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v2(age: Optional[str] = None,
-                       min_age: Optional[str] = None,
-                       max_age: Optional[str] = None,
-                       status: Optional[str] = None,
-                       name_contains: Optional[str] = None,
-                       succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> Union[tuple[None, 204], CxResponse]:
+def delete_sessions_v2(
+    age: Optional[str] = None,
+    min_age: Optional[str] = None,
+    max_age: Optional[str] = None,
+    status: Optional[str] = None,
+    name_contains: Optional[str] = None,
+    succeeded: Optional[str] = None,
+    tags: Optional[str] = None
+) -> Union[tuple[None, Literal[204]], CxResponse]:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -384,13 +386,15 @@ def delete_sessions_v2(age: Optional[str] = None,
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v3(age: Optional[str] = None,
-                       min_age: Optional[str] = None,
-                       max_age: Optional[str] = None,
-                       status: Optional[str] = None,
-                       name_contains: Optional[str] = None,
-                       succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> Union[tuple[SessionIdListDict, 200], CxResponse]:
+def delete_sessions_v3(
+    age: Optional[str] = None,
+    min_age: Optional[str] = None,
+    max_age: Optional[str] = None,
+    status: Optional[str] = None,
+    name_contains: Optional[str] = None,
+    succeeded: Optional[str] = None,
+    tags: Optional[str] = None
+) -> Union[tuple[SessionIdListDict, Literal[200]], CxResponse]:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -417,13 +421,15 @@ def delete_sessions_v3(age: Optional[str] = None,
                           succeeded=succeeded, tags=tags)
 
 
-def delete_sessions(age: Optional[str],
-                    min_age: Optional[str],
-                    max_age: Optional[str],
-                    status: Optional[str],
-                    name_contains: Optional[str],
-                    succeeded: Optional[str],
-                    tags: Optional[str]) -> Union[tuple[SessionIdListDict, 200], CxResponse]:
+def delete_sessions(
+    age: Optional[str],
+    min_age: Optional[str],
+    max_age: Optional[str],
+    status: Optional[str],
+    name_contains: Optional[str],
+    succeeded: Optional[str],
+    tags: Optional[str]
+) -> Union[tuple[SessionIdListDict, Literal[200]], CxResponse]:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
