@@ -310,6 +310,11 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     if drop_branches:
         for layer in iter_layers(data, include_additional_inventory=True):
+            # Remove the branch field if it exists (if it does not, do nothing).
+            # The pop call will raise a KeyError if the field does not exist, unless
+            # we specify a default return value. In this case, we do not care about
+            # the return value, but we specify a default of None purely to avoid
+            # the KeyError being raised.
             layer.pop("branch", None)
 
     data['name'] = configuration_id
