@@ -110,6 +110,9 @@ class V3ComponentsUpdate(TypedDict):
     patch: V3ComponentData
     filters: V3ComponentsFilter
 
+type V2PatchComponentsResponse = tuple[list[V2ComponentData], Literal[200]] | CxResponse
+type V3PatchComponentsResponse = tuple[ComponentIdListDict, Literal[200]] | CxResponse
+
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -302,7 +305,7 @@ def put_components_v3():
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v2() -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
+def patch_components_v2() -> V2PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v2/components invoked patch_components_v2")
     data = connexion.request.get_json()
@@ -315,9 +318,7 @@ def patch_components_v2() -> tuple[list[V2ComponentData], Literal[200]] | CxResp
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v2_components_list(
-    data: list[V2ComponentData]
-) -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
+def patch_v2_components_list(data: list[V2ComponentData]) -> V2PatchComponentsResponse:
     try:
         components = []
         for component_data in data:
@@ -340,9 +341,7 @@ def patch_v2_components_list(
     return response, 200
 
 
-def patch_v2_components_dict(
-    data: V2ComponentsUpdate
-) -> tuple[list[V2ComponentData], Literal[200]] | CxResponse:
+def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
@@ -390,7 +389,7 @@ def patch_v2_components_dict(
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_components_v3() -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
+def patch_components_v3() -> V3PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v3/components invoked patch_components_v3")
     data = connexion.request.get_json()
@@ -403,9 +402,7 @@ def patch_components_v3() -> tuple[ComponentIdListDict, Literal[200]] | CxRespon
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v3_components_list(
-    data: list[V3ComponentData]
-) -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
+def patch_v3_components_list(data: list[V3ComponentData]) -> V3PatchComponentsResponse:
     try:
         components = []
         for component_data in data:
@@ -428,9 +425,7 @@ def patch_v3_components_list(
     return response, 200
 
 
-def patch_v3_components_dict(
-    data: V3ComponentsUpdate
-) -> tuple[ComponentIdListDict, Literal[200]] | CxResponse:
+def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsResponse:
     filters = data.get("filters", {})
     id_list = []
     status_list = []
