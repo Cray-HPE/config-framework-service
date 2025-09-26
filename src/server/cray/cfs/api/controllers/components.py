@@ -372,6 +372,11 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
                                config_name=filters.get("configName", None), tag_list=tag_list)
 
     v2_patch = data.get("patch", {})
+    # Remove the id field if it exists (if it does not, do nothing).
+    # The pop call will raise a KeyError if the field does not exist, unless
+    # we specify a default return value. In this case, we do not care about
+    # the return value, but we specify a default of None purely to avoid
+    # the KeyError being raised.
     v2_patch.pop("id", None)
     v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
     v3_patch = _set_auto_fields(v3_patch)
@@ -454,6 +459,11 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
                                enabled=filters.get("enabled", None),
                                config_name=filters.get("config_name", None), tag_list=tag_list)
     patch = data.get("patch", {})
+    # Remove the id field if it exists (if it does not, do nothing).
+    # The pop call will raise a KeyError if the field does not exist, unless
+    # we specify a default return value. In this case, we do not care about
+    # the return value, but we specify a default of None purely to avoid
+    # the KeyError being raised.
     patch.pop("id", None)
     patch = _set_auto_fields(patch)
     component_ids = DB.patch_all(component_filter, patch, _update_handler)
