@@ -49,6 +49,39 @@ type DataFilter = Callable[[DbEntry], bool]
 type UpdateHandler = Callable[[DbEntry], DbEntry]
 type DeletionHandler = Callable[[DbEntry], None]
 
+
+class DBNoEntryError(Exception):
+    """
+    This exception is raised when the DB tries to do a get
+    and the entry is not found.
+    """
+    def __init__(self, db_name: DatabaseNames, key: DbKey) -> None:
+        self.db_name = db_name
+        self.key: str = key if isinstance(key, str) else key.decode('utf-8')
+        super().__init__(self.__str__())
+
+    def __str__(self) -> str:
+        return f"No entry for '{self.key}' in '{self.db_name}' database"
+
+
+class DBTooBusyError(Exception):
+    """
+    This exception is raised when the DB is unable to perform an operation
+    (like a patch) because the database keeps changing underneath it (possibly
+    after some number of retries).
+    This error could be avoided by adding locking, but I think this will be
+    rare enough that it's not worth the performance hit of requiring locks
+    for all DB writes.
+    """
+    def __init__(self, db_name: DatabaseNames, msg: str) -> None:
+        self.db_name = db_name
+        self.msg = msg
+        super().__init__(self.__str__())
+
+    def __str__(self) -> str:
+        return f"'{self.db_name}' database error: {self.msg}"
+
+
 LOGGER = logging.getLogger(__name__)
 DATABASES: list[DatabaseNames] = ["options",
                                   "sessions",
@@ -79,27 +112,41 @@ class DBWrapper:
     """
 
     def __init__(self, db: DbIdentifier) -> None:
-        db_id = self._get_db_id(db)
-        self.client = self._get_client(db_id)
+        self.db_id = self._get_db_id(db)
+        self.db_name: DatabaseNames = DATABASES[self.db_id]
+        self.client = self._get_client()
 
     def __contains__(self, key: DbKey) -> bool:
         return self.client.exists(key)
 
-    def _get_db_id(self, db: DbIdentifier) -> int:
+    @classmethod
+    def _get_db_id(cls, db: DbIdentifier) -> int:
         """Converts a db name to the id used by Redis."""
         return db if isinstance(db, int) else DATABASES.index(db)
 
-    def _get_client(self, db_id: int) -> redis.client.Redis:
+    def _get_client(self) -> redis.client.Redis:
         """Create a connection with the database."""
         LOGGER.debug("Creating database connection"
                      "host: %s port: %s database: %s",
-                     DB_HOST, DB_PORT, db_id)
+                     DB_HOST, DB_PORT, self.db_id)
         try:
-            return redis.Redis(host=DB_HOST, port=DB_PORT, db=db_id, protocol=3)
+            return redis.Redis(host=DB_HOST, port=DB_PORT, db=self.db_id, protocol=3)
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
-                         db_id, err)
+                         self.db_id, err)
             raise
+
+    def _no_entry_exception(self, key: DbKey) -> DBNoEntryError:
+        """
+        Helper method for creating a DBNoEntryError for this database
+        """
+        return DBNoEntryError(self.db_name, key)
+
+    def _too_busy_exception(self, msg: str) -> DBTooBusyError:
+        """
+        Helper method for creating a DBTooBusyError for this database
+        """
+        return DBTooBusyError(self.db_name, msg)
 
     # The following methods act like REST calls for single items
     def get(self, key: DbKey) -> Optional[DbEntry]:
