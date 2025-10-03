@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
+- Added missing spaces in two error messages.
 - CASMCMS-9538: Fix race condition problems
     - CASMCMS-9553: Make DBWrapper.iter_values smart enough to handle the case where
       a DB entry is deleted while it is executing
@@ -16,13 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9561: Consolidate back-end code for multi-session-delete endpoints
     - CASMCMS-9562: Consolidate back-end code for multi-component-patch endpoints
     - CASMCMS-9564: Create `DBNoEntryError` and `DBTooBusyError` exceptions
+    - CASMCMS-9554: Update DBWrapper `delete`/`get_delete` calls to use `DBNoEntryError`
 
 ### Changed
 - CASMCMS-9263: Make database scanning more performant
-
-### Fixed
-- CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
-- Added missing spaces in two error messages.
 
 ## [1.23.8] - 05/18/2026
 ### Added
