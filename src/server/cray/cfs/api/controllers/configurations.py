@@ -29,8 +29,10 @@ import logging
 import os
 import subprocess
 import tempfile
+from typing import Literal
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import components, options, sources
@@ -43,6 +45,12 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
 SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+# For rudimentary type annotations
+
+# The response format for the delete configuration endpoint is the same for v2 and v3
+type DeleteConfigurationResponse = tuple[None, Literal[204]] | CxResponse
+
 
 def _get_filtered_configurations(tenant):
     response = DB.get_all()
@@ -370,46 +378,60 @@ def patch_configuration_v3(configuration_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_configuration_v2(configuration_id):
+def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v2/configurations/%s invoked delete_configuration_v2", configuration_id)
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
-    if _config_in_use(configuration_id):
-        return connexion.problem(
-            status=400, title="Configuration is in use.",
-            detail=f"Configuration {configuration_id} is referenced by the desired state of "
-                   "some components")
-    return DB.delete(configuration_id), 204
+    return _delete_configuration(configuration_id)
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
 @options.refresh_options_update_loglevel
-def delete_configuration_v3(configuration_id):
+def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
+    # Check if the delete request comes from a specific tenant
+    if (requesting_tenant := get_tenant_from_header()):
+        # If the configuration already exists, and the tenant is not owned by the requesting delete
+        # tenant, then we cannot allow them to delete the existing data for this key.
+        try:
+            existing_configuration = DB.get(configuration_id) or {}
+        except dbutils.DBNoEntryError as err:
+            LOGGER.debug(err)
+            return connexion.problem(
+                status=404, title="Configuration not found",
+                detail=f"Configuration {configuration_id} could not be found")
+        if existing_configuration.get('tenant_name', '') != requesting_tenant:
+            return TENANT_FORBIDDEN_OPERATION
+    # Getting here either means that the request is not on behalf of a tenant, or that
+    # the request is on behalf of the tenant that owns this configuration. Either way,
+    # the delete should proceed.
+
+    # Note that this still does allow a small window for a race condition problem.
+    # Specifically, if the owner of this configuration is changed between now and when
+    # the DB delete happens, it could result in a tenant deleting a configuration
+    # that does not belong to them.
+    return _delete_configuration(configuration_id)
+
+
+def _delete_configuration(configuration_id: str) -> DeleteConfigurationResponse:
+    """
+    Return a 400 error if the configuration is in use.
+    Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
+    Otherwise, return None, 204
+    """
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
             detail=f"Configuration {configuration_id} is referenced by the desired state of "
                    "some components")
-    # If the put request comes from a specific tenant, make note of it in the record -- we're going
-    # to use it in subsequent data puts and permission checks.
-    requesting_tenant = get_tenant_from_header() or None
-    # If the configuration already exists, and the tenant is not owned by the requesting delete
-    # tenant, then we cannot allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id) or {}
-    if all([requesting_tenant is not None,
-            existing_configuration.get('tenant_name', '') != requesting_tenant]):
-        return TENANT_FORBIDDEN_OPERATION
-    return DB.delete(configuration_id), 204
+    try:
+        return DB.delete(configuration_id), 204
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Configuration not found",
+            detail=f"Configuration {configuration_id} could not be found")
 
 
 def iter_layers(config_data, include_additional_inventory=True):
