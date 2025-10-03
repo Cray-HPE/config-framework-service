@@ -25,10 +25,12 @@ from collections.abc import Container
 from datetime import datetime
 from functools import partial
 import logging
+from typing import Literal
 import uuid
 import urllib.parse
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations
@@ -41,6 +43,8 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+# For rudimentary type annotation
+type DeleteSourceResponse = tuple[None, Literal[204]] | CxResponse
 
 
 @dbutils.redis_error_handler
@@ -246,23 +250,28 @@ def _clean_credentials_data(data):
 
 
 @dbutils.redis_error_handler
-def delete_source_v3(source_id):
+def delete_source_v3(source_id: str) -> DeleteSourceResponse:
     """Used by the DELETE /sources/{source_id} API operation"""
     LOGGER.debug("DELETE /v3/sources/%s invoked delete_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
-    if source_id not in DB:
-        return connexion.problem(
-            status=404, title="Source not found",
-            detail=f"Source {source_id} could not be found")
     if source_id in _get_in_use_list():
         return connexion.problem(
             status=400, title="Source is in use.",
             detail=f"Source {source_id} is referenced by some configurations")
-    source = DB.get(source_id)
+
+    try:
+        source = DB.get_delete(source_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Source not found",
+            detail=f"Source {source_id} could not be found")
+
     source_credentials = source.get("credentials", {})
     if source_credentials and source_credentials.get("secret_name"):
         delete_vault_secret(source_credentials["secret_name"])
-    return DB.delete(source_id), 204
+
+    return None, 204
 
 
 def _set_auto_fields(data):

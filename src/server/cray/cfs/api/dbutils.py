@@ -154,13 +154,18 @@ class DBWrapper:
         datastr = self.client.get(key)
         return json.loads(datastr) if datastr else None
 
-    def get_delete(self, key: DbKey) -> Optional[DbEntry]:
+    def get_delete(self, key: DbKey) -> DbEntry:
         """
         Get the data for the given key from the database, and delete it from the DB.
-        Returns the data (or None if the entry does not exist).
+        Returns the data. Raises DbNoEntryError if the entry does not exist.
         """
         datastr = self.client.getdel(key)
-        return json.loads(datastr) if datastr else None
+        if not datastr:
+            raise self._no_entry_exception(key)
+        data = json.loads(datastr)
+        if data is None:
+            raise self._no_entry_exception(key)
+        return data
 
     def get_keys(self, start_after_key: Optional[str] = None) -> list[str]:
         """
@@ -298,8 +303,12 @@ class DBWrapper:
         return data
 
     def delete(self, key: DbKey) -> None:
-        """Deletes data from the database."""
-        self.client.delete(key)
+        """
+        Deletes data from the database.
+        This is just a wrapper for the get_delete method,
+        but it discards the return value.
+        """
+        self.get_delete(key)
 
     def delete_all(
         self, data_filter: DataFilter,
