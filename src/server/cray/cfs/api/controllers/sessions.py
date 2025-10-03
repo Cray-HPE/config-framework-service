@@ -35,6 +35,7 @@ import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 import dateutil
 from kafka.errors import KafkaTimeoutError
+from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils, kafka_utils
 from cray.cfs.api.controllers import options
@@ -61,6 +62,8 @@ class JobFieldAlreadySet(Exception):
             f"current value: {actual_job}, patch value: {patch_job}"
         )
 
+# For rudimentary type annotations
+
 # Marked as final because we do not intend to subclass this. It doesn't really
 # matter at this point, but if type checking is ever properly added, this helps
 # the type checker.
@@ -70,6 +73,13 @@ class SessionIdListDict(TypedDict):
     Used for type hinting the v3 session endpoints which return ID list dicts
     """
     session_ids: list[str]
+
+
+# The response format for the delete session endpoint is the same for v2 and v3
+DeleteSessionResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
+
+V2DeleteSessionsResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
+V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200]], CxResponse]
 
 
 def _init(topic='cfs-session-events'):
@@ -287,7 +297,7 @@ def _finish_session_create(data):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_session_v2(session_name):  # noqa: E501
+def delete_session_v2(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
     :param session_name: Config Framework Session name
@@ -301,7 +311,7 @@ def delete_session_v2(session_name):  # noqa: E501
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_session_v3(session_name):  # noqa: E501
+def delete_session_v3(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
     :param session_name: Config Framework Session name
@@ -313,20 +323,17 @@ def delete_session_v3(session_name):  # noqa: E501
     return _delete_session(session_name)
 
 
-def _delete_session(session_name):  # noqa: E501
-    """Delete Config Framework Session
-
-     # noqa: E501
-
-    :param session_name: Config Framework Session name
-    :type session_name: str
-
-    :rtype: None
+def _delete_session(session_name: str) -> DeleteSessionResponse:
+    """
+    Deletes the session from the database.
+    If it does not exist, return a 404 error.
+    Otherwise, add a delete event for this session to the Kafka bus, and return None, 204
     """
     LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
-    session = DB.get_delete(session_name)
-    if session is None:
-        LOGGER.debug("_delete_session: '%s' not found in database", session_name)
+    try:
+        session = DB.get_delete(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
@@ -338,15 +345,13 @@ def _delete_session(session_name):  # noqa: E501
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v2(
-    age: Optional[str] = None,
-    min_age: Optional[str] = None,
-    max_age: Optional[str] = None,
-    status: Optional[str] = None,
-    name_contains: Optional[str] = None,
-    succeeded: Optional[str] = None,
-    tags: Optional[str] = None
-) -> Union[tuple[None, Literal[204]], CxResponse]:
+def delete_sessions_v2(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> V2DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -386,15 +391,13 @@ def delete_sessions_v2(
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v3(
-    age: Optional[str] = None,
-    min_age: Optional[str] = None,
-    max_age: Optional[str] = None,
-    status: Optional[str] = None,
-    name_contains: Optional[str] = None,
-    succeeded: Optional[str] = None,
-    tags: Optional[str] = None
-) -> Union[tuple[SessionIdListDict, Literal[200]], CxResponse]:
+def delete_sessions_v3(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -421,15 +424,13 @@ def delete_sessions_v3(
                           succeeded=succeeded, tags=tags)
 
 
-def delete_sessions(
-    age: Optional[str],
-    min_age: Optional[str],
-    max_age: Optional[str],
-    status: Optional[str],
-    name_contains: Optional[str],
-    succeeded: Optional[str],
-    tags: Optional[str]
-) -> Union[tuple[SessionIdListDict, Literal[200]], CxResponse]:
+def delete_sessions(age: Optional[str],
+                    min_age: Optional[str],
+                    max_age: Optional[str],
+                    status: Optional[str],
+                    name_contains: Optional[str],
+                    succeeded: Optional[str],
+                    tags: Optional[str]) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.

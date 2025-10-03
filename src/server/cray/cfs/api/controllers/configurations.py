@@ -29,8 +29,11 @@ import logging
 import os
 import subprocess
 import tempfile
+from typing import Literal, Union
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
+from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import components, options, sources
@@ -43,6 +46,10 @@ DB = dbutils.get_wrapper(db='configurations')
 SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+# For rudimentary type annotations
+
+# The response format for the delete configuration endpoint is the same for v2 and v3
+DeleteConfigurationResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -299,36 +306,38 @@ def patch_configuration_v3(configuration_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_configuration_v2(configuration_id):
+def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v2/configurations/%s invoked delete_configuration_v2", configuration_id)
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
-    if _config_in_use(configuration_id):
-        return connexion.problem(
-            status=400, title="Configuration is in use.",
-            detail=f"Configuration {configuration_id} is referenced by the desired state of "
-                   "some components")
-    return DB.delete(configuration_id), 204
+    return _delete_configuration(configuration_id)
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_configuration_v3(configuration_id):
+def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
+    return _delete_configuration(configuration_id)
+
+
+def _delete_configuration(configuration_id: str) -> DeleteConfigurationResponse:
+    """
+    Return a 400 error if the configuration is in use.
+    Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
+    Otherwise, return None, 204
+    """
     if _config_in_use(configuration_id):
         return connexion.problem(
             status=400, title="Configuration is in use.",
             detail=f"Configuration {configuration_id} is referenced by the desired state of "
                    "some components")
-    return DB.delete(configuration_id), 204
+    try:
+        return DB.delete(configuration_id), 204
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Configuration not found",
+            detail=f"Configuration {configuration_id} could not be found")
 
 
 def iter_layers(config_data, include_additional_inventory=True):
