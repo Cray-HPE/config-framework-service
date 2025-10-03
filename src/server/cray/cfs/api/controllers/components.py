@@ -113,6 +113,8 @@ class V3ComponentsUpdate(TypedDict):
 type V2PatchComponentsResponse = tuple[list[V2ComponentData], Literal[200]] | CxResponse
 type V3PatchComponentsResponse = tuple[ComponentIdListDict, Literal[200]] | CxResponse
 
+# The response format for the delete component endpoint is the same for v2 and v3
+type DeleteComponentResponse = tuple[None, Literal[204]] | CxResponse
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -586,26 +588,31 @@ def patch_component_v3(component_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_component_v2(component_id):
+def delete_component_v2(component_id: str) -> DeleteComponentResponse:
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /v2/components/%s invoked delete_component_v2", component_id)
-    if component_id not in DB:
-        return connexion.problem(
-            status=404, title="Component not found.",
-            detail=f"Component {component_id} could not be found")
-    return DB.delete(component_id), 204
+    return _delete_component(component_id)
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_component_v3(component_id):
+def delete_component_v3(component_id: str) -> DeleteComponentResponse:
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /v3/components/%s invoked delete_component_v3", component_id)
-    if component_id not in DB:
+    return _delete_component(component_id)
+
+
+def _delete_component(component_id: str) -> DeleteComponentResponse:
+    """
+    Delete the specified component from the database, or return 404 if it does not exist
+    """
+    try:
+        return DB.delete(component_id), 204
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
-    return DB.delete(component_id), 204
 
 
 def _set_auto_fields(data):

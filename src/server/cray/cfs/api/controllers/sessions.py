@@ -49,6 +49,8 @@ CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
 _kafka = None
 
+# For rudimentary type annotations
+
 # Marked as final because we do not intend to subclass this. It doesn't really
 # matter at this point, but if type checking is ever properly added, this helps
 # the type checker.
@@ -58,6 +60,13 @@ class SessionIdListDict(TypedDict):
     Used for type hinting the v3 session endpoints which return ID list dicts
     """
     session_ids: list[str]
+
+
+# The response format for the delete session endpoint is the same for v2 and v3
+type DeleteSessionResponse = tuple[None, Literal[204]] | CxResponse
+
+type V2DeleteSessionsResponse = tuple[None, Literal[204]] | CxResponse
+type V3DeleteSessionsResponse = tuple[SessionIdListDict, Literal[200]] | CxResponse
 
 
 def _init(topic='cfs-session-events'):
@@ -231,7 +240,7 @@ def _create_session(session_create):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_session_v2(session_name):  # noqa: E501
+def delete_session_v2(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
     :param session_name: Config Framework Session name
@@ -240,18 +249,12 @@ def delete_session_v2(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v2/sessions/%s invoked delete_session_v2", session_name)
-    session = DB.get_delete(session_name)
-    if session is None:
-        return connexion.problem(
-            status=404, title="Session not found.",
-            detail=f"Session {session_name} could not be found")
-    _kafka.produce(event_type='DELETE', data=session)
-    return None, 204
+    return _delete_session(session_name)
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_session_v3(session_name):  # noqa: E501
+def delete_session_v3(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
     :param session_name: Config Framework Session name
@@ -260,8 +263,19 @@ def delete_session_v3(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v3/sessions/%s invoked delete_session_v3", session_name)
-    session = DB.get_delete(session_name)
-    if session is None:
+    return _delete_session(session_name)
+
+
+def _delete_session(session_name: str) -> DeleteSessionResponse:
+    """
+    Deletes the session from the database.
+    If it does not exist, return a 404 error.
+    Otherwise, add a delete event for this session to the Kafka bus, and return None, 204
+    """
+    try:
+        session = DB.get_delete(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
@@ -277,7 +291,7 @@ def delete_sessions_v2(age: Optional[str] = None,
                        status: Optional[str] = None,
                        name_contains: Optional[str] = None,
                        succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> tuple[None, Literal[204]] | CxResponse:
+                       tags: Optional[str] = None) -> V2DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -323,7 +337,7 @@ def delete_sessions_v3(age: Optional[str] = None,
                        status: Optional[str] = None,
                        name_contains: Optional[str] = None,
                        succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> tuple[SessionIdListDict, Literal[200]] | CxResponse:
+                       tags: Optional[str] = None) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -356,7 +370,7 @@ def delete_sessions(age: Optional[str],
                     status: Optional[str],
                     name_contains: Optional[str],
                     succeeded: Optional[str],
-                    tags: Optional[str]) -> tuple[SessionIdListDict, Literal[200]] | CxResponse:
+                    tags: Optional[str]) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
