@@ -28,7 +28,7 @@ from functools import partial
 import logging
 import re
 import shlex
-from typing import final, Literal, Optional, TypedDict, Union
+from typing import final, Literal, NewType, Optional, TypedDict, Union
 from uuid import UUID
 
 import connexion
@@ -64,6 +64,12 @@ class JobFieldAlreadySet(Exception):
 
 # For rudimentary type annotations
 
+V2SessionData = NewType("V2SessionData", dbutils.JsonDict)
+V3SessionData = NewType("V3SessionData", dbutils.JsonDict)
+
+V2SessionPatchData = NewType("V2SessionPatchData", dbutils.JsonDict)
+V3SessionPatchData = NewType("V3SessionPatchData", dbutils.JsonDict)
+
 # Marked as final because we do not intend to subclass this. It doesn't really
 # matter at this point, but if type checking is ever properly added, this helps
 # the type checker.
@@ -78,9 +84,15 @@ class SessionIdListDict(TypedDict):
 # The response format for the delete session endpoint is the same for v2 and v3
 DeleteSessionResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
 
+V2GetSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
+V3GetSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
+
 V2DeleteSessionsResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
 V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200]], CxResponse]
 
+# Although it does not conform to convention, the successful patch requests return 200 status
+V2PatchSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
+V3PatchSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
@@ -479,7 +491,7 @@ def delete_sessions(age: Optional[str],
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def get_session_v2(session_name):  # noqa: E501
+def get_session_v2(session_name: str) -> V2GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
 
     :param session_name: Config Framework Session name
@@ -488,16 +500,19 @@ def get_session_v2(session_name):  # noqa: E501
     :rtype: V2Session
     """
     LOGGER.debug("GET /v2/sessions/%s invoked get_session_v2", session_name)
-    if session_name not in DB:
+    try:
+        v3_session_data = DB.get(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    return convert_session_to_v2(DB.get(session_name)), 200
+    return convert_session_to_v2(v3_session_data), 200
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def get_session_v3(session_name):  # noqa: E501
+def get_session_v3(session_name: str) -> V3GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
 
     :param session_name: Config Framework Session name
@@ -506,13 +521,15 @@ def get_session_v3(session_name):  # noqa: E501
     :rtype: V3Session
     """
     LOGGER.debug("GET /v3/sessions/%s invoked get_session_v3", session_name)
-    if session_name not in DB:
+    try:
+        v3_session_data = DB.get(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    session_data = DB.get(session_name)
-    _set_link(session_data)
-    return session_data, 200
+    _set_link(v3_session_data)
+    return v3_session_data, 200
 
 
 @dbutils.redis_error_handler
@@ -579,7 +596,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_session_v2(session_name):
+def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
     """Update a Config Framework Session
 
     Updates a V2Session # noqa: E501
@@ -587,34 +604,35 @@ def patch_session_v2(session_name):
     """
     LOGGER.debug("PATCH /v2/sessions/%s invoked patch_session_v2", session_name)
     try:
-        data = connexion.request.get_json()
-        if any(key != 'status' for key in data):
+        v2_patch_data = connexion.request.get_json()
+        if any(key != 'status' for key in v2_patch_data):
             raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
             detail=str(err))
 
-    LOGGER.debug("patch_session_v2(%s): data=%s", session_name, data)
-
-    if session_name not in DB:
+    LOGGER.debug("patch_session_v2(%s): data=%s", session_name, v2_patch_data)
+    v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
+    try:
+        # CASMCMS-9627: To minimize changes, only update the V3 API.
+        # This is fine because that is what cfs-operator uses. This also allows
+        # a way for an admin to bypass the restrictions, if for some reason it is ever
+        # needed.
+        v3_session_data = _patch_session(session_name, v3_patch_data, job_update_restrictions=False)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    data = dbutils.convert_data_from_v2(data, V2Session)
-    # CASMCMS-9627: To minimize changes, only update the V3 API.
-    # This is fine because that is what cfs-operator uses. This also allows
-    # a way for an admin to bypass the restrictions, if for some reason it is ever
-    # needed.
-    response_data = _patch_session(session_name, data, job_update_restrictions=False)
-    resp_body = convert_session_to_v2(response_data)
+    resp_body = convert_session_to_v2(v3_session_data)
     LOGGER.debug("patch_session_v2(%s): Returning 200 with body: %s", session_name, resp_body)
     return resp_body, 200
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_session_v3(session_name):
+def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     """Update a Config Framework Session
 
     Updates a V3Session # noqa: E501
@@ -625,29 +643,29 @@ def patch_session_v3(session_name):
     """
     LOGGER.debug("PATCH /v3/sessions/%s invoked patch_session_v3", session_name)
     try:
-        data = connexion.request.get_json()
-        if any(key != 'status' for key in data):
+        v3_patch_data = connexion.request.get_json()
+        if any(key != 'status' for key in v3_patch_data):
             raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
             detail=str(err))
 
-    LOGGER.debug("patch_session_v3(%s): data=%s", session_name, data)
-
-    if session_name not in DB:
+    LOGGER.debug("patch_session_v3(%s): data=%s", session_name, v3_patch_data)
+    try:
+        v3_session_data = _patch_session(session_name, v3_patch_data, job_update_restrictions=True)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
-    try:
-        response_data = _patch_session(session_name, data, job_update_restrictions=True)
     except JobFieldAlreadySet as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=409, title="Session patch conflict.",
             detail=f"Session {session_name} could not be patched: {err}")
-    LOGGER.debug("patch_session_v3(%s): Returning 200 with body: %s", session_name, response_data)
-    return response_data, 200
+    LOGGER.debug("patch_session_v3(%s): Returning 200 with body: %s", session_name, v3_session_data)
+    return v3_session_data, 200
 
 
 # Some status fields should not progress backwards.
@@ -658,7 +676,9 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_name, new_data, job_update_restrictions: bool):
+def _patch_session(session_name: str,
+                   new_data: V3SessionPatchData,
+                   job_update_restrictions: bool) -> V3SessionData:
     """
     Applies the patch_data to the specified session, and returns the updated session data.
     If job_update_restrictions is true, call _enforce_job_update_restrictions.
@@ -915,12 +935,12 @@ def _set_link(data):
     return data
 
 
-def convert_session_to_v2(data):
+def convert_session_to_v2(data: V3SessionData) -> V2SessionData:
     data = dbutils.convert_data_to_v2(data, V2Session)
     return data
 
 
-def convert_session_to_v3(data):
+def convert_session_to_v3(data: V2SessionData) -> V3SessionData:
     data = dbutils.convert_data_from_v2(data, V2Session)
     return data
 

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9562: Consolidate back-end code for multi-component-patch endpoints
     - CASMCMS-9564: Create `DBNoEntryError` and `DBTooBusyError` exceptions
     - CASMCMS-9554: Update DBWrapper `delete`/`get_delete` calls to use `DBNoEntryError`
+    - CASMCMS-9568: Update DBWrapper `get` calls to use `DBNoEntryError`
 
 ### Changed
 - CASMCMS-9263: Make database scanning more performant
