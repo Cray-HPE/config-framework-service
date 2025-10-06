@@ -28,7 +28,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Literal
+from typing import Literal, NewType, Optional
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -48,6 +48,15 @@ SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 # For rudimentary type annotations
+V2ConfigurationData = NewType("V2ConfigurationData", dbutils.JsonDict)
+V3ConfigurationData = NewType("V3ConfigurationData", dbutils.JsonDict)
+
+type V2GetConfigurationResponse = tuple[V2ConfigurationData, Literal[200]] | CxResponse
+type V3GetConfigurationResponse = tuple[V3ConfigurationData, Literal[200]] | CxResponse
+
+# Even though it does not conform to convention, successful patch requests return 200 status
+type V2PatchConfigurationResponse = tuple[V2ConfigurationData, Literal[200]] | CxResponse
+type V3PatchConfigurationResponse = tuple[V3ConfigurationData, Literal[200]] | CxResponse
 
 # The response format for the delete configuration endpoint is the same for v2 and v3
 type DeleteConfigurationResponse = tuple[None, Literal[204]] | CxResponse
@@ -177,30 +186,37 @@ def _config_in_use(config_name: str) -> bool:
     return False
 
 @dbutils.redis_error_handler
-def get_configuration_v2(configuration_id):
+def get_configuration_v2(configuration_id: str) -> V2GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /v2/configurations/%s invoked get_configuration_v2", configuration_id)
-    if configuration_id not in DB:
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
-    return convert_configuration_to_v2(DB.get(configuration_id)), 200
+    return convert_configuration_to_v2(v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-def get_configuration_v3(configuration_id):
+def get_configuration_v3(configuration_id: str) -> V3GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /v3/configurations/%s invoked get_configuration_v3", configuration_id)
-    if configuration_id not in DB:
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(status=404, title="Configuration not found",
                                  detail=f"Configuration {configuration_id} could not be found")
-    configuration_data = DB.get(configuration_id)
-    tenant = get_tenant_from_header() or None
-    if all([tenant,
-            tenant != configuration_data.get('tenant_name', '')]):
-        return TENANT_FORBIDDEN_OPERATION
-    return DB.get(configuration_id), 200
+    # Check if the get request comes from a specific tenant
+    if (requesting_tenant := get_tenant_from_header()):
+        # This request is coming from a specific tenant.
+        # Do not return the data unless it belongs to the requesting tenant.
+        if requesting_tenant != v3_configuration_data.get('tenant_name', ''):
+            return TENANT_FORBIDDEN_OPERATION
+    return v3_configuration_data, 200
 
 
 @dbutils.redis_error_handler
@@ -260,7 +276,11 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     # If the configuration already exists, and the configuration is not owned by the requesting put
     # tenant, then we cannot allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id) or {}
+    try:
+        existing_configuration = DB.get(configuration_id) or {}
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        existing_configuration = {}
     LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'", requesting_tenant,
                  existing_configuration)
     if requesting_tenant is not None:
@@ -325,48 +345,53 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
 
 @dbutils.redis_error_handler
-def patch_configuration_v2(configuration_id):
+def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
-    if configuration_id not in DB:
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
-    data = DB.get(configuration_id)
+
     try:
-        data = _set_auto_fields(data)
+        v3_configuration_data = _set_auto_fields(v3_configuration_data)
     except BranchConversionException as e:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
             detail=str(e))
 
-    return convert_configuration_to_v2(DB.put(configuration_id, data)), 200
+    return convert_configuration_to_v2(DB.put(configuration_id, v3_configuration_data)), 200
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-def patch_configuration_v3(configuration_id):
+def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
-    if configuration_id not in DB:
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
-    data = DB.get(configuration_id)
 
     tenant = get_tenant_from_header() or None
     if all([tenant,
-            tenant != data.get('tenant_name', '')]):
+            tenant != v3_configuration_data.get('tenant_name', '')]):
         return TENANT_FORBIDDEN_OPERATION
 
     try:
-        data = _set_auto_fields(data)
+        v3_configuration_data = _set_auto_fields(v3_configuration_data)
     except BranchConversionException as e:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
             detail=str(e))
 
-    return DB.put(configuration_id, data), 200
+    return DB.put(configuration_id, v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
@@ -383,8 +408,8 @@ def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationRespons
     LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
     # Check if the delete request comes from a specific tenant
     if (requesting_tenant := get_tenant_from_header()):
-        # If the configuration already exists, and the tenant is not owned by the requesting delete
-        # tenant, then we cannot allow them to delete the existing data for this key.
+        # If the configuration already exists and is not owned by the tenant doing
+        # the delete request, then we cannot allow them to delete the existing data for this key.
         try:
             existing_configuration = DB.get(configuration_id) or {}
         except dbutils.DBNoEntryError as err:
@@ -560,23 +585,30 @@ def _get_ssl_info(source=None, tmp_dir=""):
 class Configurations:
     """Helper class for other endpoints that need access to configurations"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Some callers call the get_config method without checking if the configuration name is
         # set. If it is not set, calling the database will always just return None, so we can
         # save ourselves the network traffic of a database call here.
-        self.configs = { "": None, None: None }
+        self.configs: dict[Optional[str], Optional[V3ConfigurationData]] = { "": None, None: None }
 
-    def get_config(self, key):
+    def get_config(self, key: str) -> Optional[V3ConfigurationData]:
         if key not in self.configs:
-            self.configs[key] = DB.get(key)
+            try:
+                self.configs[key] = DB.get(key)
+            except dbutils.DBNoEntryError as err:
+                LOGGER.debug(err)
+                # When this code was originally written, this is the value that
+                # would be stored in the case that the configuration did not exist in the
+                # database.
+                self.configs[key] = None
         return self.configs[key]
 
 
-def convert_configuration_to_v2(data):
+def convert_configuration_to_v2(data: V3ConfigurationData) -> V2ConfigurationData:
     data = dbutils.convert_data_to_v2(data, V2Configuration)
     return data
 
 
-def convert_configuration_to_v3(data):
+def convert_configuration_to_v3(data: V2ConfigurationData) -> V3ConfigurationData:
     data = dbutils.convert_data_from_v2(data, V2Configuration)
     return data
