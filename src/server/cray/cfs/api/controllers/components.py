@@ -110,11 +110,15 @@ class V3ComponentsUpdate(TypedDict):
     patch: V3ComponentData
     filters: V3ComponentsFilter
 
-type V2PatchComponentsResponse = tuple[list[V2ComponentData], Literal[200]] | CxResponse
-type V3PatchComponentsResponse = tuple[ComponentIdListDict, Literal[200]] | CxResponse
+type V2GetComponentResponse = tuple[V2ComponentData, Literal[200]] | CxResponse
+type V3GetComponentResponse = tuple[V3ComponentData, Literal[200]] | CxResponse
 
 # The response format for the delete component endpoint is the same for v2 and v3
 type DeleteComponentResponse = tuple[None, Literal[204]] | CxResponse
+
+type V2PatchComponentsResponse = tuple[list[V2ComponentData], Literal[200]] | CxResponse
+type V3PatchComponentsResponse = tuple[ComponentIdListDict, Literal[200]] | CxResponse
+
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -481,14 +485,16 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def get_component_v2(component_id, config_details=False):
+def get_component_v2(component_id: str, config_details: bool=False) -> V2GetComponentResponse:
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /v2/components/%s invoked get_component_v2", component_id)
-    if component_id not in DB:
+    try:
+        component = DB.get(component_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
-    component = DB.get(component_id)
     configs = configurations.Configurations()
     component = _set_status(component, configs, config_details)
     component = convert_component_to_v2(component)
@@ -497,14 +503,19 @@ def get_component_v2(component_id, config_details=False):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def get_component_v3(component_id, state_details=False, config_details=False):
+def get_component_v3(component_id: str,
+                     state_details: bool=False,
+                     config_details: bool=False) -> V3GetComponentResponse:
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /v3/components/%s invoked get_component_v3", component_id)
-    if component_id not in DB:
+    try:
+        component = DB.get(component_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
-    component = DB.get(component_id)
+
     configs = configurations.Configurations()
     component = _set_status(component, configs, config_details)
     component = _set_link(component)
