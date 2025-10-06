@@ -26,9 +26,9 @@ from collections.abc import Container
 from datetime import datetime
 from functools import partial
 import logging
-from typing import Literal, Union
-import uuid
+from typing import Literal, NewType, Union
 import urllib.parse
+import uuid
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -44,7 +44,9 @@ DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 # For rudimentary type annotation
+SourceData = NewType("SourceData", dbutils.JsonDict)
 DeleteSourceResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
+GetSourceResponse: TypeAlias = Union[tuple[SourceData, Literal[200]], CxResponse]
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -112,15 +114,17 @@ def _iter_configurations_data():
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def get_source_v3(source_id):
+def get_source_v3(source_id: str) -> GetSourceResponse:
     """Used by the GET /sources/{source_id} API operation"""
     LOGGER.debug("GET /v3/sources/%s invoked get_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
-    if source_id not in DB:
+    try:
+        return DB.get(source_id), 200
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Source not found",
             detail=f"Source {source_id} could not be found")
-    return DB.get(source_id), 200
 
 
 @dbutils.redis_error_handler
