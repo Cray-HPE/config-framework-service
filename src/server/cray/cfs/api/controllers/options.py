@@ -55,7 +55,11 @@ def _init():
 
 
 def cleanup_old_options():
-    data = DB.get(OPTIONS_KEY)
+    try:
+        data = DB.get(OPTIONS_KEY)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return
     if not data:
         return
     # Cleanup
@@ -82,7 +86,12 @@ def get_options_v3():
 
 
 def get_options_data():
-    return _check_defaults(DB.get(OPTIONS_KEY))
+    try:
+        current_data = DB.get(OPTIONS_KEY)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        current_data = None
+    return _check_defaults(current_data)
 
 
 def _check_defaults(data):

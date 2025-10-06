@@ -150,9 +150,18 @@ class DBWrapper:
 
     # The following methods act like REST calls for single items
     def get(self, key: DbKey) -> Optional[DbEntry]:
-        """Get the data for the given key, or None if the entry does not exist."""
+        """
+        Get the data for the given key from the database, and return it.
+        Raises DbNoEntryError if the entry does not exist.
+        """
         datastr = self.client.get(key)
-        return json.loads(datastr) if datastr else None
+        if not datastr:
+            raise self._no_entry_exception(key)
+        data = json.loads(datastr)
+        if data is None:
+            raise self._no_entry_exception(key)
+        return data
+
 
     def get_delete(self, key: DbKey) -> DbEntry:
         """
@@ -235,17 +244,17 @@ class DBWrapper:
                 page_full = True
         return data_page, next_page_exists
 
-    def put(self, key: DbKey, new_data: DbEntry) -> Optional[DbEntry]:
+    def put(self, key: DbKey, new_data: DbEntry) -> DbEntry:
         """Put data into the database, replacing any old data."""
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
-        return self.get(key)
+        return new_data
 
     def patch(
         self, key: DbKey,
         new_data: DbEntry,
         update_handler: Optional[UpdateHandler] = None
-    ) -> Optional[DbEntry]:
+    ) -> DbEntry:
         """
         Patch data in the database.
         update_handler provides a way to operate on the full patched data
@@ -257,7 +266,7 @@ class DBWrapper:
             data = update_handler(data)
         data_str = json.dumps(data)
         self.client.set(key, data_str)
-        return self.get(key)
+        return data
 
     def patch_all_entries(
         self, data_filter: DataFilter,
