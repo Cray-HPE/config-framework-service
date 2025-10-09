@@ -22,24 +22,22 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 from collections.abc import Container
-import connexion
 from datetime import datetime
 from functools import partial
 import logging
 import uuid
 import urllib.parse
 
-from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import configurations
-from cray.cfs.api.controllers import options
+import connexion
 
+from cray.cfs.api import dbutils
+from cray.cfs.api.controllers import configurations, options
 from cray.cfs.api.vault_utils import put_secret as put_vault_secret
 from cray.cfs.api.vault_utils import delete_secret as delete_vault_secret
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
 
 
 @dbutils.redis_error_handler

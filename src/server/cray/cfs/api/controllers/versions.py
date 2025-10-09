@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2024, 2026 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -38,14 +38,8 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
 def calc_version() -> Version:
     # parse open API spec file from docker image or local repository
     openapispec_f = '/app/lib/server/cray/cfs/api/openapi/openapi.yaml'
-    f = None
-    try:
-        f = open(openapispec_f, 'r')
-    except IOError as e:
-        LOGGER.debug('error opening openapi.yaml file: %s' % e)
-
-    openapispec_map = yaml.safe_load(f)
-    f.close()
+    with open(openapispec_f, 'r') as f:
+        openapispec_map = yaml.safe_load(f)
     major, minor, patch = openapispec_map['info']['version'].split('.')
     return Version(
         major=major,

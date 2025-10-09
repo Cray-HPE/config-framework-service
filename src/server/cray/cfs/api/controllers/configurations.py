@@ -22,7 +22,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 from collections.abc import Container
-import connexion
 from datetime import datetime
 from functools import partial
 import logging
@@ -30,13 +29,13 @@ import os
 import subprocess
 import tempfile
 
+import connexion
+
 from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import components
-from cray.cfs.api.controllers import options
-from cray.cfs.api.controllers import sources
+from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
-from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
+from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
