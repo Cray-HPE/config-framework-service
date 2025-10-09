@@ -35,12 +35,12 @@ import dateutil
 from kafka.errors import KafkaTimeoutError
 
 from cray.cfs.api import dbutils, kafka_utils
-from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.controllers import options
+from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
 from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
-from cray.cfs.api.models.v3_session_data import V3SessionData as V3Session  # noqa: E501
 from cray.cfs.api.models.v3_session_create import V3SessionCreate  # noqa: E501
+from cray.cfs.api.models.v3_session_data import V3SessionData as V3Session  # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
