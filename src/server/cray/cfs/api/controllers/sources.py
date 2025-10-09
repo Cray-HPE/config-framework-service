@@ -32,8 +32,8 @@ import connexion
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
-from cray.cfs.api.vault_utils import put_secret as put_vault_secret
 from cray.cfs.api.vault_utils import delete_secret as delete_vault_secret
+from cray.cfs.api.vault_utils import put_secret as put_vault_secret
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
