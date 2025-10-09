@@ -21,16 +21,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-import connexion
+
 from copy import deepcopy
 from datetime import datetime
 from functools import partial
 import logging
 
+import connexion
+
 from cray.cfs.api import dbutils
+from cray.cfs.api.controllers import configurations, options
 from cray.cfs.api.k8s_utils import get_ara_ui_url
-from cray.cfs.api.controllers import options
-from cray.cfs.api.controllers import configurations
 from cray.cfs.api.models.v2_component_state import V2ComponentState as V2Component
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.components')

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,25 +24,25 @@
 # Cray-provided controllers for the Configuration Framework Service
 
 import logging
+from typing import Literal
 
-from cray.cfs.api import dbutils
-from cray.cfs.api import kafka_utils
+from cray.cfs.api import dbutils, kafka_utils
 from cray.cfs.api.models.healthz import Healthz
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.healthz')
 DB = dbutils.get_wrapper(db='options')
 KAFKA = None
 
-def get_healthz():
+def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
+    """Used by the GET /healthz API operation"""
+    LOGGER.debug("GET /healthz invoked get_healthz")
     status_code = 200
 
     db_status = _get_db_status()
     kafka_status = _get_kafka_status()
 
-    for status in [db_status, kafka_status]:
-        if status != 'ok':
-            status_code = 503
-            break
+    if db_status != 'ok' or kafka_status != 'ok':
+        status_code = 503
 
     return Healthz(
         db_status=db_status,
@@ -50,20 +50,16 @@ def get_healthz():
     ), status_code
 
 
-def _get_db_status():
-    available = False
+def _get_db_status() -> str:
     try:
         if DB.info():
-            available = True
-    except Exception as e:
-        LOGGER.error(e)
-
-    if available:
-        return 'ok'
+            return 'ok'
+    except Exception as err:
+        LOGGER.error(err)
     return 'not_available'
 
 
-def _get_kafka_status():
+def _get_kafka_status() -> str:
     global KAFKA
     available = False
     try:

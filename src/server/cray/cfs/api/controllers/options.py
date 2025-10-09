@@ -22,9 +22,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 import logging
-import connexion
 import threading
 import time
+
+import connexion
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.models.v2_options import V2Options
