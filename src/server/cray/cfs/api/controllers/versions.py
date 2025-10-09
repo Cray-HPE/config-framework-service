@@ -51,6 +51,12 @@ def _get_version():
     return calc_version(), 200
 
 
+def get_version():
+    """Used by the GET / API operation"""
+    LOGGER.debug("GET /versions invoked get_versions")
+    return _get_version()
+
+
 def get_versions():
     """Used by the GET /versions API operation"""
     LOGGER.debug("GET /versions invoked get_versions")
@@ -58,12 +64,12 @@ def get_versions():
 
 
 def get_versions_v2():
-    """Used by the GET /v2/versions API operation"""
-    LOGGER.debug("GET /v2/versions invoked get_versions_v2")
+    """Used by the GET /v2 API operation"""
+    LOGGER.debug("GET /v2 invoked get_versions_v2")
     return _get_version()
 
 
 def get_versions_v3():
-    """Used by the GET /v3/versions API operation"""
-    LOGGER.debug("GET /v3/versions invoked get_versions_v3")
+    """Used by the GET /v3 API operation"""
+    LOGGER.debug("GET /v3 invoked get_versions_v3")
     return _get_version()
