@@ -54,6 +54,7 @@ STATUS = {
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_components_v2(ids="", status="", enabled=None, config_name="", config_details=False,
                    tags=""):
     """Used by the GET /components API operation for the v2 api"""
@@ -96,6 +97,7 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_components_v3(ids="", status="", enabled=None, config_name="", state_details=False, config_details=False,
                       tags="", limit=1, after_id=""):
@@ -176,6 +178,7 @@ def _component_filter(component_data, config_details, configs,
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_components_v2():
     """Used by the PUT /components API operation"""
     LOGGER.debug("PUT /components invoked put_components")
@@ -199,6 +202,7 @@ def put_components_v2():
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_components_v3():
     """Used by the PUT /components API operation"""
     LOGGER.debug("PUT /components invoked put_components")
@@ -222,6 +226,7 @@ def put_components_v3():
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_components_v2():
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /components invoked patch_components")
@@ -317,6 +322,7 @@ def patch_v2_components_dict(data):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_components_v3():
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /components invoked patch_components")
@@ -397,6 +403,7 @@ def patch_v3_components_dict(data):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_component_v2(component_id, config_details=False):
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /components/id invoked get_component")
@@ -412,6 +419,7 @@ def get_component_v2(component_id, config_details=False):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_component_v3(component_id, state_details=False, config_details=False):
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /components/id invoked get_component")
@@ -429,6 +437,7 @@ def get_component_v3(component_id, state_details=False, config_details=False):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_component_v2(component_id):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /components/id invoked put_component")
@@ -445,6 +454,7 @@ def put_component_v2(component_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_component_v3(component_id):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /components/id invoked put_component")
@@ -460,6 +470,7 @@ def put_component_v3(component_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_component_v2(component_id):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /components/id invoked patch_component")
@@ -480,6 +491,7 @@ def patch_component_v2(component_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_component_v3(component_id):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /components/id invoked patch_component")
@@ -498,6 +510,7 @@ def patch_component_v3(component_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_component_v2(component_id):
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /components/id invoked delete_component")
@@ -509,6 +522,7 @@ def delete_component_v2(component_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_component_v3(component_id):
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /components/id invoked delete_component")

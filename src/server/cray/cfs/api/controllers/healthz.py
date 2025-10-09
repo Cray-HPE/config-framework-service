@@ -24,9 +24,12 @@
 # Cray-provided controllers for the Configuration Framework Service
 
 import logging
-from typing import Literal
+from typing import Literal, Optional
+
+import redis
 
 from cray.cfs.api import dbutils, kafka_utils
+from cray.cfs.api.controllers import options
 from cray.cfs.api.models.healthz import Healthz
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.healthz')
@@ -36,9 +39,29 @@ KAFKA = None
 def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
     """Used by the GET /healthz API operation"""
     LOGGER.debug("GET /healthz invoked get_healthz")
-    status_code = 200
+    # Unlike every other API controller, we do not use the
+    # options.refresh_options_update_loglevel decorator, for the same
+    # reason that we do not use the dbutils.redis_error_handler decorator.
+    # Because this is a health check endpoint, we do not want to generate a
+    # database error resulting in a generic 503, instead of a more nuanced
+    # response.
+    db_status: Optional[str] = None
+    status_code: int = 200
+    try:
+        options.update_server_log_level()
+    except redis.exceptions.ConnectionError as err:
+        LOGGER.error(err)
+        db_status = 'not_available'
+    except Exception as err:
+        # Because this could mean a non-DB error, we don't
+        # update the db_status field. But we do want to return
+        # a 503, to reflect that SOMETHING is wrong.
+        LOGGER.error(err)
+        status_code = 503
 
-    db_status = _get_db_status()
+    # If we already have detected a database error, no need to check again
+    if db_status is None:
+        db_status = _get_db_status()
     kafka_status = _get_kafka_status()
 
     if db_status != 'ok' or kafka_status != 'ok':

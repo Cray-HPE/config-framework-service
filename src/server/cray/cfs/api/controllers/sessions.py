@@ -54,6 +54,7 @@ def _init(topic='cfs-session-events'):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def create_session_v2():  # noqa: E501
     """Create a Config Framework Session
 
@@ -121,6 +122,7 @@ def create_session_v2():  # noqa: E501
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def create_session_v3():  # noqa: E501
     """Create a Config Framework Session
 
@@ -214,6 +216,7 @@ def _create_session(session_create):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_session_v2(session_name):  # noqa: E501
     """Delete Config Framework Session
 
@@ -236,6 +239,7 @@ def delete_session_v2(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_session_v3(session_name):  # noqa: E501
     """Delete Config Framework Session
 
@@ -258,6 +262,7 @@ def delete_session_v3(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_sessions_v2(age=None,  min_age=None, max_age=None,
                        status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
@@ -310,6 +315,7 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_sessions_v3(age=None,  min_age=None, max_age=None,
                        status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
@@ -361,6 +367,7 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_session_v2(session_name):  # noqa: E501
     """Config Framework Session Details
 
@@ -380,6 +387,7 @@ def get_session_v2(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_session_v3(session_name):  # noqa: E501
     """Config Framework Session Details
 
@@ -401,6 +409,7 @@ def get_session_v3(session_name):  # noqa: E501
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
@@ -430,6 +439,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None, limit=1, after_id=""):  # noqa: E501
@@ -465,6 +475,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_session_v2(session_name):
     """Update a Config Framework Session
 
@@ -493,6 +504,7 @@ def patch_session_v2(session_name):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_session_v3(session_name):
     """Update a Config Framework Session
 
