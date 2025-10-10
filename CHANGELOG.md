@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- CASMCMS-9538: Process and thread ID now included in logging messages.
+
 ### Fixed
 - CASMCMS-9571: Fixed bug preventing CFS log level from updating correctly on the running server
 - CASMCMS-9538: Fix race condition problems

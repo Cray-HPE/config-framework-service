@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,7 @@ from cray.cfs.api.controllers import options
 from cray.cfs.api.controllers import sessions
 
 log_level = os.environ.get('STARTING_LOG_LEVEL', 'WARN')
-LOG_FORMAT = "%(asctime)-15s - %(levelname)-7s - %(name)s - %(message)s"
+LOG_FORMAT = "%(asctime)-15s - %(process)d - %(thread)d - %(levelname)-7s - %(name)s - %(message)s"
 logging.basicConfig(level=log_level, format=LOG_FORMAT)
 LOGGER = logging.getLogger(__name__)
 
