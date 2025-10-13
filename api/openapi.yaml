@@ -1806,6 +1806,8 @@ paths:
       responses:
         200:
           $ref: '#/components/responses/Healthz'
+        500:
+          $ref: '#/components/responses/Healthz'
         503:
           $ref: '#/components/responses/Healthz'
   # V2 #
