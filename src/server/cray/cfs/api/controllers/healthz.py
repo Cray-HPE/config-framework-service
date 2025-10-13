@@ -55,15 +55,16 @@ def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
     except Exception as err:
         # Because this could mean a non-DB error, we don't
         # update the db_status field. But we do want to return
-        # a 503, to reflect that SOMETHING is wrong.
+        # a 500, to reflect that SOMETHING is wrong.
         LOGGER.error(err)
-        status_code = 503
+        status_code = 500
 
     # If we already have detected a database error, no need to check again
     if db_status is None:
         db_status = _get_db_status()
     kafka_status = _get_kafka_status()
 
+    # Whether the current status_code value is 200 or 500, change that to 503 if we have detected Kafka or DB errors
     if db_status != 'ok' or kafka_status != 'ok':
         status_code = 503
 
