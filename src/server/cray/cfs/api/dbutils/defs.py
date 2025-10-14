@@ -27,6 +27,7 @@ dbutils: constants and global settings
 """
 
 import logging
+from typing import Final
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
@@ -35,11 +36,14 @@ from .env_vars import get_pos_int_env_var_or_default
 from .typing import DatabaseNames
 
 LOGGER = logging.getLogger(__name__)
-DATABASES: list[DatabaseNames] = ["options",
-                                  "sessions",
-                                  "components",
-                                  "configurations",
-                                  "sources"]  # Index is the db id.
+DATABASES: Final[tuple[DatabaseNames]] = (
+    "options",
+    "sessions",
+    "components",
+    "configurations",
+    "sources")  # Index is the db id.
+CFS_DB_SERVICE_NAME: Final[str] = "cray-cfs-api-db"
+CFS_DB_SERVICE_NS: Final[str] = "services"
 
 try:
     config.load_incluster_config()
@@ -48,13 +52,13 @@ except ConfigException:  # pragma: no cover
 
 _api_client = client.ApiClient()
 k8ssvcs = client.CoreV1Api(_api_client)
-svc_obj = k8ssvcs.read_namespaced_service("cray-cfs-api-db", "services")
+svc_obj = k8ssvcs.read_namespaced_service(CFS_DB_SERVICE_NAME, CFS_DB_SERVICE_NS)
 DB_HOST = svc_obj.spec.cluster_ip
-DB_PORT = 6379
+DB_PORT: Final[int] = 6379
 
 # In a watch/execute pipeline, a DB method will not start a new retry iteration if
 # more than DB_BUSY_SECONDS have elapsed since the DB operation started.
-DEFAULT_DB_BUSY_SECONDS = 60
+DEFAULT_DB_BUSY_SECONDS: Final[int] = 60
 DB_BUSY_SECONDS = get_pos_int_env_var_or_default("DB_BUSY_SECONDS",
                                                  DEFAULT_DB_BUSY_SECONDS)
 LOGGER.debug("DB_BUSY_SECONDS = %d", DB_BUSY_SECONDS)
