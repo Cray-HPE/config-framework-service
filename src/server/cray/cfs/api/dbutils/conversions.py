@@ -33,7 +33,7 @@ from cray.cfs.api.models.base_model import Model as BaseModel
 from .typing import JsonDict
 
 
-def convert_data_to_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
+def convert_data_to_v2(data: JsonDict, model_type: type[BaseModel]) -> JsonDict:
     """
     When exporting from a model with to_dict, all keys are in snake_case.  However the model
         contains the information on the keys in the api spec.  This gives the ability to make the
@@ -67,7 +67,7 @@ def _convert_data_to_v2(data: JsonDict, data_type: Any) -> JsonDict:
     return data
 
 
-def convert_data_from_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
+def convert_data_from_v2(data: JsonDict, model_type: type[BaseModel]) -> JsonDict:
     """
     When exporting from a model with to_dict, all keys are in snake_case.  However the model
         contains the information on the keys in the api spec.  This gives the ability to make the
