@@ -60,9 +60,9 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 list --format freeze
 COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
+COPY src/server/cray/cfs/api/dbutils lib/server/cray/cfs/api/dbutils
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
-     src/server/cray/cfs/api/dbutils.py \
      src/server/cray/cfs/api/kafka_utils.py \
      src/server/cray/cfs/api/k8s_utils.py \
      src/server/cray/cfs/api/vault_utils.py \

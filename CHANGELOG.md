@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - CASMCMS-9538: Process and thread ID now included in logging messages.
+- CASMCMS-9573: Refactor dbutils into multiple files
 
 ### Fixed
 - CASMCMS-9571: Fixed bug preventing CFS log level from updating correctly on the running server
