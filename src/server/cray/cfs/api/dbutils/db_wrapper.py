@@ -22,83 +22,33 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from collections.abc import Callable, Generator, Iterable
-import functools
+from collections.abc import Generator, Iterable
 import logging
-from typing import Any, Literal, Optional, ParamSpec, TypeVar
+from typing import Optional
 
-import connexion
-from connexion.lifecycle import ConnexionResponse as CxResponse
-from kubernetes import config, client
-from kubernetes.config.config_exception import ConfigException
 import redis
 import ujson as json
 
-from cray.cfs.api.models.base_model import Model as BaseModel
-
-# Definitions for type hinting
-type JsonData = bool | str | None | int | float | list[JsonData] | dict[str, JsonData]
-type JsonDict = dict[str, JsonData]
-type JsonList = list[JsonData]
-# All CFS database entries are dicts that are stored in JSON.
-type DbEntry = JsonDict
-type DbKey = str | bytes
-DatabaseNames = Literal["options", "sessions", "components", "configurations", "sources"]
-type DbIdentifier = DatabaseNames | int
-type DataFilter = Callable[[DbEntry], bool]
-type UpdateHandler = Callable[[DbEntry], DbEntry]
-type DeletionHandler = Callable[[DbEntry], None]
-
-
-class DBNoEntryError(Exception):
-    """
-    This exception is raised when the DB tries to do a get
-    and the entry is not found.
-    """
-    def __init__(self, db_name: DatabaseNames, key: DbKey) -> None:
-        self.db_name = db_name
-        self.key: str = key if isinstance(key, str) else key.decode('utf-8')
-        super().__init__(self.__str__())
-
-    def __str__(self) -> str:
-        return f"No entry for '{self.key}' in '{self.db_name}' database"
-
-
-class DBTooBusyError(Exception):
-    """
-    This exception is raised when the DB is unable to perform an operation
-    (like a patch) because the database keeps changing underneath it (possibly
-    after some number of retries).
-    This error could be avoided by adding locking, but I think this will be
-    rare enough that it's not worth the performance hit of requiring locks
-    for all DB writes.
-    """
-    def __init__(self, db_name: DatabaseNames, msg: str) -> None:
-        self.db_name = db_name
-        self.msg = msg
-        super().__init__(self.__str__())
-
-    def __str__(self) -> str:
-        return f"'{self.db_name}' database error: {self.msg}"
+from .decorators import convert_db_watch_errors
+from .defs import (
+                    DATABASES,
+                    DB_HOST,
+                    DB_PORT
+                  )
+from .exceptions import DBNoEntryError, DBTooBusyError
+from .typing import (
+                        DatabaseNames,
+                        DataFilter,
+                        DbEntry,
+                        DbIdentifier,
+                        DbKey,
+                        DeletionHandler,
+                        JsonDict,
+                        UpdateHandler
+                    )
 
 
 LOGGER = logging.getLogger(__name__)
-DATABASES: list[DatabaseNames] = ["options",
-                                  "sessions",
-                                  "components",
-                                  "configurations",
-                                  "sources"]  # Index is the db id.
-
-try:
-    config.load_incluster_config()
-except ConfigException:  # pragma: no cover
-    config.load_kube_config()  # Development
-
-_api_client = client.ApiClient()
-k8ssvcs = client.CoreV1Api(_api_client)
-svc_obj = k8ssvcs.read_namespaced_service("cray-cfs-api-db", "services")
-DB_HOST = svc_obj.spec.cluster_ip
-DB_PORT = 6379
 
 
 class DBWrapper:
@@ -136,44 +86,44 @@ class DBWrapper:
                          self.db_id, err)
             raise
 
-    def _no_entry_exception(self, key: DbKey) -> DBNoEntryError:
+    def no_entry_exception(self, key: DbKey) -> DBNoEntryError:
         """
         Helper method for creating a DBNoEntryError for this database
         """
         return DBNoEntryError(self.db_name, key)
 
-    def _too_busy_exception(self, msg: str) -> DBTooBusyError:
+    def too_busy_exception(self) -> DBTooBusyError:
         """
         Helper method for creating a DBTooBusyError for this database
         """
-        return DBTooBusyError(self.db_name, msg)
+        return DBTooBusyError(self.db_name)
 
-    # The following methods act like REST calls for single items
+    @convert_db_watch_errors
     def get(self, key: DbKey) -> Optional[DbEntry]:
         """
         Get the data for the given key from the database, and return it.
-        Raises DbNoEntryError if the entry does not exist.
+        Raises DBNoEntryError if the entry does not exist.
         """
         datastr = self.client.get(key)
         if not datastr:
-            raise self._no_entry_exception(key)
+            raise self.no_entry_exception(key)
         data = json.loads(datastr)
         if data is None:
-            raise self._no_entry_exception(key)
+            raise self.no_entry_exception(key)
         return data
 
-
+    @convert_db_watch_errors
     def get_delete(self, key: DbKey) -> DbEntry:
         """
         Get the data for the given key from the database, and delete it from the DB.
-        Returns the data. Raises DbNoEntryError if the entry does not exist.
+        Returns the data. Raises DBNoEntryError if the entry does not exist.
         """
         datastr = self.client.getdel(key)
         if not datastr:
-            raise self._no_entry_exception(key)
+            raise self.no_entry_exception(key)
         data = json.loads(datastr)
         if data is None:
-            raise self._no_entry_exception(key)
+            raise self.no_entry_exception(key)
         return data
 
     def get_keys(self, start_after_key: Optional[str] = None) -> list[str]:
@@ -214,6 +164,7 @@ class DBWrapper:
                 yield data
             all_keys = all_keys[500:]
 
+    @convert_db_watch_errors
     def get_all(
         self, limit: int = 0,
         after_id: Optional[str] = None,
@@ -244,12 +195,16 @@ class DBWrapper:
                 page_full = True
         return data_page, next_page_exists
 
+    @convert_db_watch_errors
     def put(self, key: DbKey, new_data: DbEntry) -> DbEntry:
-        """Put data into the database, replacing any old data."""
+        """
+        Put data into the database, replacing any old data.
+        """
         datastr = json.dumps(new_data)
         self.client.set(key, datastr)
         return new_data
 
+    @convert_db_watch_errors
     def patch(
         self, key: DbKey,
         new_data: DbEntry,
@@ -257,7 +212,7 @@ class DBWrapper:
     ) -> DbEntry:
         """
         Patch data in the database.
-        update_handler provides a way to operate on the full patched data
+        update_handler provides a way to operate on the full patched data.
         """
         data_str = self.client.get(key)
         data = json.loads(data_str)
@@ -268,6 +223,7 @@ class DBWrapper:
         self.client.set(key, data_str)
         return data
 
+    @convert_db_watch_errors
     def patch_all_entries(
         self, data_filter: DataFilter,
         patch: JsonDict,
@@ -292,6 +248,7 @@ class DBWrapper:
             self.client.set(key, data_str)
             yield (key, data)
 
+    @convert_db_watch_errors
     def patch_all(
         self, data_filter: DataFilter,
         patch: JsonDict,
@@ -311,6 +268,7 @@ class DBWrapper:
                 data[k] = v
         return data
 
+    @convert_db_watch_errors
     def delete(self, key: DbKey) -> None:
         """
         Deletes data from the database.
@@ -319,6 +277,7 @@ class DBWrapper:
         """
         self.get_delete(key)
 
+    @convert_db_watch_errors
     def delete_all(
         self, data_filter: DataFilter,
         deletion_handler: Optional[DeletionHandler] = None
@@ -342,97 +301,6 @@ class DBWrapper:
         return self.client.info()
 
 
-P = ParamSpec('P')
-R = TypeVar('R')
-
-def redis_error_handler(func: Callable[P, R]) -> Callable[P, R|CxResponse]:
-    """Decorator for returning better errors if Redis is unreachable"""
-
-    @functools.wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | CxResponse:
-        # Our get/patch functions don't take body, but the **kwargs
-        # in the arguments to this wrapper cause it to get passed.
-        kwargs.pop('body', None)
-        try:
-            return func(*args, **kwargs)
-        except redis.exceptions.ConnectionError as e:
-            LOGGER.error('Unable to connect to the Redis database: %s', e)
-            return connexion.problem(
-                status=503,
-                title='Unable to connect to the Redis database',
-                detail=str(e))
-
-    return wrapper
-
-
 def get_wrapper(db: DbIdentifier) -> DBWrapper:
     """Returns a database object."""
     return DBWrapper(db)
-
-
-def convert_data_to_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
-    """
-    When exporting from a model with to_dict, all keys are in snake_case.  However the model
-        contains the information on the keys in the api spec.  This gives the ability to make the
-        data match the given model/spec, which is useful when translating between the v2 and v3 api
-    Data must start in the v3 format exported by model().to_dict()
-    """
-    result = {}
-    model = model_type()
-    for attribute, attribute_key in model.attribute_map.items():
-        if attribute in data:
-            data_type = model.openapi_types[attribute]
-            result[attribute_key] = _convert_data_to_v2(data[attribute], data_type)
-    return result
-
-
-def _convert_data_to_v2(data: JsonDict, data_type: Any) -> JsonDict:
-    if not isinstance(data_type, type):
-        # Special case where the data_type is a "typing" object.  e.g typing.Dict
-        if not data:
-            return data
-        if data_type.__origin__ == list:
-            return [_convert_data_to_v2(item_data, data_type.__args__[0])
-                    for item_data in data]
-        if data_type.__origin__ == dict:
-            return {key: _convert_data_to_v2(item_data, data_type.__args__[1])
-                    for key, item_data in data.items()}
-    elif issubclass(data_type, BaseModel):
-        if not data:
-            data = {}
-        return convert_data_to_v2(data, data_type)
-    return data
-
-
-def convert_data_from_v2(data: JsonDict, model_type: BaseModel) -> JsonDict:
-    """
-    When exporting from a model with to_dict, all keys are in snake_case.  However the model
-        contains the information on the keys in the api spec.  This gives the ability to make the
-        data match the given model/spec, which is useful when translating between the v2 and v3 api
-    Data must start in the v3 format exported by model().to_dict()
-    """
-    result = {}
-    model = model_type()
-    for attribute_key, attribute in model.attribute_map.items():
-        if attribute in data:
-            data_type = model.openapi_types[attribute_key]
-            result[attribute_key] = _convert_data_from_v2(data[attribute], data_type)
-    return result
-
-
-def _convert_data_from_v2(data: JsonDict, data_type: Any) -> JsonDict:
-    if not isinstance(data_type, type):
-        # Special case where the data_type is a "typing" object.  e.g typing.Dict
-        if not data:
-            return data
-        if data_type.__origin__ == list:
-            return [_convert_data_from_v2(item_data, data_type.__args__[0])
-                    for item_data in data]
-        if data_type.__origin__ == dict:
-            return {key: _convert_data_from_v2(item_data, data_type.__args__[1])
-                    for key, item_data in data.items()}
-    elif issubclass(data_type, BaseModel):
-        if not data:
-            data = {}
-        return convert_data_from_v2(data, data_type)
-    return data
