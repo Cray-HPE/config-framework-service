@@ -62,3 +62,16 @@ DEFAULT_DB_BUSY_SECONDS: Final[int] = 60
 DB_BUSY_SECONDS = get_pos_int_env_var_or_default("DB_BUSY_SECONDS",
                                                  DEFAULT_DB_BUSY_SECONDS)
 LOGGER.debug("DB_BUSY_SECONDS = %d", DB_BUSY_SECONDS)
+
+# For database methods that work on multiple database entries, DB_BATCH_SIZE
+# is the maximum number of entries it will attempt to work on at once.
+# The lower the number, the worse the DB performance will be, but the lower
+# the risk of DB operations being retried because of conflicting DB changes by other clients.
+# The higher the number, the better the DB performance will be, but the higher
+# the risk of DB operations being retried because of conflicting DB changes by other clients.
+# (which would result in a performance impact or even a timeout failure for the
+# overall DB method).
+DEFAULT_DB_BATCH_SIZE: Final[int] = 100
+DB_BATCH_SIZE = get_pos_int_env_var_or_default("DB_BATCH_SIZE",
+                                               DEFAULT_DB_BATCH_SIZE)
+LOGGER.debug("DB_BATCH_SIZE = %d", DB_BATCH_SIZE)
