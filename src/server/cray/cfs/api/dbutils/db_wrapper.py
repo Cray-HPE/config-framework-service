@@ -23,7 +23,9 @@
 #
 
 from collections.abc import Generator, Iterable
+import itertools
 import logging
+import time
 from typing import Optional
 
 import redis
@@ -32,6 +34,8 @@ import ujson as json
 from .decorators import convert_db_watch_errors
 from .defs import (
                     DATABASES,
+                    DB_BATCH_SIZE,
+                    DB_BUSY_SECONDS,
                     DB_HOST,
                     DB_PORT
                   )
@@ -277,24 +281,184 @@ class DBWrapper:
         """
         self.get_delete(key)
 
+    def _delete_batch(self,
+        keys: Iterable[str],
+        data_filter: DataFilter,
+        keys_done: set[str]
+    ) -> tuple[list[str], list[DbEntry]]:
+        """
+        Helper for delete_all method
+        Given a list of keys, tries to delete all of the keys
+        which exist in the database and which meet the specified
+        filter (if one is specified).
+
+        Before attempting the delete, as keys are excluded based on
+        the above criteria, they are added to 'keys_done'.
+
+        If the delete fails because of database changes that occur,
+        then a Redis WatchError will be raised, which the caller must
+        handle as they see fit.
+
+        If the delete succeeds, this function returns two lists:
+        1. A list of database keys that were deleted
+        2. The data entries for each key in #1
+
+        If no keys meet the criteria for deletion, then this function
+        will return two empty lists.
+        """
+        keys_not_to_delete: list[str] = []
+        keys_to_delete: list[str] = []
+        data_to_delete: list[DbEntry] = []
+        with self.client.pipeline() as pipe:
+            # Start by watching all of the keys in this batch
+            # This has to be done before we call mget for them.
+            pipe.watch(*keys)
+
+            # Retrieve all of the specified keys from the database
+            # All database calls to pipe will be executed immediately,
+            # since we have not yet called pipe.multi()
+            data_str_list = pipe.mget(*keys)
+
+            for key, data_str in zip(keys, data_str_list):
+                if not data_str:
+                    # Already empty, no need to delete it
+                    keys_not_to_delete.append(key)
+                    continue
+                data = json.loads(data_str)
+                if data is None:
+                    keys_not_to_delete.append(key)
+                    continue
+                if data_filter and not data_filter(data):
+                    # This data does not match our filter, so skip it
+                    keys_not_to_delete.append(key)
+                    continue
+                # This key should be deleted
+                keys_to_delete.append(key)
+                data_to_delete.append(data)
+
+            if keys_not_to_delete:
+                # Also add them to keys_done, so we don't check them again on
+                # future iterations (if we have to re-try because of database changes)
+                keys_done.update(keys_not_to_delete)
+                # We would also like to stop watching them, but unfortunately that is
+                # not possible.
+
+            if keys_to_delete:
+                # Begin our transaction
+                # After this call to pipe.multi(), the database calls are NOT executed immediately.
+                pipe.multi()
+                # Queue the DB command to delete the specified keys
+                pipe.delete(*keys_to_delete)
+                # Execute the pipeline
+                #
+                # At this point, if any entries still being watched have been changed since we
+                # started watching them (including being created or deleted), then a Redis
+                # WatchError exception will be raised and the delete command will not be executed.
+                # The caller of this function will include logic that decides how to handle this.
+                #
+                # Instead, if none of those entries has changed, then Redis will atomically execute
+                # all of the queued database commands. The return value of the pipe.execute()
+                # call is a list with the return values for all of the queued DB commands. In this
+                # case, that is just the delete call, and we do not care about its return value.
+                # If the delete failed, it would raise an exception, and that's all we really care
+                # about.
+                pipe.execute()
+
+        # If we get here, it means that either the pipe executed successfully, or (if we had no
+        # keys to be deleted in this batch) it was not executed at all. Either way, return the
+        # list of keys and data that we deleted (which will both be empty, in the latter case).
+        return keys_to_delete, data_to_delete
+
+
     @convert_db_watch_errors
     def delete_all(
         self, data_filter: DataFilter,
         deletion_handler: Optional[DeletionHandler] = None
     ) -> list[str]:
-        """Delete multiple resources in the database."""
-        deleted_id_list = []
-        for key in self.get_keys():
-            data_str = self.client.get(key)
-            data = json.loads(data_str)
-            if data_filter and not data_filter(data):
-                # This data does not match our filter, so skip it
-                continue
-            self.client.delete(key)
-            if deletion_handler:
-                deletion_handler(data)
-            deleted_id_list.append(key)
-        return deleted_id_list
+        """
+        Delete multiple resources in the database.
+        Raises DBTooBusyError if unable to complete the deletes in time.
+        """
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # keys_left starts being set to all of the keys in the database.
+        # We will remove keys from it as we process them (either by deleting
+        # them or determining that they do not need to be deleted).
+        keys_left: list[str] = self.get_keys()
+
+        # deleted_keys is where we record the keys that we delete, so they
+        # can be returned to the caller
+        deleted_keys: list[str] = []
+
+        # The delete_all method has a big loop at its heart.
+        # The keys_done variable is used to keep track of which keys have been processed
+        # in the current iteration of the loop.
+        keys_done: set[str] = set()
+
+        # Keep looping until either we have processed all of the keys in our keys_left list -- we
+        # do not worry about keys that are created after this method starts running.
+        #
+        # The DB busy scenario is handled by an exception being raised, so it bypasses the
+        # regular loop logic.
+        while keys_left:
+            if keys_done:
+                # keys_done is non-empty, which means that some keys were processed on
+                # the previous iteration of the loop. So we remove those from our list of
+                # remaining keys
+                keys_left = [ k for k in keys_left if k not in keys_done ]
+
+                # If that removed the final keys from the list, exit the loop
+                if not keys_left:
+                    break
+
+                # Clear the keys_done set, so it is empty to start this iteration
+                keys_done.clear()
+
+            # The main work in the loop is enclosed in this try/except block.
+            # This is to catch Redis WatchErrors, which are raised when a change to the database
+            # caused one of our delete operations to abort. Any other exceptions that arise are
+            # not handled at this layer.
+            try:
+                # Process the keys in batches, rather than all at once.
+                # See defs.py for details on DB_BATCH_SIZE.
+                for key_batch in itertools.batched(keys_left, DB_BATCH_SIZE):
+                    # Call our helper function on this batch of keys
+                    batch_deleted_keys, batch_deleted_data = self._delete_batch(key_batch,
+                                                                                data_filter,
+                                                                                keys_done)
+                    # If we get here, it means the deletes completed successfully.
+                    # If any of these keys did not need to be deleted, then the helper
+                    # function has already added them to the keys_done list.
+
+                    # We also add the deleted keys to our done list.
+                    keys_done.update(batch_deleted_keys)
+
+                    # And add them to our list of deleted keys
+                    deleted_keys.extend(batch_deleted_keys)
+                    # If there is no deletion_handler, we can go to the next batch
+                    if not deletion_handler:
+                        continue
+                    # If there is a deletion_handler, apply it to the entries that
+                    # were deleted
+                    for data in batch_deleted_data:
+                        deletion_handler(data)
+            except redis.exceptions.WatchError as err:
+                # This means one of the keys changed values between when we filtered it and when
+                # we went to delete it.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key changed (%s); retrying", err)
+        # If we get here, it means we ended up processing all of the keys in our starting list.
+        # So return the IDs of the ones we deleted.
+        return deleted_keys
 
     def info(self) -> dict:
         """Returns the database info."""
