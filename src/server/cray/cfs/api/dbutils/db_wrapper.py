@@ -231,9 +231,6 @@ class DBWrapper:
             if not data_str:
                 raise self.no_entry_exception(key)
             data = json.loads(data_str)
-            if data is None:
-                raise self.no_entry_exception(key)
-
             # Apply the patch_data to the current data
             data = self._update(data, patch_data)
 
