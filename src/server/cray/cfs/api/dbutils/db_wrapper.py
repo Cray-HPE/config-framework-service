@@ -345,8 +345,10 @@ class DBWrapper:
                 # Begin our transaction
                 # After this call to pipe.multi(), the database calls are NOT executed immediately.
                 pipe.multi()
+
                 # Queue the DB command to delete the specified keys
                 pipe.delete(*keys_to_delete)
+
                 # Execute the pipeline
                 #
                 # At this point, if any entries still being watched have been changed since we
@@ -438,9 +440,11 @@ class DBWrapper:
 
                     # And add them to our list of deleted keys
                     deleted_keys.extend(batch_deleted_keys)
+
                     # If there is no deletion_handler, we can go to the next batch
                     if not deletion_handler:
                         continue
+
                     # If there is a deletion_handler, apply it to the entries that
                     # were deleted
                     for data in batch_deleted_data:
@@ -451,9 +455,11 @@ class DBWrapper:
                 if time.time() > no_retries_after:
                     # We are past the last allowed retry time, so re-raise the exception
                     raise err
+
                 # We are not past the time limit, so just log a warning and we'll go back to the
                 # top of the loop.
                 LOGGER.warning("Key changed (%s); retrying", err)
+
         # If we get here, it means we ended up processing all of the keys in our starting list.
         # So return the IDs of the ones we deleted.
         # Sort the list, to preserve the previous behavior of this function.
