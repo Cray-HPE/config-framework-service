@@ -31,7 +31,7 @@ from typing import Optional
 import redis
 import ujson as json
 
-from .decorators import convert_db_watch_errors
+from .decorators import convert_db_watch_errors, redis_pipeline
 from .defs import (
                     DATABASES,
                     DB_BATCH_SIZE,
@@ -208,8 +208,10 @@ class DBWrapper:
         self.client.set(key, datastr)
         return new_data
 
-    def _patch(
-        self, key: DbKey,
+    @redis_pipeline
+    def _patch(self,
+        pipe: redis.client.Pipeline,
+        key: DbKey,
         patch_data: DbEntry,
         update_handler: Optional[UpdateHandler]
     ) -> DbEntry:
@@ -217,52 +219,56 @@ class DBWrapper:
         Helper function for patch, which tries to apply the patch inside a Redis pipeline.
         Returns the updated entry data if successful.
         The pipeline will raise a Redis WatchError otherwise.
+
+        Note:
+        The pipe argument does not exist as far as the caller of this method is concerned.
+        That argument is automatically provided by the @redis_pipeline wrapper.
         """
-        with self.client.pipeline() as pipe:
-            # Mark this key for monitoring before we retrieve its data,
-            # so that we know if it changes underneath us.
-            pipe.watch(key)
+        # Mark this key for monitoring before we retrieve its data,
+        # so that we know if it changes underneath us.
+        pipe.watch(key)
 
-            # Because we have not yet called pipe.multi(), this DB
-            # get call will execute immediately and return the data.
-            data_str = pipe.get(key)
+        # Because we have not yet called pipe.multi(), this DB
+        # get call will execute immediately and return the data.
+        data_str = pipe.get(key)
 
-            # Raise an exception if no or null entry.
-            if not data_str:
-                raise self.no_entry_exception(key)
-            data = json.loads(data_str)
-            # Apply the patch_data to the current data
-            data = self._update(data, patch_data)
+        # Raise an exception if no or null entry.
+        if not data_str:
+            raise self.no_entry_exception(key)
+        data = json.loads(data_str)
 
-            # Call the update handler, if one was specified
-            if update_handler:
-                data = update_handler(data)
+        # Apply the patch_data to the current data
+        data = self._update(data, patch_data)
 
-            # Encode the updated data as a JSON string
-            data_str = json.dumps(data)
+        # Call the update handler, if one was specified
+        if update_handler:
+            data = update_handler(data)
 
-            # Begin our transaction.
-            pipe.multi()
+        # Encode the updated data as a JSON string
+        data_str = json.dumps(data)
 
-            # Because this is after the pipe.multi() call, the following
-            # set command is not executed immediately, and instead is
-            # queued up. The return value from this call is not the
-            # return value for the actual DB call.
-            pipe.set(key, data_str)
+        # Begin our transaction.
+        pipe.multi()
 
-            # Calling pipe.execute() does one of two things:
-            # 1. If the key we are watching has not changed since we started
-            #    watching it, then our DB set operation will be executed.
-            #    The return value of pipe.execute() is a list of the responses
-            #    from all of the queued DB commands (in our case, just a single
-            #    command -- the set). We don't really care about the response.
-            #    If the set failed, Redis would raise an exception, and that's
-            #    all we're really concerned about.
-            # 2. If they key we are watching DID change, then the queued DB
-            #    operations (the set, in our case) are aborted and a Redis WatchError
-            #    exception will be raised, and the caller will have to decide how
-            #    to deal with it.
-            pipe.execute()
+        # Because this is after the pipe.multi() call, the following
+        # set command is not executed immediately, and instead is
+        # queued up. The return value from this call is not the
+        # return value for the actual DB call.
+        pipe.set(key, data_str)
+
+        # Calling pipe.execute() does one of two things:
+        # 1. If the key we are watching has not changed since we started
+        #    watching it, then our DB set operation will be executed.
+        #    The return value of pipe.execute() is a list of the responses
+        #    from all of the queued DB commands (in our case, just a single
+        #    command -- the set). We don't really care about the response.
+        #    If the set failed, Redis would raise an exception, and that's
+        #    all we're really concerned about.
+        # 2. If they key we are watching DID change, then the queued DB
+        #    operations (the set, in our case) are aborted and a Redis WatchError
+        #    exception will be raised, and the caller will have to decide how
+        #    to deal with it.
+        pipe.execute()
 
         # If we get here, it means no exception was raised by pipe.execute, so we
         # should return the updated data.
@@ -292,6 +298,12 @@ class DBWrapper:
                 # Call a helper function to try and patch the entry. If it is successful,
                 # it will return the updated data, which we will return to our caller.
                 # If it is unsuccessful, an exception will be raised.
+                #
+                # At the time of this writing, pylint is not clever enough to understand
+                # the function signature mutation performed by the @redis_pipeline
+                # decorator, and so it falsely reports that we are missing an argument
+                # here.
+                # pylint: disable=no-value-for-parameter
                 return self._patch(key, patch_data, update_handler)
             except redis.exceptions.WatchError as err:
                 # This means the entry changed values while the helper function was
@@ -358,13 +370,20 @@ class DBWrapper:
         """
         self.get_delete(key)
 
+    @redis_pipeline
     def _delete_batch(self,
+        pipe: redis.client.Pipeline,
         keys: Iterable[str],
         data_filter: DataFilter,
         keys_done: set[str]
     ) -> tuple[list[str], list[DbEntry]]:
         """
         Helper for delete_all method
+
+        Note:
+        The pipe argument does not exist as far as the caller of this method is concerned.
+        That argument is automatically provided by the @redis_pipeline wrapper.
+
         Given a list of keys, tries to delete all of the keys
         which exist in the database and which meet the specified
         filter (if one is specified).
@@ -385,58 +404,57 @@ class DBWrapper:
         """
         keys_to_delete: list[str] = []
         data_to_delete: list[DbEntry] = []
-        with self.client.pipeline() as pipe:
-            # Start by watching all of the keys in this batch
-            # This has to be done before we call mget for them.
-            pipe.watch(*keys)
 
-            # Retrieve all of the specified keys from the database
-            # All database calls to pipe will be executed immediately,
-            # since we have not yet called pipe.multi()
-            data_str_list = pipe.mget(*keys)
+        # Start by watching all of the keys in this batch
+        # This has to be done before we call mget for them.
+        pipe.watch(*keys)
 
-            for key, data_str in zip(keys, data_str_list):
-                if not data_str:
-                    # Already empty, no need to delete it
-                    keys_done.add(key)
-                    continue
-                data = json.loads(data_str)
-                if data_filter and not data_filter(data):
-                    # This data does not match our filter, so skip it
-                    keys_done.add(key)
-                    continue
-                # This key should be deleted
-                keys_to_delete.append(key)
-                data_to_delete.append(data)
+        # Retrieve all of the specified keys from the database
+        # All database calls to pipe will be executed immediately,
+        # since we have not yet called pipe.multi()
+        data_str_list = pipe.mget(*keys)
 
-            # For the keys that we are not going to delete, the above loop
-            # adds them to the keys_done set, so we don't check them again on
-            # future iterations (if we have to re-try because of database changes)
-            # We would also like to stop watching them, but unfortunately that is
-            # not possible.
+        for key, data_str in zip(keys, data_str_list):
+            if not data_str:
+                # Already empty, no need to delete it
+                keys_done.add(key)
+                continue
+            if data_filter and not data_filter(data):
+                # This data does not match our filter, so skip it
+                keys_done.add(key)
+                continue
+            # This key should be deleted
+            keys_to_delete.append(key)
+            data_to_delete.append(data)
 
-            if keys_to_delete:
-                # Begin our transaction
-                # After this call to pipe.multi(), the database calls are NOT executed immediately.
-                pipe.multi()
+        # For the keys that we are not going to delete, the above loop
+        # adds them to the keys_done set, so we don't check them again on
+        # future iterations (if we have to re-try because of database changes)
+        # We would also like to stop watching them, but unfortunately that is
+        # not possible.
 
-                # Queue the DB command to delete the specified keys
-                pipe.delete(*keys_to_delete)
+        if keys_to_delete:
+            # Begin our transaction
+            # After this call to pipe.multi(), the database calls are NOT executed immediately.
+            pipe.multi()
 
-                # Execute the pipeline
-                #
-                # At this point, if any entries still being watched have been changed since we
-                # started watching them (including being created or deleted), then a Redis
-                # WatchError exception will be raised and the delete command will not be executed.
-                # The caller of this function will include logic that decides how to handle this.
-                #
-                # Instead, if none of those entries has changed, then Redis will atomically execute
-                # all of the queued database commands. The return value of the pipe.execute()
-                # call is a list with the return values for all of the queued DB commands. In this
-                # case, that is just the delete call, and we do not care about its return value.
-                # If the delete failed, it would raise an exception, and that's all we really care
-                # about.
-                pipe.execute()
+            # Queue the DB command to delete the specified keys
+            pipe.delete(*keys_to_delete)
+
+            # Execute the pipeline
+            #
+            # At this point, if any entries still being watched have been changed since we
+            # started watching them (including being created or deleted), then a Redis
+            # WatchError exception will be raised and the delete command will not be executed.
+            # The caller of this function will include logic that decides how to handle this.
+            #
+            # Instead, if none of those entries has changed, then Redis will atomically execute
+            # all of the queued database commands. The return value of the pipe.execute()
+            # call is a list with the return values for all of the queued DB commands. In this
+            # case, that is just the delete call, and we do not care about its return value.
+            # If the delete failed, it would raise an exception, and that's all we really care
+            # about.
+            pipe.execute()
 
         # If we get here, it means that either the pipe executed successfully, or (if we had no
         # keys to be deleted in this batch) it was not executed at all. Either way, return the
@@ -502,6 +520,11 @@ class DBWrapper:
                 # See defs.py for details on DB_BATCH_SIZE.
                 for key_batch in itertools.batched(keys_left, DB_BATCH_SIZE):
                     # Call our helper function on this batch of keys
+                    # At the time of this writing, pylint is not clever enough to understand
+                    # the function signature mutation performed by the @redis_pipeline
+                    # decorator, and so it falsely reports that we are missing an argument
+                    # here.
+                    # pylint: disable=no-value-for-parameter
                     batch_deleted_keys, batch_deleted_data = self._delete_batch(key_batch,
                                                                                 data_filter,
                                                                                 keys_done)
