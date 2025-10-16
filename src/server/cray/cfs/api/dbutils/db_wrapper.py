@@ -324,9 +324,6 @@ class DBWrapper:
                     keys_done.add(key)
                     continue
                 data = json.loads(data_str)
-                if data is None:
-                    keys_done.add(key)
-                    continue
                 if data_filter and not data_filter(data):
                     # This data does not match our filter, so skip it
                     keys_done.add(key)
