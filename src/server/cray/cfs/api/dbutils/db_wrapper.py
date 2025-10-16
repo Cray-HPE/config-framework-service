@@ -306,7 +306,6 @@ class DBWrapper:
         If no keys meet the criteria for deletion, then this function
         will return two empty lists.
         """
-        keys_not_to_delete: list[str] = []
         keys_to_delete: list[str] = []
         data_to_delete: list[DbEntry] = []
         with self.client.pipeline() as pipe:
@@ -322,26 +321,25 @@ class DBWrapper:
             for key, data_str in zip(keys, data_str_list):
                 if not data_str:
                     # Already empty, no need to delete it
-                    keys_not_to_delete.append(key)
+                    keys_done.add(key)
                     continue
                 data = json.loads(data_str)
                 if data is None:
-                    keys_not_to_delete.append(key)
+                    keys_done.add(key)
                     continue
                 if data_filter and not data_filter(data):
                     # This data does not match our filter, so skip it
-                    keys_not_to_delete.append(key)
+                    keys_done.add(key)
                     continue
                 # This key should be deleted
                 keys_to_delete.append(key)
                 data_to_delete.append(data)
 
-            if keys_not_to_delete:
-                # Also add them to keys_done, so we don't check them again on
-                # future iterations (if we have to re-try because of database changes)
-                keys_done.update(keys_not_to_delete)
-                # We would also like to stop watching them, but unfortunately that is
-                # not possible.
+            # For the keys that we are not going to delete, the above loop
+            # adds them to the keys_done set, so we don't check them again on
+            # future iterations (if we have to re-try because of database changes)
+            # We would also like to stop watching them, but unfortunately that is
+            # not possible.
 
             if keys_to_delete:
                 # Begin our transaction
@@ -458,7 +456,8 @@ class DBWrapper:
                 LOGGER.warning("Key changed (%s); retrying", err)
         # If we get here, it means we ended up processing all of the keys in our starting list.
         # So return the IDs of the ones we deleted.
-        return deleted_keys
+        # Sort the list, to preserve the previous behavior of this function.
+        return sorted(deleted_keys)
 
     def info(self) -> dict:
         """Returns the database info."""
