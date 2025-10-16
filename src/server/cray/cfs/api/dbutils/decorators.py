@@ -89,6 +89,33 @@ def convert_db_watch_errors[**P, C: HasTooBusyExceptionMethod, R](
             return method(self, *args, **kwargs)
         except redis.exceptions.WatchError as err:
             LOGGER.debug(err)
+            # Because C is bounded by the HasTooBusyExceptionMethod protocol, we know that
+            # self.too_busy_exception() must exist and return a DBTooBusyError
             raise self.too_busy_exception() from err
+
+    return wrapper
+
+
+class HasRedisClient(Protocol):
+    """
+    Protocol for classes that have a Redis client instance variable named 'client'
+    (e.g. DBWrapper)
+    """
+    client: redis.client.Redis
+
+def redis_pipeline[**P, C: HasRedisClient, R](
+    method: Callable[Concatenate[C, redis.client.Pipeline, P], R]
+) -> Callable[Concatenate[C, P], R]:
+    """
+    Decorator to put around DBWrapper methods that provides a Redis pipeline as the
+    first argument to the function (inside of a context manager).
+    """
+
+    @functools.wraps(method)
+    def wrapper(self: C, /, *args: P.args, **kwargs: P.kwargs) -> R:
+        # Because C is bounded by the HasRedisClient protocol, we know that
+        # self.client is a redis.client.Redis object
+        with self.client.pipeline() as pipe:
+            return method(self, pipe, *args, **kwargs)
 
     return wrapper
