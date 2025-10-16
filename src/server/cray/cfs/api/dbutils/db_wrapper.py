@@ -246,11 +246,13 @@ class DBWrapper:
 
             # Begin our transaction.
             pipe.multi()
+
             # Because this is after the pipe.multi() call, the following
             # set command is not executed immediately, and instead is
             # queued up. The return value from this call is not the
             # return value for the actual DB call.
             pipe.set(key, data_str)
+
             # Calling pipe.execute() does one of two things:
             # 1. If the key we are watching has not changed since we started
             #    watching it, then our DB set operation will be executed.
@@ -300,6 +302,7 @@ class DBWrapper:
                 if time.time() > no_retries_after:
                     # We are past the last allowed retry time, so re-raise the exception
                     raise err
+
                 # We are not past the time limit, so just log a warning and we'll go back to the
                 # top of the loop.
                 LOGGER.warning("Key '%s' changed (%s); retrying", key, err)
