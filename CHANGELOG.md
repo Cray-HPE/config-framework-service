@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9554: Update DBWrapper `delete`/`get_delete` calls to use `DBNoEntryError`
     - CASMCMS-9568: Update DBWrapper `get` calls to use `DBNoEntryError`
     - CASMCMS-9572: `DBWrapper.delete_all`: Use Redis watch/execute pipeline
+    - CASMCMS-9577: `DBWrapper.patch`: Use Redis watch/execute pipeline
 
 ## [1.27.0] - 07/03/2025
 ### Changed

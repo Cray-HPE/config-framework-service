@@ -208,24 +208,101 @@ class DBWrapper:
         self.client.set(key, datastr)
         return new_data
 
+    def _patch(
+        self, key: DbKey,
+        patch_data: DbEntry,
+        update_handler: Optional[UpdateHandler] = None
+    ) -> DbEntry:
+        """
+        Helper function for patch, which tries to apply the patch inside a Redis pipeline.
+        Returns the updated entry data if successful.
+        The pipeline will raise a Redis WatchError otherwise.
+        """
+        with self.client.pipeline() as pipe:
+            # Mark this key for monitoring before we retrieve its data,
+            # so that we know if it changes underneath us.
+            pipe.watch(key)
+
+            # Because we have not yet called pipe.multi(), this DB
+            # get call will execute immediately and return the data.
+            data_str = pipe.get(key)
+
+            # Raise an exception if no or null entry.
+            if not data_str:
+                raise self.no_entry_exception(key)
+            data = json.loads(data_str)
+            if data is None:
+                raise self.no_entry_exception(key)
+
+            # Apply the patch_data to the current data
+            data = self._update(data, patch_data)
+
+            # Call the update handler, if one was specified
+            if update_handler:
+                data = update_handler(data)
+
+            # Encode the updated data as a JSON string
+            data_str = json.dumps(data)
+
+            # Begin our transaction.
+            pipe.multi()
+            # Because this is after the pipe.multi() call, the following
+            # set command is not executed immediately, and instead is
+            # queued up. The return value from this call is not the
+            # return value for the actual DB call.
+            pipe.set(key, data_str)
+            # Calling pipe.execute() does one of two things:
+            # 1. If the key we are watching has not changed since we started
+            #    watching it, then our DB set operation will be executed.
+            #    The return value of pipe.execute() is a list of the responses
+            #    from all of the queued DB commands (in our case, just a single
+            #    command -- the set). We don't really care about the response.
+            #    If the set failed, Redis would raise an exception, and that's
+            #    all we're really concerned about.
+            # 2. If they key we are watching DID change, then the queued DB
+            #    operations (the set, in our case) are aborted and a Redis WatchError
+            #    exception will be raised, and the caller will have to decide how
+            #    to deal with it.
+            pipe.execute()
+
+        # If we get here, it means no exception was raised by pipe.execute, so we
+        # should return the updated data.
+        return data
+
     @convert_db_watch_errors
     def patch(
         self, key: DbKey,
-        new_data: DbEntry,
+        patch_data: DbEntry,
         update_handler: Optional[UpdateHandler] = None
     ) -> DbEntry:
         """
         Patch data in the database.
         update_handler provides a way to operate on the full patched data.
         """
-        data_str = self.client.get(key)
-        data = json.loads(data_str)
-        data = self._update(data, new_data)
-        if update_handler:
-            data = update_handler(data)
-        data_str = json.dumps(data)
-        self.client.set(key, data_str)
-        return data
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # The loop condition is a simple True because the logic for exiting the loop is
+        # contained inside the loop itself.
+        while True:
+            try:
+                # Call a helper function to try and patch the entry. If it is successful,
+                # it will return the updated data, which we will return to our caller.
+                # If it is unsuccessful, an exception will be raised.
+                return self._patch(key, patch_data, update_handler)
+            except redis.exceptions.WatchError as err:
+                # This means the entry changed values while the helper function was
+                # trying to patch it.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key '%s' changed (%s); retrying", key, err)
 
     @convert_db_watch_errors
     def patch_all_entries(
