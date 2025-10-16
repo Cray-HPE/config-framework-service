@@ -211,7 +211,7 @@ class DBWrapper:
     def _patch(
         self, key: DbKey,
         patch_data: DbEntry,
-        update_handler: Optional[UpdateHandler] = None
+        update_handler: Optional[UpdateHandler]
     ) -> DbEntry:
         """
         Helper function for patch, which tries to apply the patch inside a Redis pipeline.
