@@ -316,30 +316,193 @@ class DBWrapper:
                 # top of the loop.
                 LOGGER.warning("Key '%s' changed (%s); retrying", key, err)
 
+    @redis_pipeline
+    def _patch_batch(self,
+        pipe: redis.client.Pipeline,
+        keys: Iterable[str],
+        data_filter: DataFilter,
+        patch: JsonDict,
+        update_handler: Optional[UpdateHandler],
+        keys_done: set[str]
+    ) -> dict[str, DbEntry]:
+        """
+        Helper for patch_all_entries method
+
+        Note:
+        The pipe argument does not exist as far as the caller of this method is concerned.
+        That argument is automatically provided by the @redis_pipeline wrapper.
+
+        Given a list of keys, tries to apply the specified patch to all of the keys
+        which exist in the database and which meet the specified filter.
+
+        Before attempting the patch, as keys are excluded based on
+        the above criteria, they are added to 'keys_done'.
+
+        If the patch fails because of database changes that occur,
+        then a Redis WatchError will be raised, which the caller must
+        handle as they see fit.
+
+        If the patch succeeds, this function returns a mapping from keys to the
+        corresponding patched entry data
+
+        If no keys meet the criteria for patching, then this function
+        will return an empty dict.
+        """
+        # Mapping from keys to the updated data
+        patched_data_map: dict[str, DbEntry] = {}
+        # Mapping from keys to the updated JSON-encoded data strings
+        patched_datastr_map: dict[str, str] = {}
+
+        # Start by watching all of the keys in this batch
+        # This has to be done before we call mget for them.
+        pipe.watch(*keys)
+
+        # Retrieve all of the specified keys from the database
+        # All database calls to pipe will be executed immediately,
+        # since we have not yet called pipe.multi()
+        data_str_list = pipe.mget(*keys)
+
+        for key, data_str in zip(keys, data_str_list):
+            if not data_str:
+                # Already empty, cannot patch it
+                keys_done.add(key)
+                continue
+            data = json.loads(data_str)
+            if data_filter and not data_filter(data):
+                # This data does not match our filter, so skip it
+                keys_done.add(key)
+                continue
+
+            # This key should be patched
+
+            # Apply the patch to the current data,
+            # and call the update_handler
+            data = self._update(data, patch)
+            if update_handler:
+                data = update_handler(data)
+
+            patched_data_map[key] = data
+            patched_datastr_map[key] = json.dumps(data)
+
+        if patched_datastr_map:
+            # Begin our transaction
+            # After this call to pipe.multi(), the database calls are NOT executed immediately.
+            pipe.multi()
+            # Queue the DB command to updated the specified keys with the patched data
+            pipe.mset(patched_datastr_map)
+            # Execute the pipeline
+            #
+            # At this point, if any entries still being watched have been changed since we
+            # started watching them (including being created or deleted), then a Redis
+            # WatchError exception will be raised and the mset command will not be executed.
+            # The caller of this function will include logic that decides how to handle this.
+            #
+            # Instead, if none of those entries has changed, then Redis will atomically execute
+            # all of the queued database commands. The return value of the pipe.execute()
+            # call is a list with the return values for all of the queued DB commands. In this
+            # case, that is just the mset call, and we do not care about its return value.
+            # If the mset failed, it would raise an exception, and that's all we really care
+            # about.
+            pipe.execute()
+
+        # If we get here, it means that either the pipe executed successfully, or (if we had no
+        # keys to be patchd in this batch) it was not executed at all. Either way, add the
+        # patched keys (if any) to the done list, and then return the patched data map.
+        keys_done.update(patched_data_map)
+        return patched_data_map
+
     @convert_db_watch_errors
     def patch_all_entries(
         self, data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler] = None
-    ) -> Generator[tuple[str, DbEntry], None, None]:
+    ) -> list[tuple[str, DbEntry]]:
         """
         Patch multiple resources in the database.
-        For each entry that is patched, yield a tuple of its key and its data.
+        Returns a list of tuples of the entries that were patched. The tuples consist of the
+        DB key and the associated patched data.
+        Raises DBTooBusyError if unable to complete the deletes in time.
         """
-        for key in self.get_keys():
-            data_str = self.client.get(key)
-            data = json.loads(data_str)
-            # Data filtering happens here rather than after due to paging/memory constraints;
-            # we can't load all data and then filter on the results
-            if data_filter and not data_filter(data):
-                # This data does not match our filter, so skip it
-                continue
-            data = self._update(data, patch)
-            if update_handler:
-                data = update_handler(data)
-            data_str = json.dumps(data)
-            self.client.set(key, data_str)
-            yield (key, data)
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # keys_left starts being set to all of the keys in the database.
+        # We will remove keys from it as we process them (either by patching
+        # them or determining that they do not need to be patched).
+        keys_left: list[str] = self.get_keys()
+
+        # Mapping from keys to the updated data
+        patched_data_map: dict[str, DbEntry] = {}
+
+        # The patch_all_entries method has a big loop at its heart.
+        # The keys_done variable is used to keep track of which keys have been processed
+        # in the current iteration of the loop.
+        keys_done: set[str] = set()
+
+        # Keep looping until either we have processed all of the keys in our keys_left list -- we
+        # do not worry about keys that are created after this method starts running.
+        #
+        # The DB busy scenario is handled by an exception being raised, so it bypasses the
+        # regular loop logic.
+        while keys_left:
+            if keys_done:
+                # keys_done is non-empty, which means that some keys were processed on
+                # the previous iteration of the loop. So we remove those from our list of
+                # remaining keys
+                keys_left = [ k for k in keys_left if k not in keys_done ]
+
+                # If that removed the final keys from the list, exit the loop
+                if not keys_left:
+                    break
+
+                # Clear the keys_done set, so it is empty to start this iteration
+                keys_done.clear()
+
+            # The main work in the loop is enclosed in this try/except block.
+            # This is to catch Redis WatchErrors, which are raised when a change to the database
+            # caused one of our patch operations to abort. Any other exceptions that arise are
+            # not handled at this layer.
+            try:
+                # Process the keys in batches, rather than all at once.
+                # See defs.py for details on DB_BATCH_SIZE.
+                for key_batch in itertools.batched(keys_left, DB_BATCH_SIZE):
+                    # Call our helper function on this batch of keys
+                    # At the time of this writing, pylint is not clever enough to understand
+                    # the function signature mutation performed by the @redis_pipeline
+                    # decorator, and so it falsely reports that we are missing an argument
+                    # here.
+                    # pylint: disable=no-value-for-parameter
+                    batch_patched_data_map = self._patch_batch(key_batch,
+                                                               data_filter,
+                                                               patch,
+                                                               update_handler,
+                                                               keys_done)
+                    # If we get here, it means the patches (if any) completed successfully.
+                    # The helper function will have already updated keys_done with any
+                    # keys that did not need to be patched, and any keys that were patched.
+
+                    # Update our master patched data map from this batch
+                    patched_data_map.update(batch_patched_data_map)
+            except redis.exceptions.WatchError as err:
+                # This means one of the keys changed values between when we filtered it and when
+                # we went to update the DB with the patched data.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key changed (%s); retrying", err)
+
+        # If we get here, it means we ended up processing all of the keys in our starting list.
+        # So return a list of the patched data, in the form of (key, patched_data) tuples
+        # Sort the list (which will mean by key, since that is the first field in the tuple),
+        # to preserve the previous behavior of this function.
+        return sorted(patched_data_map.items())
 
     @convert_db_watch_errors
     def patch_all(
@@ -347,7 +510,10 @@ class DBWrapper:
         patch: JsonDict,
         update_handler: Optional[UpdateHandler] = None
     ) -> list[str]:
-        """Patch multiple resources in the database."""
+        """
+        Patch multiple resources in the database.
+        Return list of the IDs of the patched entries.
+        """
         return [ k for k, _ in self.patch_all_entries(data_filter=data_filter,
                                                       patch=patch,
                                                       update_handler=update_handler) ]
@@ -376,7 +542,7 @@ class DBWrapper:
         keys: Iterable[str],
         data_filter: DataFilter,
         keys_done: set[str]
-    ) -> tuple[list[str], list[DbEntry]]:
+    ) -> dict[str, DbEntry]:
         """
         Helper for delete_all method
 
@@ -395,15 +561,14 @@ class DBWrapper:
         then a Redis WatchError will be raised, which the caller must
         handle as they see fit.
 
-        If the delete succeeds, this function returns two lists:
-        1. A list of database keys that were deleted
-        2. The data entries for each key in #1
+        If the delete succeeds, this function returns a mapping from keys to the
+        deleted entry data.
 
         If no keys meet the criteria for deletion, then this function
-        will return two empty lists.
+        will return an empty dict.
         """
-        keys_to_delete: list[str] = []
-        data_to_delete: list[DbEntry] = []
+        # Mapping from keys to their deleted entry data
+        deleted_data_map: dict[str, DbEntry] = {}
 
         # Start by watching all of the keys in this batch
         # This has to be done before we call mget for them.
@@ -425,8 +590,7 @@ class DBWrapper:
                 keys_done.add(key)
                 continue
             # This key should be deleted
-            keys_to_delete.append(key)
-            data_to_delete.append(data)
+            deleted_data_map[key] = data
 
         # For the keys that we are not going to delete, the above loop
         # adds them to the keys_done set, so we don't check them again on
@@ -434,13 +598,13 @@ class DBWrapper:
         # We would also like to stop watching them, but unfortunately that is
         # not possible.
 
-        if keys_to_delete:
+        if deleted_data_map:
             # Begin our transaction
             # After this call to pipe.multi(), the database calls are NOT executed immediately.
             pipe.multi()
 
             # Queue the DB command to delete the specified keys
-            pipe.delete(*keys_to_delete)
+            pipe.delete(*deleted_data_map)
 
             # Execute the pipeline
             #
@@ -458,10 +622,11 @@ class DBWrapper:
             pipe.execute()
 
         # If we get here, it means that either the pipe executed successfully, or (if we had no
-        # keys to be deleted in this batch) it was not executed at all. Either way, return the
-        # list of keys and data that we deleted (which will both be empty, in the latter case).
-        return keys_to_delete, data_to_delete
-
+        # keys to be deleted in this batch) it was not executed at all. Either way, add the
+        # deleted keys (if any) to keys_done and then return the list of keys and data that we
+        # deleted.
+        keys_done.update(deleted_data_map)
+        return deleted_data_map
 
     @convert_db_watch_errors
     def delete_all(
@@ -526,18 +691,15 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_deleted_keys, batch_deleted_data = self._delete_batch(key_batch,
-                                                                                data_filter,
-                                                                                keys_done)
+                    batch_deleted_data_map = self._delete_batch(key_batch,
+                                                                data_filter,
+                                                                keys_done)
                     # If we get here, it means the deletes completed successfully.
-                    # If any of these keys did not need to be deleted, then the helper
-                    # function has already added them to the keys_done list.
+                    # The helper function will have updated keys_done with the keys that
+                    # were deleted and the keys that did not need to be deleted.
 
-                    # We also add the deleted keys to our done list.
-                    keys_done.update(batch_deleted_keys)
-
-                    # And add them to our list of deleted keys
-                    deleted_keys.extend(batch_deleted_keys)
+                    # Add the deleted keys to our master list of deleted keys
+                    deleted_keys.extend(batch_deleted_data_map)
 
                     # If there is no deletion_handler, we can go to the next batch
                     if not deletion_handler:
@@ -545,7 +707,7 @@ class DBWrapper:
 
                     # If there is a deletion_handler, apply it to the entries that
                     # were deleted
-                    for data in batch_deleted_data:
+                    for data in batch_deleted_data_map.values():
                         deletion_handler(data)
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
