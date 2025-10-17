@@ -390,8 +390,10 @@ class DBWrapper:
             # Begin our transaction
             # After this call to pipe.multi(), the database calls are NOT executed immediately.
             pipe.multi()
+
             # Queue the DB command to updated the specified keys with the patched data
             pipe.mset(patched_datastr_map)
+
             # Execute the pipeline
             #
             # At this point, if any entries still being watched have been changed since we
