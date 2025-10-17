@@ -235,17 +235,21 @@ class DBWrapper:
         # Raise an exception if no or null entry.
         if not data_str:
             raise self.no_entry_exception(key)
-        data = json.loads(data_str)
+        orig_data = json.loads(data_str)
 
         # Apply the patch_data to the current data
-        data = self._update(data, patch_data)
+        new_data = self._update(orig_data, patch_data)
 
         # Call the update handler, if one was specified
         if update_handler:
-            data = update_handler(data)
+            new_data = update_handler(new_data)
+
+        # If the data has not changed, no need to continue
+        if orig_data == new_data:
+            return new_data
 
         # Encode the updated data as a JSON string
-        data_str = json.dumps(data)
+        data_str = json.dumps(new_data)
 
         # Begin our transaction.
         pipe.multi()
@@ -272,7 +276,7 @@ class DBWrapper:
 
         # If we get here, it means no exception was raised by pipe.execute, so we
         # should return the updated data.
-        return data
+        return new_data
 
     @convert_db_watch_errors
     def patch(
@@ -367,10 +371,10 @@ class DBWrapper:
                 # Already empty, cannot patch it
                 keys_done.add(key)
                 continue
-            data = json.loads(data_str)
+            orig_data = json.loads(data_str)
             # Data filtering happens here rather than after due to paging/memory constraints;
             # we can't load all data and then filter on the results
-            if data_filter and not data_filter(data):
+            if data_filter and not data_filter(orig_data):
                 # This data does not match our filter, so skip it
                 keys_done.add(key)
                 continue
@@ -379,12 +383,18 @@ class DBWrapper:
 
             # Apply the patch to the current data,
             # and call the update_handler
-            data = self._update(data, patch)
+            new_data = self._update(orig_data, patch)
             if update_handler:
-                data = update_handler(data)
+                new_data = update_handler(new_data)
 
-            patched_data_map[key] = data
-            patched_datastr_map[key] = json.dumps(data)
+            # If this did not actually change the entry, then there is no need to
+            # actually patch it
+            if new_data == orig_data:
+                keys_done.add(key)
+                continue
+
+            patched_data_map[key] = new_data
+            patched_datastr_map[key] = json.dumps(new_data)
 
         if patched_datastr_map:
             # Begin our transaction
