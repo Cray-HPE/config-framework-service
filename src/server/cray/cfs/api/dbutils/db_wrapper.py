@@ -368,6 +368,8 @@ class DBWrapper:
                 keys_done.add(key)
                 continue
             data = json.loads(data_str)
+            # Data filtering happens here rather than after due to paging/memory constraints;
+            # we can't load all data and then filter on the results
             if data_filter and not data_filter(data):
                 # This data does not match our filter, so skip it
                 keys_done.add(key)
