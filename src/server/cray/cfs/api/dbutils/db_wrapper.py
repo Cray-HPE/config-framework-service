@@ -435,7 +435,7 @@ class DBWrapper:
         Patch multiple resources in the database.
         Returns a list of tuples of the entries that were patched. The tuples consist of the
         DB key and the associated patched data.
-        Raises DBTooBusyError if unable to complete the deletes in time.
+        Raises DBTooBusyError if unable to complete the patches in time.
         """
         # Set the time after which we will perform no more DB retries.
         # Note that this is not the same as it being a hard timeout. If no Redis
