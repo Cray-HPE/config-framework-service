@@ -538,6 +538,36 @@ class DBWrapper:
                                                       patch=patch,
                                                       update_handler=update_handler) ]
 
+    def _patch_list_load_entry_data(
+        self,
+        pipe: redis.client.Pipeline,
+        unique_keys: Sequence[str]
+    ) -> dict[str, DbEntry]:
+        """
+        Helper function for _patch_list
+
+        Retrieves the entries for the specified keys from the database.
+        If any of them do not exist, raise a DBNoEntryError
+        Otherwise, JSON decode them, and return a dict mapping the keys to
+        the decoded data.
+        """
+        # Retrieve all of the specified keys from the database
+        # All database calls to pipe will be executed immediately,
+        # since _patch_list has not yet called pipe.multi()
+        data_str_list: list[None|str] = pipe.mget(*unique_keys)
+        data_str_map: dict[str, str] = {}
+        for key, data_str in zip(unique_keys, data_str_list):
+            # To preserve the existing CFS behavior, if any entries are missing
+            # in the database, we will raise an exception for the first one we find
+            if not data_str:
+                raise self.no_entry_exception(key)
+            # This means data_str must be a str value
+            data_str_map[key] = data_str
+
+        # Return a mapping from the keys to the decoded JSON data
+        return { key: json.loads(data_str)
+                 for key, data_str in data_str_map.items() }
+
     @redis_pipeline
     def _patch_list(self,
         pipe: redis.client.Pipeline,
@@ -589,23 +619,8 @@ class DBWrapper:
         # This has to be done before we call mget for them.
         pipe.watch(*unique_keys)
 
-        # Retrieve all of the specified keys from the database
-        # All database calls to pipe will be executed immediately,
-        # since we have not yet called pipe.multi()
-        data_str_list: list[None|str] = pipe.mget(*unique_keys)
-        data_str_map: dict[str, str|None] = dict(zip(unique_keys, data_str_list))
-
-        # To preserve the existing CFS behavior, if any entries are missing
-        # in the database, we will raise an exception for the first one we find (based on
-        # the order of the patch data in key_patch_tuples)
-        for key in unique_keys:
-            if not data_str_map[key]:
-                raise self.no_entry_exception(key)
-
-        # Mapping from keys to the entry for that key
-        orig_data_map: dict[str, DbEntry] = { key: json.loads(data_str)
-                                              for key, data_str in data_str_map.items() }
-
+        # Load the data for the keys from the database, and JSON decode it
+        orig_data_map = self._patch_list_load_entry_data(pipe, unique_keys)
         patched_data_map = orig_data_map.copy()
 
         for key, patch in key_patch_tuples:
