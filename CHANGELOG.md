@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `DBWrapper.patch` to use it
     - CASMCMS-9578: `DBWrapper.patch_all_entries`: Use Redis watch/execute pipeline
     - CASMCMS-9563: Create `DBWrapper.patch_list`
+    - CASMCMS-9580: Modify `patch_all` so it does not call `patch_all_entries`, in order to avoid the
+      unnecessary memory usage of storing all the patched entry data
+    - CASMCMS-9580: Modify `patch_all_entries` so that it just returns the entries, not tuples of ids and entries,
+      since that was only being done for the benefit of `patch_all`
+    - CASMCMS-9580: Rename `patch_all*` methods to better reflect their behavior
+        - `patch_all_entries` becomes `patch_all_return_entries`
+        - `patch_all` becomes `patch_all_return_keys`
 
 ## [1.27.0] - 07/03/2025
 ### Changed
