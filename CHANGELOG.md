@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9576: Create `redis_pipeline` decorator; modify `DBWrapper.delete_all` and
       `DBWrapper.patch` to use it
     - CASMCMS-9578: `DBWrapper.patch_all_entries`: Use Redis watch/execute pipeline
+    - CASMCMS-9563: Create `DBWrapper.patch_list`
 
 ## [1.27.0] - 07/03/2025
 ### Changed

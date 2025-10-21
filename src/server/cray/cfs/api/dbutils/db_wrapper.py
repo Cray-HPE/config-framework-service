@@ -22,7 +22,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from collections.abc import Generator, Iterable
+from collections.abc import Collection, Generator, Iterable, Sequence
+import copy
 import itertools
 import logging
 import time
@@ -323,7 +324,7 @@ class DBWrapper:
     @redis_pipeline
     def _patch_batch(self,
         pipe: redis.client.Pipeline,
-        keys: Iterable[str],
+        keys: Collection[str],
         data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler],
@@ -354,6 +355,11 @@ class DBWrapper:
         """
         # Mapping from keys to the updated data
         patched_data_map: dict[str, DbEntry] = {}
+
+        # If no keys were specified we're done already
+        if not keys:
+            return patched_data_map
+
         # Mapping from keys to the updated JSON-encoded data strings
         patched_datastr_map: dict[str, str] = {}
 
@@ -364,7 +370,7 @@ class DBWrapper:
         # Retrieve all of the specified keys from the database
         # All database calls to pipe will be executed immediately,
         # since we have not yet called pipe.multi()
-        data_str_list = pipe.mget(*keys)
+        data_str_list: list[None|str] = pipe.mget(*keys)
 
         for key, data_str in zip(keys, data_str_list):
             if not data_str:
@@ -420,7 +426,7 @@ class DBWrapper:
             pipe.execute()
 
         # If we get here, it means that either the pipe executed successfully, or (if we had no
-        # keys to be patchd in this batch) it was not executed at all. Either way, add the
+        # keys to be patched in this batch) it was not executed at all. Either way, add the
         # patched keys (if any) to the done list, and then return the patched data map.
         keys_done.update(patched_data_map)
         return patched_data_map
@@ -532,6 +538,174 @@ class DBWrapper:
                                                       patch=patch,
                                                       update_handler=update_handler) ]
 
+    @redis_pipeline
+    def _patch_list(self,
+        pipe: redis.client.Pipeline,
+        key_patch_tuples: Sequence[tuple[str, DbEntry]],
+        update_handler: Optional[UpdateHandler]
+    ) -> dict[str, DbEntry]:
+        """
+        Helper for patch_list method
+
+        Note:
+        The pipe argument does not exist as far as the caller of this method is concerned.
+        That argument is automatically provided by the @redis_pipeline wrapper.
+
+        Given a list of (key, patch for that entry) tuples, apply the specified patch to the
+        specified key for every tuple in the list.
+
+        If any of the entries does not exist in the DB, none of the patches are applied, and
+        DBNoEntryError is raised for the first missing entry that is identified.
+
+        If the patch fails because of database changes that occur,
+        then a Redis WatchError will be raised, which the caller must
+        handle as they see fit.
+
+        If the patch succeeds, this function returns a list of tuples that corresponds to
+        the input list of tuples. The first element of each tuple will be the same as the
+        input list tuples -- the DB key. The second element of each tuple will be the patched
+        entry data AT THAT POINT. Emphasis because it is possible that the same key is listed
+        twice. In that case, the first instance of that key in the output will show that entry
+        after the first patch was applied, the second instance will show the entry after the
+        second patch was applied, and so on. The final instance for any given DB key in the
+        output reflects the value of that DB entry after all patches have been applied.
+
+        Note that in the case that multiple patches are applied to the same key, the data is only
+        written to the database once, with the final patched value. None of the intermediate
+        patched values are written to the database.
+        """
+        # List of output tuples:
+        key_patched_tuples: list[tuple[str, DbEntry]]
+
+        # Extract the keys from the tuples
+        all_keys = [ key for key, _ in key_patch_tuples ]
+
+        # Create a list of the unique key values (since the same key could be in multiple tuples).
+        # Sort this list in order of the earliest occurance in the input tuples list, to preserve
+        # the existing CFS behavior.
+        unique_keys: list[str] = sorted(set(all_keys), key=all_keys.index)
+
+        # Start by watching all of the keys
+        # This has to be done before we call mget for them.
+        pipe.watch(*unique_keys)
+
+        # Retrieve all of the specified keys from the database
+        # All database calls to pipe will be executed immediately,
+        # since we have not yet called pipe.multi()
+        data_str_list: list[None|str] = pipe.mget(*unique_keys)
+        data_str_map: dict[str, str] = dict(zip(unique_keys, data_str_list))
+
+        # To preserve the existing CFS behavior, if any entries are missing
+        # in the database, we will raise an exception for the first one we find (based on
+        # the order of the patch data in key_patch_tuples)
+        for key in unique_keys:
+            if not data_str_map[key]:
+                raise self.no_entry_exception(key)
+
+        # Mapping from keys to the entry for that key
+        orig_data_map: dict[str, DbEntry] = { key: json.loads(data_str)
+                                              for key, data_str in data_str_map.items() }
+
+        patched_data_map = orig_data_map.copy()
+
+        for key, patch in key_patch_tuples:
+            # Apply the patch to the current data,
+            # and call the update_handler
+            orig_data = copy.deepcopy(patched_data_map[key])
+            new_data = self._update(orig_data, patch)
+            if update_handler:
+                new_data = update_handler(new_data)
+
+            patched_data_map[key] = new_data
+            key_patched_tuples.append((key, new_data))
+
+        # Make a new map which consists of all DB data that has actually changed
+        # as a result of the patch, encoded into JSON data strings
+        patched_datastr_map = { key: json.dumps(patched_data)
+                                for key, patched_data in patched_data_map.items()
+                                if patched_data != orig_data[key] }
+
+        if patched_datastr_map:
+            # Begin our transaction
+            # After this call to pipe.multi(), the database calls are NOT executed immediately.
+            pipe.multi()
+
+            # Queue the DB command to updated the specified keys with the patched data
+            pipe.mset(patched_datastr_map)
+
+            # Execute the pipeline
+            #
+            # At this point, if any entries still being watched have been changed since we
+            # started watching them (including being created or deleted), then a Redis
+            # WatchError exception will be raised and the mset command will not be executed.
+            # The caller of this function will include logic that decides how to handle this.
+            #
+            # Instead, if none of those entries has changed, then Redis will atomically execute
+            # all of the queued database commands. The return value of the pipe.execute()
+            # call is a list with the return values for all of the queued DB commands. In this
+            # case, that is just the mset call, and we do not care about its return value.
+            # If the mset failed, it would raise an exception, and that's all we really care
+            # about.
+            pipe.execute()
+
+        # If we get here, it means that either the pipe executed successfully, or none of the
+        # patches actually resulted in DB data changing. Either way, return.
+        return key_patched_tuples
+
+    @convert_db_watch_errors
+    def patch_list(
+        self, key_patch_tuples: Sequence[tuple[str, JsonDict]],
+        update_handler: Optional[UpdateHandler] = None
+    ) -> list[tuple[str, DbEntry]]:
+        """
+        Input is a list of tuples: (DB key, patch for that entry)
+        The specified patch is applied to the specified DB entry, for all tuples.
+        Returns a list of tuples of the entries that were patched. The tuples consist of the
+        DB key and the associated patched data.
+        If any of the entries does not exist in the DB, none of the patches are applied, and
+        DBNoEntryError is raised.
+        Raises DBTooBusyError if unable to complete the patches in time.
+        """
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # Keep looping until the patch succeeds or we run out of time.
+        #
+        # The stop conditions are handled inside the loop, so the check condition here
+        # is just True
+        while True:
+            # The main work in the loop is enclosed in this try/except block.
+            # This is to catch Redis WatchErrors, which are raised when a change to the database
+            # caused our patch operation to abort. Any other exceptions that arise are
+            # not handled at this layer.
+            try:
+                # Because the patch data is being sent to us as a list, it should be short enough
+                # that we do not require batch processing. This also means we can guarantee that
+                # either the entire patch is applied or none of it.
+                #
+                # Call our helper function to patch the data and return the result
+                # At the time of this writing, pylint is not clever enough to understand
+                # the function signature mutation performed by the @redis_pipeline
+                # decorator, and so it falsely reports that we are missing an argument
+                # here.
+                # pylint: disable=no-value-for-parameter
+                return self._patch_list(key_patch_tuples, update_handler)
+            except redis.exceptions.WatchError as err:
+                # This means one of the keys changed values between when we filtered it and when
+                # we went to update the DB with the patched data.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key changed (%s); retrying", err)
+
+
     def _update(self, data: JsonDict, new_data: JsonDict) -> JsonDict:
         """Recursively patches JSON to allow sub-fields to be patched."""
         for k, v in new_data.items():
@@ -553,7 +727,7 @@ class DBWrapper:
     @redis_pipeline
     def _delete_batch(self,
         pipe: redis.client.Pipeline,
-        keys: Iterable[str],
+        keys: Collection[str],
         data_filter: DataFilter,
         keys_done: set[str]
     ) -> dict[str, DbEntry]:
@@ -583,6 +757,10 @@ class DBWrapper:
         """
         # Mapping from keys to their deleted entry data
         deleted_data_map: dict[str, DbEntry] = {}
+
+        # If no keys are specified as input, we are done
+        if not keys:
+            return deleted_data_map
 
         # Start by watching all of the keys in this batch
         # This has to be done before we call mget for them.
