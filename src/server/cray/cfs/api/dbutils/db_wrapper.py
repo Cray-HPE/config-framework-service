@@ -575,7 +575,7 @@ class DBWrapper:
         patched values are written to the database.
         """
         # List of output tuples:
-        key_patched_tuples: list[tuple[str, DbEntry]]
+        key_patched_tuples: list[tuple[str, DbEntry]] = []
 
         # Extract the keys from the tuples
         all_keys = [ key for key, _ in key_patch_tuples ]
