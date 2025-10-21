@@ -432,15 +432,14 @@ class DBWrapper:
         return patched_data_map
 
     @convert_db_watch_errors
-    def patch_all_entries(
+    def patch_all_return_entries(
         self, data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler] = None
-    ) -> list[tuple[str, DbEntry]]:
+    ) -> list[DbEntry]:
         """
         Patch multiple resources in the database.
-        Returns a list of tuples of the entries that were patched. The tuples consist of the
-        DB key and the associated patched data.
+        Returns a list of the patched entries (sorted by key order).
         Raises DBTooBusyError if unable to complete the patches in time.
         """
         # Set the time after which we will perform no more DB retries.
@@ -519,13 +518,12 @@ class DBWrapper:
                 LOGGER.warning("Key changed (%s); retrying", err)
 
         # If we get here, it means we ended up processing all of the keys in our starting list.
-        # So return a list of the patched data, in the form of (key, patched_data) tuples
-        # Sort the list (which will mean by key, since that is the first field in the tuple),
-        # to preserve the previous behavior of this function.
-        return sorted(patched_data_map.items())
+        # So return a list of the patched data.
+        # Sort the list by key, to preserve the previous behavior of this function.
+        return [ patched_data_map[key] for key in sorted(patched_data_map) ]
 
     @convert_db_watch_errors
-    def patch_all(
+    def patch_all_return_keys(
         self, data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler] = None
@@ -533,10 +531,88 @@ class DBWrapper:
         """
         Patch multiple resources in the database.
         Return list of the IDs of the patched entries.
+        Raises DBTooBusyError if unable to complete the patches in time.
         """
-        return [ k for k, _ in self.patch_all_entries(data_filter=data_filter,
-                                                      patch=patch,
-                                                      update_handler=update_handler) ]
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # keys_left starts being set to all of the keys in the database.
+        # We will remove keys from it as we process them (either by patching
+        # them or determining that they do not need to be patched).
+        keys_left: list[str] = self.get_keys()
+
+        # List of keys whose entries have been patched
+        patched_ids: list[str] = []
+
+        # The patch_all_entries method has a big loop at its heart.
+        # The keys_done variable is used to keep track of which keys have been processed
+        # in the current iteration of the loop.
+        keys_done: set[str] = set()
+
+        # Keep looping until either we have processed all of the keys in our keys_left list -- we
+        # do not worry about keys that are created after this method starts running.
+        #
+        # The DB busy scenario is handled by an exception being raised, so it bypasses the
+        # regular loop logic.
+        while keys_left:
+            if keys_done:
+                # keys_done is non-empty, which means that some keys were processed on
+                # the previous iteration of the loop. So we remove those from our list of
+                # remaining keys
+                keys_left = [ k for k in keys_left if k not in keys_done ]
+
+                # If that removed the final keys from the list, exit the loop
+                if not keys_left:
+                    break
+
+                # Clear the keys_done set, so it is empty to start this iteration
+                keys_done.clear()
+
+            # The main work in the loop is enclosed in this try/except block.
+            # This is to catch Redis WatchErrors, which are raised when a change to the database
+            # caused one of our patch operations to abort. Any other exceptions that arise are
+            # not handled at this layer.
+            try:
+                # Process the keys in batches, rather than all at once.
+                # See defs.py for details on DB_BATCH_SIZE.
+                for key_batch in itertools.batched(keys_left, DB_BATCH_SIZE):
+                    # Call our helper function on this batch of keys
+                    # At the time of this writing, pylint is not clever enough to understand
+                    # the function signature mutation performed by the @redis_pipeline
+                    # decorator, and so it falsely reports that we are missing an argument
+                    # here.
+                    # pylint: disable=no-value-for-parameter
+                    batch_patched_data_map = self._patch_batch(key_batch,
+                                                               data_filter,
+                                                               patch,
+                                                               update_handler,
+                                                               keys_done)
+                    # If we get here, it means the patches (if any) completed successfully.
+                    # The helper function will have already updated keys_done with any
+                    # keys that did not need to be patched, and any keys that were patched.
+
+                    # Update patched_ids from this batch
+                    patched_ids.extend(batch_patched_data_map)
+            except redis.exceptions.WatchError as err:
+                # This means one of the keys changed values between when we filtered it and when
+                # we went to update the DB with the patched data.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key changed (%s); retrying", err)
+
+        # If we get here, it means we ended up processing all of the keys in our starting list.
+        # So return a list of the patched ids.
+        # Sort the list, to preserve the previous behavior of this function.
+        return sorted(patched_ids)
+
 
     def _patch_list_load_entry_data(
         self,
