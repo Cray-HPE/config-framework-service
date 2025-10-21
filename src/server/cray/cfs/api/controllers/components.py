@@ -392,9 +392,10 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
     v3_patch = _set_auto_fields(v3_patch)
 
-    response = []
-    for _, v3_patched_comp in DB.patch_all_entries(component_filter, v3_patch, _update_handler):
-        response.append(convert_component_to_v2(v3_patched_comp))
+    response = [ convert_component_to_v2(v3_patched_comp)
+                 for v3_patched_comp in DB.patch_all_return_entries(component_filter,
+                                                                    v3_patch,
+                                                                    _update_handler) ]
     return response, 200
 
 
@@ -478,7 +479,7 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
     # the KeyError being raised.
     patch.pop("id", None)
     patch = _set_auto_fields(patch)
-    component_ids = DB.patch_all(component_filter, patch, _update_handler)
+    component_ids = DB.patch_all_return_keys(component_filter, patch, _update_handler)
     response = {"component_ids": component_ids}
     return response, 200
 
