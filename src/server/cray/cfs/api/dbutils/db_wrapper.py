@@ -593,7 +593,7 @@ class DBWrapper:
         # All database calls to pipe will be executed immediately,
         # since we have not yet called pipe.multi()
         data_str_list: list[None|str] = pipe.mget(*unique_keys)
-        data_str_map: dict[str, str] = dict(zip(unique_keys, data_str_list))
+        data_str_map: dict[str, str|None] = dict(zip(unique_keys, data_str_list))
 
         # To preserve the existing CFS behavior, if any entries are missing
         # in the database, we will raise an exception for the first one we find (based on
