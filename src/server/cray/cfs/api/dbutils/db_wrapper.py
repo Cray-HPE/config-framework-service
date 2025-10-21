@@ -543,7 +543,7 @@ class DBWrapper:
         pipe: redis.client.Pipeline,
         key_patch_tuples: Sequence[tuple[str, DbEntry]],
         update_handler: Optional[UpdateHandler]
-    ) -> dict[str, DbEntry]:
+    ) -> list[tuple[str, DbEntry]]:
         """
         Helper for patch_list method
 
