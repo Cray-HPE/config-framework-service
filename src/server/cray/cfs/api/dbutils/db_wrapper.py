@@ -596,6 +596,7 @@ class DBWrapper:
                     # keys that did not need to be patched, and any keys that were patched.
 
                     # Update patched_ids from this batch
+                    # This appends the keys of batch_patched_data_map to the end of the patched_ids list.
                     patched_ids.extend(batch_patched_data_map)
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
