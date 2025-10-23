@@ -342,7 +342,7 @@ def patch_v2_components_list(data: list[V2ComponentData]) -> V2PatchComponentsRe
     for component_id, component_data in components:
         component_data = dbutils.convert_data_from_v2(component_data, V2Component)
         component_data = _set_auto_fields(component_data)
-        response_data = DB.patch(component_id, component_data, _update_handler)
+        response_data = DB.patch(component_id, component_data, update_handler=_update_handler)
         response.append(convert_component_to_v2(response_data))
     return response, 200
 
@@ -395,7 +395,7 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     response = [ convert_component_to_v2(v3_patched_comp)
                  for v3_patched_comp in DB.patch_all_return_entries(component_filter,
                                                                     v3_patch,
-                                                                    _update_handler) ]
+                                                                    update_handler=_update_handler) ]
     return response, 200
 
 
@@ -431,7 +431,7 @@ def patch_v3_components_list(data: list[V3ComponentData]) -> V3PatchComponentsRe
     component_ids = []
     for component_id, component_data in components:
         component_data = _set_auto_fields(component_data)
-        DB.patch(component_id, component_data, _update_handler)
+        DB.patch(component_id, component_data, update_handler=_update_handler)
         component_ids.append(component_id)
     response = {"component_ids": component_ids}
     return response, 200
@@ -479,7 +479,7 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
     # the KeyError being raised.
     patch.pop("id", None)
     patch = _set_auto_fields(patch)
-    component_ids = DB.patch_all_return_keys(component_filter, patch, _update_handler)
+    component_ids = DB.patch_all_return_keys(component_filter, patch, update_handler=_update_handler)
     response = {"component_ids": component_ids}
     return response, 200
 
@@ -575,7 +575,7 @@ def patch_component_v2(component_id):
             detail=str(err))
     data = dbutils.convert_data_from_v2(data, V2Component)
     data = _set_auto_fields(data)
-    response_data = DB.patch(component_id, data, _update_handler)
+    response_data = DB.patch(component_id, data, update_handler=_update_handler)
     return convert_component_to_v2(response_data), 200
 
 
@@ -595,7 +595,7 @@ def patch_component_v3(component_id):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
     data = _set_auto_fields(data)
-    return DB.patch(component_id, data, _update_handler), 200
+    return DB.patch(component_id, data, update_handler=_update_handler), 200
 
 
 @dbutils.redis_error_handler
