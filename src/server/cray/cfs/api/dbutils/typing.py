@@ -45,5 +45,7 @@ DbKey: TypeAlias = Union[str, bytes]
 DatabaseNames = Literal["options", "sessions", "components", "configurations", "sources"]
 DbIdentifier: TypeAlias = Union[DatabaseNames, int]
 DataFilter: TypeAlias = Callable[[DbEntry], bool]
+
+PatchHandler: TypeAlias = Callable[[DbEntry, JsonDict], DbEntry]
 UpdateHandler: TypeAlias = Callable[[DbEntry], DbEntry]
 DeletionHandler: TypeAlias = Callable[[DbEntry], None]

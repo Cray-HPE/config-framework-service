@@ -50,6 +50,7 @@ from .typing import (
                         DbKey,
                         DeletionHandler,
                         JsonDict,
+                        PatchHandler,
                         UpdateHandler
                     )
 
@@ -218,7 +219,8 @@ class DBWrapper:
         *,
         key: DbKey,
         patch_data: DbEntry,
-        update_handler: Optional[UpdateHandler]
+        update_handler: Optional[UpdateHandler],
+        patch_handler: PatchHandler
     ) -> DbEntry:
         """
         Helper function for patch, which tries to apply the patch inside a Redis pipeline.
@@ -243,7 +245,7 @@ class DBWrapper:
         orig_data = json.loads(data_str)
 
         # Apply the patch_data to the current data
-        new_data = patch_dict(orig_data, patch_data)
+        new_data = patch_handler(orig_data, patch_data)
 
         # Call the update handler, if one was specified
         if update_handler:
@@ -289,7 +291,8 @@ class DBWrapper:
         key: DbKey,
         patch_data: DbEntry,
         *,
-        update_handler: Optional[UpdateHandler] = None
+        update_handler: Optional[UpdateHandler] = None,
+        patch_handler: PatchHandler = patch_dict
     ) -> DbEntry:
         """
         Patch data in the database.
@@ -317,7 +320,8 @@ class DBWrapper:
                 # pylint: disable=no-value-for-parameter
                 return self._patch(key=key,
                                    patch_data=patch_data,
-                                   update_handler=update_handler)
+                                   update_handler=update_handler,
+                                   patch_handler=patch_handler)
             except redis.exceptions.WatchError as err:
                 # This means the entry changed values while the helper function was
                 # trying to patch it.
@@ -338,6 +342,7 @@ class DBWrapper:
         data_filter: DataFilter,
         patch: JsonDict,
         update_handler: Optional[UpdateHandler],
+        patch_handler: PatchHandler,
         keys_done: set[str]
     ) -> dict[str, DbEntry]:
         """
@@ -399,7 +404,7 @@ class DBWrapper:
 
             # Apply the patch to the current data,
             # and call the update_handler
-            new_data = patch_dict(orig_data, patch)
+            new_data = patch_handler(orig_data, patch)
             if update_handler:
                 new_data = update_handler(new_data)
 
@@ -447,7 +452,8 @@ class DBWrapper:
         data_filter: DataFilter,
         patch: JsonDict,
         *,
-        update_handler: Optional[UpdateHandler] = None
+        update_handler: Optional[UpdateHandler] = None,
+        patch_handler: PatchHandler = patch_dict
     ) -> list[DbEntry]:
         """
         Patch multiple resources in the database.
@@ -511,6 +517,7 @@ class DBWrapper:
                                                                data_filter=data_filter,
                                                                patch=patch,
                                                                update_handler=update_handler,
+                                                               patch_handler=patch_handler,
                                                                keys_done=keys_done)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
@@ -540,7 +547,8 @@ class DBWrapper:
         data_filter: DataFilter,
         patch: JsonDict,
         *,
-        update_handler: Optional[UpdateHandler] = None
+        update_handler: Optional[UpdateHandler] = None,
+        patch_handler: PatchHandler = patch_dict
     ) -> list[str]:
         """
         Patch multiple resources in the database.
@@ -604,6 +612,7 @@ class DBWrapper:
                                                                data_filter=data_filter,
                                                                patch=patch,
                                                                update_handler=update_handler,
+                                                               patch_handler=patch_handler,
                                                                keys_done=keys_done)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
@@ -666,7 +675,8 @@ class DBWrapper:
         pipe: redis.client.Pipeline,
         *,
         key_patch_tuples: Sequence[tuple[str, DbEntry]],
-        update_handler: Optional[UpdateHandler]
+        update_handler: Optional[UpdateHandler],
+        patch_handler: PatchHandler
     ) -> list[tuple[str, DbEntry]]:
         """
         Helper for patch_list method
@@ -721,7 +731,7 @@ class DBWrapper:
             # Apply the patch to the current data,
             # and call the update_handler
             orig_data = copy.deepcopy(patched_data_map[key])
-            new_data = patch_dict(orig_data, patch)
+            new_data = patch_handler(orig_data, patch)
             if update_handler:
                 new_data = update_handler(new_data)
 
@@ -766,7 +776,8 @@ class DBWrapper:
         self,
         key_patch_tuples: Sequence[tuple[str, JsonDict]],
         *,
-        update_handler: Optional[UpdateHandler] = None
+        update_handler: Optional[UpdateHandler] = None,
+        patch_handler: PatchHandler = patch_dict
     ) -> list[tuple[str, DbEntry]]:
         """
         Input is a list of tuples: (DB key, patch for that entry)
@@ -805,7 +816,8 @@ class DBWrapper:
                 # here.
                 # pylint: disable=no-value-for-parameter
                 return self._patch_list(key_patch_tuples=key_patch_tuples,
-                                        update_handler=update_handler)
+                                        update_handler=update_handler,
+                                        patch_handler=patch_handler)
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
                 # we went to update the DB with the patched data.
