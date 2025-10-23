@@ -38,5 +38,7 @@ type DbKey = str | bytes
 DatabaseNames = Literal["options", "sessions", "components", "configurations", "sources"]
 type DbIdentifier = DatabaseNames | int
 type DataFilter = Callable[[DbEntry], bool]
+
+type PatchHandler = Callable[[DbEntry, JsonDict], DbEntry]
 type UpdateHandler = Callable[[DbEntry], DbEntry]
 type DeletionHandler = Callable[[DbEntry], None]

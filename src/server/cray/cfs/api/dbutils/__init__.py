@@ -30,4 +30,12 @@ from .conversions import convert_data_from_v2, convert_data_to_v2, patch_dict
 from .db_wrapper import get_wrapper
 from .decorators import redis_error_handler
 from .exceptions import DBError, DBNoEntryError, DBTooBusyError
-from .typing import DbEntry, JsonData, JsonDict, JsonList
+from .typing import (
+                        DbEntry,
+                        DeletionHandler,
+                        JsonData,
+                        JsonDict,
+                        JsonList,
+                        PatchHandler,
+                        UpdateHandler
+                    )
