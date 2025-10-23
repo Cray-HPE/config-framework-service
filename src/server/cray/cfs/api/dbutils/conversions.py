@@ -23,7 +23,9 @@
 #
 
 """
-Utilities for converting data between CFS v2 and v3 format
+Utilities for converting data:
+- converting between CFS v2 and v3 format
+- applying a patch to data
 """
 
 from typing import Any
@@ -113,3 +115,13 @@ def _convert_data_from_v2(v2_data: JsonData, data_type: Any) -> JsonData:
             v2_data = {}
         return convert_data_from_v2(v2_data, data_type)
     return v2_data
+
+
+def patch_dict(orig_dict: JsonDict, dict_updates: JsonDict) -> JsonDict:
+    """Recursively patches JSON in-place to allow sub-fields to be patched."""
+    for k, v in dict_updates.items():
+        if isinstance(v, dict):
+            orig_dict[k] = patch_dict(orig_dict.get(k, {}), v)
+        else:
+            orig_dict[k] = v
+    return orig_dict

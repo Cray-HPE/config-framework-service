@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9580: Rename `patch_all*` methods to better reflect their behavior
         - `patch_all_entries` becomes `patch_all_return_entries`
         - `patch_all` becomes `patch_all_return_keys`
+    - Refactor `DBWrapper._update` method into `patch_dict` regular function
 
 ## [1.27.0] - 07/03/2025
 ### Changed
