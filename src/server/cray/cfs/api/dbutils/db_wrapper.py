@@ -132,7 +132,7 @@ class DBWrapper:
             raise self.no_entry_exception(key)
         return data
 
-    def get_keys(self, start_after_key: Optional[str] = None) -> list[str]:
+    def get_keys(self, *, start_after_key: Optional[str] = None) -> list[str]:
         """
         Returns a sorted list of all keys (as str) in the database.
         If start_after_key is specified, only keys lexically after the
@@ -153,7 +153,7 @@ class DBWrapper:
         # Return the list starting after that index
         return sorted_keys[i+1:]
 
-    def iter_values(self, start_after_key: Optional[str] = None) -> Generator[DbEntry, None, None]:
+    def iter_values(self, *, start_after_key: Optional[str] = None) -> Generator[DbEntry, None, None]:
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
@@ -172,7 +172,9 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def get_all(
-        self, limit: int = 0,
+        self,
+        *,
+        limit: int = 0,
         after_id: Optional[str] = None,
         data_filters: Optional[Iterable[DataFilter]] = None
     ) -> tuple[list[DbEntry], bool]:
@@ -184,7 +186,7 @@ class DBWrapper:
         page_full = False
         next_page_exists = False
         data_page = []
-        for data in self.iter_values(after_id):
+        for data in self.iter_values(start_after_key=after_id):
             # Data filtering happens here rather than after; due to
             # paging/memory constraints, we can't load all data and then filter on the results.
             if data_filters and not all(data_filter(data) for data_filter in data_filters):
@@ -213,6 +215,7 @@ class DBWrapper:
     @redis_pipeline
     def _patch(self,
         pipe: redis.client.Pipeline,
+        *,
         key: DbKey,
         patch_data: DbEntry,
         update_handler: Optional[UpdateHandler]
@@ -282,8 +285,10 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def patch(
-        self, key: DbKey,
+        self,
+        key: DbKey,
         patch_data: DbEntry,
+        *,
         update_handler: Optional[UpdateHandler] = None
     ) -> DbEntry:
         """
@@ -310,7 +315,9 @@ class DBWrapper:
                 # decorator, and so it falsely reports that we are missing an argument
                 # here.
                 # pylint: disable=no-value-for-parameter
-                return self._patch(key, patch_data, update_handler)
+                return self._patch(key=key,
+                                   patch_data=patch_data,
+                                   update_handler=update_handler)
             except redis.exceptions.WatchError as err:
                 # This means the entry changed values while the helper function was
                 # trying to patch it.
@@ -323,8 +330,10 @@ class DBWrapper:
                 LOGGER.warning("Key '%s' changed (%s); retrying", key, err)
 
     @redis_pipeline
-    def _patch_batch(self,
+    def _patch_batch(
+        self,
         pipe: redis.client.Pipeline,
+        *,
         keys: Collection[str],
         data_filter: DataFilter,
         patch: JsonDict,
@@ -434,8 +443,10 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def patch_all_return_entries(
-        self, data_filter: DataFilter,
+        self,
+        data_filter: DataFilter,
         patch: JsonDict,
+        *,
         update_handler: Optional[UpdateHandler] = None
     ) -> list[DbEntry]:
         """
@@ -496,11 +507,11 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_patched_data_map = self._patch_batch(key_batch,
-                                                               data_filter,
-                                                               patch,
-                                                               update_handler,
-                                                               keys_done)
+                    batch_patched_data_map = self._patch_batch(keys=key_batch,
+                                                               data_filter=data_filter,
+                                                               patch=patch,
+                                                               update_handler=update_handler,
+                                                               keys_done=keys_done)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
                     # keys that did not need to be patched, and any keys that were patched.
@@ -525,8 +536,10 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def patch_all_return_keys(
-        self, data_filter: DataFilter,
+        self,
+        data_filter: DataFilter,
         patch: JsonDict,
+        *,
         update_handler: Optional[UpdateHandler] = None
     ) -> list[str]:
         """
@@ -587,11 +600,11 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_patched_data_map = self._patch_batch(key_batch,
-                                                               data_filter,
-                                                               patch,
-                                                               update_handler,
-                                                               keys_done)
+                    batch_patched_data_map = self._patch_batch(keys=key_batch,
+                                                               data_filter=data_filter,
+                                                               patch=patch,
+                                                               update_handler=update_handler,
+                                                               keys_done=keys_done)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
                     # keys that did not need to be patched, and any keys that were patched.
@@ -619,6 +632,7 @@ class DBWrapper:
     def _patch_list_load_entry_data(
         self,
         pipe: redis.client.Pipeline,
+        *,
         unique_keys: Sequence[str]
     ) -> dict[str, DbEntry]:
         """
@@ -647,8 +661,10 @@ class DBWrapper:
                  for key, data_str in data_str_map.items() }
 
     @redis_pipeline
-    def _patch_list(self,
+    def _patch_list(
+        self,
         pipe: redis.client.Pipeline,
+        *,
         key_patch_tuples: Sequence[tuple[str, DbEntry]],
         update_handler: Optional[UpdateHandler]
     ) -> list[tuple[str, DbEntry]]:
@@ -698,7 +714,7 @@ class DBWrapper:
         pipe.watch(*unique_keys)
 
         # Load the data for the keys from the database, and JSON decode it
-        orig_data_map = self._patch_list_load_entry_data(pipe, unique_keys)
+        orig_data_map = self._patch_list_load_entry_data(pipe, unique_keys=unique_keys)
         patched_data_map = orig_data_map.copy()
 
         for key, patch in key_patch_tuples:
@@ -747,7 +763,9 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def patch_list(
-        self, key_patch_tuples: Sequence[tuple[str, JsonDict]],
+        self,
+        key_patch_tuples: Sequence[tuple[str, JsonDict]],
+        *,
         update_handler: Optional[UpdateHandler] = None
     ) -> list[tuple[str, DbEntry]]:
         """
@@ -786,7 +804,8 @@ class DBWrapper:
                 # decorator, and so it falsely reports that we are missing an argument
                 # here.
                 # pylint: disable=no-value-for-parameter
-                return self._patch_list(key_patch_tuples, update_handler)
+                return self._patch_list(key_patch_tuples=key_patch_tuples,
+                                        update_handler=update_handler)
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
                 # we went to update the DB with the patched data.
@@ -808,8 +827,10 @@ class DBWrapper:
         self.get_delete(key)
 
     @redis_pipeline
-    def _delete_batch(self,
+    def _delete_batch(
+        self,
         pipe: redis.client.Pipeline,
+        *,
         keys: Collection[str],
         data_filter: DataFilter,
         keys_done: set[str]
@@ -905,7 +926,9 @@ class DBWrapper:
 
     @convert_db_watch_errors
     def delete_all(
-        self, data_filter: DataFilter,
+        self,
+        data_filter: DataFilter,
+        *,
         deletion_handler: Optional[DeletionHandler] = None
     ) -> list[str]:
         """
@@ -966,9 +989,9 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_deleted_data_map = self._delete_batch(key_batch,
-                                                                data_filter,
-                                                                keys_done)
+                    batch_deleted_data_map = self._delete_batch(keys=key_batch,
+                                                                data_filter=data_filter,
+                                                                keys_done=keys_done)
                     # If we get here, it means the deletes completed successfully.
                     # The helper function will have updated keys_done with the keys that
                     # were deleted and the keys that did not need to be deleted.
