@@ -32,6 +32,7 @@ from typing import Optional
 import redis
 import ujson as json
 
+from .conversions import patch_dict
 from .decorators import convert_db_watch_errors, redis_pipeline
 from .defs import (
                     DATABASES,
@@ -239,7 +240,7 @@ class DBWrapper:
         orig_data = json.loads(data_str)
 
         # Apply the patch_data to the current data
-        new_data = self._update(orig_data, patch_data)
+        new_data = patch_dict(orig_data, patch_data)
 
         # Call the update handler, if one was specified
         if update_handler:
@@ -389,7 +390,7 @@ class DBWrapper:
 
             # Apply the patch to the current data,
             # and call the update_handler
-            new_data = self._update(orig_data, patch)
+            new_data = patch_dict(orig_data, patch)
             if update_handler:
                 new_data = update_handler(new_data)
 
@@ -704,7 +705,7 @@ class DBWrapper:
             # Apply the patch to the current data,
             # and call the update_handler
             orig_data = copy.deepcopy(patched_data_map[key])
-            new_data = self._update(orig_data, patch)
+            new_data = patch_dict(orig_data, patch)
             if update_handler:
                 new_data = update_handler(new_data)
 
@@ -796,16 +797,6 @@ class DBWrapper:
                 # We are not past the time limit, so just log a warning and we'll go back to the
                 # top of the loop.
                 LOGGER.warning("Key changed (%s); retrying", err)
-
-
-    def _update(self, data: JsonDict, new_data: JsonDict) -> JsonDict:
-        """Recursively patches JSON to allow sub-fields to be patched."""
-        for k, v in new_data.items():
-            if isinstance(v, dict):
-                data[k] = self._update(data.get(k, {}), v)
-            else:
-                data[k] = v
-        return data
 
     @convert_db_watch_errors
     def delete(self, key: DbKey) -> None:
