@@ -70,6 +70,9 @@ class ComponentIdListDict(TypedDict):
 V2ComponentData = NewType("V2ComponentData", dbutils.JsonDict)
 V3ComponentData = NewType("V3ComponentData", dbutils.JsonDict)
 
+V2ComponentPatch = NewType("V2ComponentPatch", dbutils.JsonDict)
+V3ComponentPatch = NewType("V3ComponentPatch", dbutils.JsonDict)
+
 V3FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured', '']
 V2FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured']
 
@@ -101,13 +104,13 @@ class V3ComponentsFilter(TypedDict, total=False):
 
 @final
 class V2ComponentsUpdate(TypedDict):
-    patch: V2ComponentData
+    patch: V2ComponentPatch
     filters: V2ComponentsFilter
 
 
 @final
 class V3ComponentsUpdate(TypedDict):
-    patch: V3ComponentData
+    patch: V3ComponentPatch
     filters: V3ComponentsFilter
 
 type V2GetComponentResponse = tuple[V2ComponentData, Literal[200]] | CxResponse
@@ -324,10 +327,10 @@ def patch_components_v2() -> V2PatchComponentsResponse:
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v2_components_list(data: list[V2ComponentData]) -> V2PatchComponentsResponse:
+def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchComponentsResponse:
     try:
         components = []
-        for component_data in data:
+        for component_data in v2_patch_list:
             component_id = component_data['id']
             if component_id not in DB:
                 return connexion.problem(
@@ -395,7 +398,8 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     response = [ convert_component_to_v2(v3_patched_comp)
                  for v3_patched_comp in DB.patch_all_return_entries(component_filter,
                                                                     v3_patch,
-                                                                    update_handler=_update_handler) ]
+                                                                    update_handler=_update_handler)
+               ]
     return response, 200
 
 
@@ -414,10 +418,10 @@ def patch_components_v3() -> V3PatchComponentsResponse:
        detail=f"Unexpected data type {type(data)}")
 
 
-def patch_v3_components_list(data: list[V3ComponentData]) -> V3PatchComponentsResponse:
+def patch_v3_components_list(v3_patch_list: list[V3ComponentPatch]) -> V3PatchComponentsResponse:
     try:
         components = []
-        for component_data in data:
+        for component_data in v3_patch_list:
             component_id = component_data['id']
             if component_id not in DB:
                 return connexion.problem(
@@ -527,7 +531,7 @@ def get_component_v3(component_id: str,
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def put_component_v2(component_id):
+def put_component_v2(component_id: str):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /v2/components/%s invoked put_component_v2", component_id)
     try:
@@ -544,7 +548,7 @@ def put_component_v2(component_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def put_component_v3(component_id):
+def put_component_v3(component_id: str):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /v3/components/%s invoked put_component_v3", component_id)
     try:
@@ -560,7 +564,7 @@ def put_component_v3(component_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_component_v2(component_id):
+def patch_component_v2(component_id: str):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v2/components/%s invoked patch_component_v2", component_id)
     if component_id not in DB:
@@ -581,7 +585,7 @@ def patch_component_v2(component_id):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_component_v3(component_id):
+def patch_component_v3(component_id: str):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v3/components/%s invoked patch_component_v3", component_id)
     if component_id not in DB:
