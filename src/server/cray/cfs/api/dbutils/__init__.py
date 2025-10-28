@@ -33,6 +33,7 @@ from .exceptions import DBError, DBNoEntryError, DBTooBusyError
 from .typing import (
                         DbEntry,
                         DeletionHandler,
+                        EntryChecker,
                         JsonData,
                         JsonDict,
                         JsonList,

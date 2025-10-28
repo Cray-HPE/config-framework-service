@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Refactor `DBWrapper._update` method into `patch_dict` regular function
     - Add option to specify alternate patch handling function to `DBWrapper` patch methods
     - Create `put_if_not_set` method for `DBWrapper`
+    - CASMCMS-9583: Create `conditional_delete` method for `DBWrapper`.
 
 ## [1.23.8] - 05/18/2026
 ### Added
