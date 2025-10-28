@@ -26,7 +26,6 @@ from collections.abc import Callable
 import functools
 import logging
 import threading
-import time
 from typing import overload, Literal, NewType
 
 import connexion
@@ -77,18 +76,41 @@ def _init():
     update_server_log_level()
 
 
-def cleanup_old_options():
-    try:
-        data = DB.get(OPTIONS_KEY)
-    except dbutils.DBNoEntryError as err:
-        LOGGER.debug(err)
-        return
-    if not data:
-        return
-    # Cleanup
-    model_data = V2Options.from_dict(data).to_dict() | V3Options.from_dict(data).to_dict()
+def patch_options_db(
+    patch_data: V3OptionsPatch,
+    **kwargs
+) -> V3OptionsData:
+    """
+    By specifying a copy of the defaults dictionary as the default_entry, this
+    means that if the options data is not in the DB, the default values will be
+    written to the DB.
+    """
+    return DB.patch(OPTIONS_KEY, patch_data, default_entry=DEFAULTS.copy(), **kwargs)
+
+
+def cleanup_old_options() -> None:
+    """
+    For this patch call, no patch data is provided, because our cleanup function
+    does not need it. But DB.patch requires patch_data to be specified, so
+    we pass an empty dictionary as the patch data.
+    We also do not care about the return value here -- we just want to initialize
+    (if needed) and clean (if needed) the options data.
+    """
+    patch_options_db({}, patch_handler=_cleanup_old_options)
+
+
+def _cleanup_old_options(options_data: JsonDict,
+                         _: JsonDict) -> V3OptionsData:
+    """
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
+    if not options_data:
+        # Nothing to clean up in an empty dict
+        return options_data
+    model_data = V2Options.from_dict(options_data).to_dict() | V3Options.from_dict(options_data).to_dict()
     clean_data = {k: v for k, v in model_data.items() if v is not None}
-    DB.put(OPTIONS_KEY, clean_data)
+    return clean_data
 
 
 def refresh_options_update_loglevel[**P, R](func: Callable[P, R]) -> Callable[P, R]:
@@ -127,27 +149,27 @@ def get_options_v3():
 
 
 def get_options_data():
-    try:
-        current_data = DB.get(OPTIONS_KEY)
-    except dbutils.DBNoEntryError as err:
-        LOGGER.debug(err)
-        current_data = None
-    return _check_defaults(current_data)
+    """
+    We pass an empty dict as the patch data, because our patch handler doesn't
+    need it.
+    We specify an empty dict as a default entry to guarantee that we will get back
+    options data (rather than DBNoEntryError)
+    This effectively is a very fancy GET operation in the case where all of the options
+    are already present in the DB
+    """
+    return patch_options_db({}, patch_handler=_set_defaults)
 
 
-def _check_defaults(data):
-    """Adds defaults to the options data if they don't exist"""
-    put = False
-    if not data:
-        data = {}
-        put = True
+def _set_defaults(options_data: V3OptionsData, _: JsonDict) -> V3OptionsData:
+    """
+    Adds defaults to the options data if they don't exist
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
     for key, value in DEFAULTS.items():
-        if key not in data:
-            data[key] = value
-            put = True
-    if put:
-        return DB.put(OPTIONS_KEY, data)
-    return data
+        if key not in options_data:
+            options_data[key] = value
+    return options_data
 
 
 @dbutils.redis_error_handler
@@ -185,9 +207,7 @@ def _patch_options(v3_patch: V3OptionsPatch) -> V3OptionsData:
     Helper function to do the work of applying a V3 patch, since
     this is also used by the V2 patch process.
     """
-    if OPTIONS_KEY not in DB:
-        DB.put(OPTIONS_KEY, {})
-    new_v3_data = DB.patch(OPTIONS_KEY, v3_patch)
+    new_v3_data = patch_options_db(v3_patch)
     if "logging_level" in v3_patch:
         update_server_log_level()
     return new_v3_data, 200
