@@ -337,25 +337,28 @@ def patch_components_v2() -> V2PatchComponentsResponse:
 
 
 def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchComponentsResponse:
+    v3_patch_list: list[V3ComponentPatch] = []
     try:
-        components = []
-        for component_data in v2_patch_list:
-            component_id = component_data['id']
-            if component_id not in DB:
-                return connexion.problem(
-                    status=404, title="Component not found.",
-                    detail=f"Component {component_id} could not be found")
-            components.append((component_id, component_data))
+        while v2_patch_list:
+            # Pop each entry off the input list in order to reduce memory use
+            v2_patch = v2_patch_list.pop(0)
+            v3_patch_list.append(dbutils.convert_data_from_v2(v2_patch, V2Component))
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
+
+    v3_patch_list_result = _patch_v3_components_list(v3_patch_list)
+    if not isinstance(v3_patch_list_result, list):
+        # This means it is a CxResponse, so we just return that -- the error responses
+        # are the same for CFS v2 and v3 for this endpoint
+        return v3_patch_list_result
+    # This means we got back a list of tuples: component_id, v3_patched_component_data
     response: list[V2ComponentData] = []
-    for component_id, component_data in components:
-        component_data = dbutils.convert_data_from_v2(component_data, V2Component)
-        component_data = _set_auto_fields(component_data)
-        response_data = DB.patch(component_id, component_data, update_handler=_update_handler)
-        response.append(convert_component_to_v2(response_data))
+    while v3_patch_list_result:
+        # We only care about the component data, which is the second element of each tuple
+        _, v3_component_data = v3_patch_list_result.pop(0)
+        response.append(convert_component_to_v2(v3_component_data))
     return response, 200
 
 
@@ -428,26 +431,41 @@ def patch_components_v3() -> V3PatchComponentsResponse:
 
 
 def patch_v3_components_list(v3_patch_list: list[V3ComponentPatch]) -> V3PatchComponentsResponse:
+    v3_patch_list_result = _patch_v3_components_list(v3_patch_list)
+    if not isinstance(v3_patch_list_result, list):
+        # This means it is a CxResponse, so we just return that
+        return v3_patch_list_result
+    # This means we got back a list of tuples: component_id, patched_component_data
+    response = {"component_ids": [ component_id for component_id, _ in v3_patch_list_result ] }
+    return response, 200
+
+
+def _patch_v3_components_list(
+    v3_patch_list: list[V3ComponentPatch]
+) -> list[tuple[str, V3ComponentData]] | CxResponse:
+    id_patch_tuples: list[tuple[str, V3ComponentPatch]] = []
     try:
-        components = []
-        for component_data in v3_patch_list:
-            component_id = component_data['id']
+        while v3_patch_list:
+            # Pop each item off as we go, to reduce memory usage
+            v3_patch = v3_patch_list.pop(0)
+            component_id = v3_patch['id']
             if component_id not in DB:
                 return connexion.problem(
                     status=404, title="Component not found.",
                     detail=f"Component {component_id} could not be found")
-            components.append((component_id, component_data))
+            id_patch_tuples.append((component_id, _set_auto_fields(v3_patch)))
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    component_ids = []
-    for component_id, component_data in components:
-        component_data = _set_auto_fields(component_data)
-        DB.patch(component_id, component_data, update_handler=_update_handler)
-        component_ids.append(component_id)
-    response = {"component_ids": component_ids}
-    return response, 200
+
+    try:
+        return DB.patch_list(id_patch_tuples, update_handler=_update_handler)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Component not found.",
+            detail=f"Component {err.key} could not be found")
 
 
 def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsResponse:
@@ -578,10 +596,6 @@ def put_component_v3(component_id: str):
 def patch_component_v2(component_id: str):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v2/components/%s invoked patch_component_v2", component_id)
-    if component_id not in DB:
-        return connexion.problem(
-            status=404, title="Component not found.",
-            detail=f"Component {component_id} could not be found")
     try:
         v2_patch = connexion.request.get_json()
     except Exception as err:
@@ -589,9 +603,17 @@ def patch_component_v2(component_id: str):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
     v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
-    v3_patch = _set_auto_fields(v3_patch)
-    response_data = DB.patch(component_id, v3_patch, update_handler=_update_handler)
-    return convert_component_to_v2(response_data), 200
+    v3_patch_response = _patch_component_v3(component_id, v3_patch)
+    if not isinstance(v3_patch_response, tuple):
+        # This means it is a failure CxResponse.
+        # Those are the same for V2 and V3 for this endpoint, so just
+        # return it as-is
+        return v3_patch_response
+
+    # This means it is a tuple: V3ComponentData, 200
+    v3_component_data, status = v3_patch_response
+    assert status == 200, f"_patch_component_v3 returned unexpected status code: {status}"
+    return convert_component_to_v2(v3_component_data), 200
 
 
 @dbutils.redis_error_handler
@@ -599,18 +621,24 @@ def patch_component_v2(component_id: str):
 def patch_component_v3(component_id: str):
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v3/components/%s invoked patch_component_v3", component_id)
-    if component_id not in DB:
-        return connexion.problem(
-            status=404, title="Component not found.",
-            detail=f"Component {component_id} could not be found")
     try:
         v3_patch = connexion.request.get_json()
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
+    return _patch_component_v3(component_id, v3_patch)
+
+
+def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch):
     v3_patch = _set_auto_fields(v3_patch)
-    return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
+    try:
+        return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Component not found.",
+            detail=f"Component {component_id} could not be found")
 
 
 @dbutils.redis_error_handler
