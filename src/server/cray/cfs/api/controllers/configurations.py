@@ -356,22 +356,22 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
-    try:
-        v3_configuration_data = DB.get(configuration_id)
-    except dbutils.DBNoEntryError as err:
-        LOGGER.debug(err)
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
 
-    try:
-        v3_configuration_data = _set_auto_fields(v3_configuration_data)
-    except BranchConversionException as e:
-        return connexion.problem(
-            status=400, title="Error converting branch name to commit",
-            detail=str(e))
+    # THe second argument to the lambda function is not used, but is present so that
+    # patch_handler matches the expected function signature for a patch function.
+    patch_handler = lambda config_data, _: _set_auto_fields(v3_config_data)
 
-    return convert_configuration_to_v2(DB.put(configuration_id, v3_configuration_data)), 200
+    v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
+    if not isinstance(tuple, v3_patch_response):
+        # This means it is a connexion error, in which case the responses are the
+        # same for the v2 and v3 endpoints (except for tenancy-related errors, which
+        # should not be raised, since we are not checking for that in our patch function
+        return v3_patch_response
+
+    assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
+    patched_v3_configuration_data, status_code = v3_patch_response
+    assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"
+    return convert_configuration_to_v2(patched_v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
@@ -380,29 +380,48 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
 def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
+
+    tenant = get_tenant_from_header() or None
+    # Our patch handler has to make sure that this operation is kosher for this
+    # tenant (if any). If not, it will raise an exception, which the @rjeect_invalid_tenant
+    # decorator will catch and handle
+    patch_handler = partial(_check_tenant_patch_config, tenant=tenant)
+
+    return _patch_configuration_v3(configuration_id, patch_handler)
+
+
+def _patch_configuration_v3(configuration_id: str,
+                            patch_handler: PatchHandler) -> V3PatchConfigurationResponse:
     try:
-        v3_configuration_data = DB.get(configuration_id)
+        # When patching a configuration, no patch data is provided, because the
+        # data is updated based on its current values. Hence we pass an empty
+        # dictionary as the patch data.
+        patched_v3_configuration_data = DB.patch(configuration_id, {}, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
-
-    tenant = get_tenant_from_header() or None
-    if all([tenant,
-            tenant != v3_configuration_data.get('tenant_name', '')]):
-        # The @reject_invalid_tenant wrapper will catch this exception and return
-        # the appropriate connexion response
-        raise TenantForbiddenOperation()
-
-    try:
-        v3_configuration_data = _set_auto_fields(v3_configuration_data)
-    except BranchConversionException as e:
+    except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(e))
+            detail=str(err))
 
-    return DB.put(configuration_id, v3_configuration_data), 200
+    return patched_v3_configuration_data, 200
+
+
+
+def _check_tenant_patch_config(v3_config_data: V3ConfigurationData,
+                               _: JsonDict,
+                               *,
+                               tenant: Optional[str]) -> V3ConfigurationData:
+    """
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
+    if tenant and tenant != v3_config_data.get('tenant_name', ''):
+        raise TenantForbiddenOperation()
+    return _set_auto_fields(v3_config_data)
 
 
 @dbutils.redis_error_handler
@@ -419,50 +438,61 @@ def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationRespons
 def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
-    # Check if the delete request comes from a specific tenant
-    if (requesting_tenant := get_tenant_from_header()):
-        # If the configuration already exists and is not owned by the tenant doing
-        # the delete request, then we cannot allow them to delete the existing data for this key.
-        try:
-            existing_configuration = DB.get(configuration_id) or {}
-        except dbutils.DBNoEntryError as err:
-            LOGGER.debug(err)
-            return connexion.problem(
-                status=404, title="Configuration not found",
-                detail=f"Configuration {configuration_id} could not be found")
-        if existing_configuration.get('tenant_name', '') != requesting_tenant:
-            # The @reject_invalid_tenant wrapper will catch this exception and return
-            # the appropriate connexion response
-            raise TenantForbiddenOperation()
-    # Getting here either means that the request is not on behalf of a tenant, or that
-    # the request is on behalf of the tenant that owns this configuration. Either way,
-    # the delete should proceed.
-
-    # Note that this still does allow a small window for a race condition problem.
-    # Specifically, if the owner of this configuration is changed between now and when
-    # the DB delete happens, it could result in a tenant deleting a configuration
-    # that does not belong to them.
-    return _delete_configuration(configuration_id)
+    return _delete_configuration(configuration_id, requesting_tenant=get_tenant_from_header())
 
 
-def _delete_configuration(configuration_id: str) -> DeleteConfigurationResponse:
+class ConfigInUseError(Exception):
+    pass
+
+
+def _delete_configuration(
+    configuration_id: str,
+    *,
+    requesting_tenant: Optional[str] = None
+) -> DeleteConfigurationResponse:
     """
     Return a 400 error if the configuration is in use.
     Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
     Otherwise, return None, 204
     """
-    if _config_in_use(configuration_id):
-        return connexion.problem(
-            status=400, title="Configuration is in use.",
-            detail=f"Configuration {configuration_id} is referenced by the desired state of "
-                   "some components")
+    deletion_checker = partial(_config_deletion_checker,
+                               configuration_id=configuration_id,
+                               requesting_tenant=requesting_tenant)
+
     try:
-        return DB.delete(configuration_id), 204
+        db_response = DB.conditional_delete(configuration_id, deletion_checker=deletion_checker)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
+    except ConfigInUseError:
+        return connexion.problem(
+            status=400, title="Configuration is in use.",
+            detail=f"Configuration {configuration_id} is referenced by the desired state of "
+                   "some components")
+    assert db_response is True, f"Unexpected response from DB.conditional_delete: {db_response}"
+    return None, 204
+
+
+def _config_deletion_checker(
+    v3_config_data: V3ConfigurationData,
+    *,
+    configuration_id: str,
+    requesting_tenant: Optional[str]
+) -> Literal[True]:
+    """
+    If there is a requesting tenant, and this configuration belongs to a different tenant,
+    raise a TenantForbiddenOperation exception.
+    If this configuration is in use, raise a ConfigInUseError exception.
+    Otherwise, return True.
+    """
+    if requesting_tenant and v3_config_data.get('tenant_name', '') != requesting_tenant:
+        # This request has come from a tenant that is not the owner of this config
+        raise TenantForbiddenOperation()
+    if _config_in_use(configuration_id):
+        raise ConfigInUseError()
+    return True
 
 
 def iter_layers(config_data, include_additional_inventory=True):
