@@ -599,11 +599,11 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_name: str, new_data: V3SessionPatchData) -> V3SessionData:
+def _patch_session(session_name: str, patch_data: V3SessionPatchData) -> V3SessionData:
     """
     Retrieves the session data from the database.
     Raises dbutils.DBNoEntryError if the entry to be patched is not in the database
-    Otherwise, applies the new_data patch to it, writes it back to the database,
+    Otherwise, applies the patch_data patch to it, writes it back to the database,
     and returns the updated session data.
     """
     data = DB.get(session_name)
@@ -612,7 +612,7 @@ def _patch_session(session_name: str, new_data: V3SessionPatchData) -> V3Session
     session = status['session']
 
     # Artifacts
-    for artifact in new_data.get('status', {}).get('artifacts', []):
+    for artifact in patch_data.get('status', {}).get('artifacts', []):
         for existing_artifact in artifacts:
             for key in artifact.keys():
                 if existing_artifact.get(key) != artifact.get(key):
@@ -623,7 +623,7 @@ def _patch_session(session_name: str, new_data: V3SessionPatchData) -> V3Session
             artifacts.append(artifact)  # No artifacts matched
 
     # Session Status
-    for key, value in new_data.get('status', {}).get('session', {}).items():
+    for key, value in patch_data.get('status', {}).get('session', {}).items():
         if value:  # Never overwrite with an empty field
             if key in STATUS_ORDERING:
                 ordering = STATUS_ORDERING[key]
@@ -635,6 +635,7 @@ def _patch_session(session_name: str, new_data: V3SessionPatchData) -> V3Session
                     session[key] = value
             else:
                 session[key] = value
+
     return DB.put(session_name, data)
 
 
