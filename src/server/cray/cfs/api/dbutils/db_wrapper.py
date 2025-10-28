@@ -49,6 +49,7 @@ from .typing import (
                         DbIdentifier,
                         DbKey,
                         DeletionHandler,
+                        EntryChecker,
                         JsonDict,
                         PatchHandler,
                         UpdateHandler
