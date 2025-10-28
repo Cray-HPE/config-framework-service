@@ -282,22 +282,21 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
-    try:
-        v3_configuration_data = DB.get(configuration_id)
-    except dbutils.DBNoEntryError as err:
-        LOGGER.debug(err)
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail=f"Configuration {configuration_id} could not be found")
 
-    try:
-        v3_configuration_data = _set_auto_fields(v3_configuration_data)
-    except BranchConversionException as e:
-        return connexion.problem(
-            status=400, title="Error converting branch name to commit",
-            detail=str(e))
+    # The second argument to the lambda function is not used, but is present so that
+    # patch_handler matches the expected function signature for a patch function.
+    patch_handler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
 
-    return convert_configuration_to_v2(DB.put(configuration_id, v3_configuration_data)), 200
+    v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
+    if not isinstance(tuple, v3_patch_response):
+        # This means it is a connexion error, in which case the responses are the
+        # same for the v2 and v3 endpoints
+        return v3_patch_response
+
+    assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
+    patched_v3_configuration_data, status_code = v3_patch_response
+    assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"
+    return convert_configuration_to_v2(patched_v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
@@ -305,22 +304,32 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
 def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
+
+    # The second argument to the lambda function is not used, but is present so that
+    # patch_handler matches the expected function signature for a patch function.
+    patch_handler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
+
+    return _patch_configuration_v3(configuration_id, patch_handler)
+
+
+def _patch_configuration_v3(configuration_id: str,
+                            patch_handler: PatchHandler) -> V3PatchConfigurationResponse:
     try:
-        v3_configuration_data = DB.get(configuration_id)
+        # When patching a configuration, no patch data is provided, because the
+        # data is updated based on its current values. Hence we pass an empty
+        # dictionary as the patch data.
+        patched_v3_configuration_data = DB.patch(configuration_id, {}, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
-
-    try:
-        v3_configuration_data = _set_auto_fields(v3_configuration_data)
-    except BranchConversionException as e:
+    except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(e))
+            detail=str(err))
 
-    return DB.put(configuration_id, v3_configuration_data), 200
+    return patched_v3_configuration_data, 200
 
 
 @dbutils.redis_error_handler
@@ -339,24 +348,49 @@ def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationRespons
     return _delete_configuration(configuration_id)
 
 
-def _delete_configuration(configuration_id: str) -> DeleteConfigurationResponse:
+class ConfigInUseError(Exception):
+    pass
+
+
+def _delete_configuration(
+    configuration_id: str,
+) -> DeleteConfigurationResponse:
     """
     Return a 400 error if the configuration is in use.
     Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
     Otherwise, return None, 204
     """
-    if _config_in_use(configuration_id):
-        return connexion.problem(
-            status=400, title="Configuration is in use.",
-            detail=f"Configuration {configuration_id} is referenced by the desired state of "
-                   "some components")
+    deletion_checker = partial(_config_deletion_checker,
+                               configuration_id=configuration_id)
+
     try:
-        return DB.delete(configuration_id), 204
+        db_response = DB.conditional_delete(configuration_id, deletion_checker=deletion_checker)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
             detail=f"Configuration {configuration_id} could not be found")
+    except ConfigInUseError:
+        return connexion.problem(
+            status=400, title="Configuration is in use.",
+            detail=f"Configuration {configuration_id} is referenced by the desired state of "
+                   "some components")
+    assert db_response is True, f"Unexpected response from DB.conditional_delete: {db_response}"
+    return None, 204
+
+
+def _config_deletion_checker(
+    v3_config_data: V3ConfigurationData,
+    *,
+    configuration_id: str
+) -> Literal[True]:
+    """
+    If this configuration is in use, raise a ConfigInUseError exception.
+    Otherwise, return True.
+    """
+    if _config_in_use(configuration_id):
+        raise ConfigInUseError()
+    return True
 
 
 def iter_layers(config_data, include_additional_inventory=True):

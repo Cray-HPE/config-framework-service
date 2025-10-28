@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9585: Fix race conditions in session patch endpoints
     - CASMCMS-9586: Fix race conditions in source patch and restore endpoints
     - CASMCMS-9587: Fix race conditions in component patch endpoints
+    - CASMCMS-9588: Fix race conditions in configurations patch and delete endpoints
 
 ## [1.23.8] - 05/18/2026
 ### Added
