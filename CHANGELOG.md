@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9583: Create `conditional_delete` method for `DBWrapper`.
     - CASMCMS-9584: Add default entry option to `DBWrapper.patch` method
     - CASMCMS-9585: Fix race conditions in session patch methods
+    - CASMCMS-9586: Fix race conditions in source patch and restore methods
 
 ## [1.23.8] - 05/18/2026
 ### Added
