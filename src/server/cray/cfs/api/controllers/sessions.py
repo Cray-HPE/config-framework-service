@@ -554,7 +554,7 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
             detail=str(err))
     v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
     try:
-        v3_session_data = _patch_session(session_name, v3_patch_data)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -582,7 +582,7 @@ def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
             status=400, title="Bad Request",
             detail=str(err))
     try:
-        v3_session_data = _patch_session(session_name, v3_patch_data)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -599,15 +599,11 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_name: str, patch_data: V3SessionPatchData) -> V3SessionData:
+def _patch_session(session_data: V3SessionData, patch_data: V3SessionPatchData) -> V3SessionData:
     """
-    Retrieves the session data from the database.
-    Raises dbutils.DBNoEntryError if the entry to be patched is not in the database
-    Otherwise, applies the patch_data patch to it, writes it back to the database,
-    and returns the updated session data.
+    Applies the patch_data to the specified session_data, and returns the updated session data.
     """
-    data = DB.get(session_name)
-    status = data['status']
+    status = session_data['status']
     artifacts = status['artifacts']
     session = status['session']
 
@@ -636,7 +632,7 @@ def _patch_session(session_name: str, patch_data: V3SessionPatchData) -> V3Sessi
             else:
                 session[key] = value
 
-    return DB.put(session_name, data)
+    return session_data
 
 
 def _validate_session_target(target):
