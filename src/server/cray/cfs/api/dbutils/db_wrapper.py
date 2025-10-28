@@ -233,7 +233,8 @@ class DBWrapper:
         key: DbKey,
         patch_data: DbEntry,
         update_handler: Optional[UpdateHandler],
-        patch_handler: PatchHandler
+        patch_handler: PatchHandler,
+        default_entry: Optional[DbEntry]
     ) -> DbEntry:
         """
         Helper function for patch, which tries to apply the patch inside a Redis pipeline.
@@ -252,13 +253,19 @@ class DBWrapper:
         # get call will execute immediately and return the data.
         data_str = pipe.get(key)
 
-        # Raise an exception if no or null entry.
-        if not data_str:
+        if data_str:
+            orig_data = json.loads(data_str)
+            # Apply the patch_data to the current data
+            new_data = patch_handler(orig_data, patch_data)
+        elif default_entry is not None:
+            # A default entry was specified, so we will apply the patch
+            # on that.
+            orig_data = None
+            new_data = patch_handler(default_entry, patch_data)
+        else:
+            # No default entry specified
+            # Raise an exception if no or null entry.
             raise self.no_entry_exception(key)
-        orig_data = json.loads(data_str)
-
-        # Apply the patch_data to the current data
-        new_data = patch_handler(orig_data, patch_data)
 
         # Call the update handler, if one was specified
         if update_handler:
@@ -305,10 +312,16 @@ class DBWrapper:
         patch_data: DbEntry,
         *,
         update_handler: Optional[UpdateHandler] = None,
-        patch_handler: PatchHandler = patch_dict
+        patch_handler: PatchHandler = patch_dict,
+        default_entry: Optional[DbEntry] = None
     ) -> DbEntry:
         """
         Patch data in the database.
+        If the entry does not exist in the DB:
+            If default_entry is None, then DBNoEntryError is raised.
+            Otherwise, the patch is applied on top of the specified default entry
+            (and written to the DB).
+        patch_handler provides an option to specify a non-default patch function.
         update_handler provides a way to operate on the full patched data.
         """
         # Set the time after which we will perform no more DB retries.
@@ -334,7 +347,8 @@ class DBWrapper:
                 return self._patch(key=key,
                                    patch_data=patch_data,
                                    update_handler=update_handler,
-                                   patch_handler=patch_handler)
+                                   patch_handler=patch_handler,
+                                   default_entry=default_entry)
             except redis.exceptions.WatchError as err:
                 # This means the entry changed values while the helper function was
                 # trying to patch it.
