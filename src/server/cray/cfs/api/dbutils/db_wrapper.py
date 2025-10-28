@@ -851,6 +851,122 @@ class DBWrapper:
         self.get_delete(key)
 
     @redis_pipeline
+    def _conditional_delete(
+        self,
+        pipe: redis.client.Pipeline,
+        *,
+        key: DbKey,
+        deletion_checker: EntryChecker
+    ) -> bool:
+        """
+        Helper for conditional_delete method
+
+        Note:
+        The pipe argument does not exist as far as the caller of this method is concerned.
+        That argument is automatically provided by the @redis_pipeline wrapper.
+
+        Does the exact procedure described in the conditional_delete docstring,
+        just inside a Redis pipeline
+        """
+        # Mark this key for monitoring before we retrieve its data,
+        # so that we know if it changes underneath us.
+        pipe.watch(key)
+
+        # Because we have not yet called pipe.multi(), this DB
+        # get call will execute immediately and return the data.
+        data_str = pipe.get(key)
+
+        # Raise an exception if no or null entry.
+        if not data_str:
+            raise self.no_entry_exception(key)
+
+        # Decode the data
+        data = json.loads(data_str)
+
+        # Call our checker
+        if not deletion_checker(data):
+            # It says not to delete this, so return False
+            return False
+
+        # This means we should delete it
+
+        # Begin our transaction.
+        pipe.multi()
+
+        # Because this is after the pipe.multi() call, the following
+        # delete command is not executed immediately, and instead is
+        # queued up. The return value from this call is not the
+        # return value for the actual DB call.
+        pipe.delete(key)
+
+        # Calling pipe.execute() does one of two things:
+        # 1. If the key we are watching has not changed since we started
+        #    watching it, then our DB set operation will be executed.
+        #    The return value of pipe.execute() is a list of the responses
+        #    from all of the queued DB commands (in our case, just a single
+        #    command -- the delete). We don't really care about the response.
+        #    If the delete failed, Redis would raise an exception, and that's
+        #    all we're really concerned about.
+        # 2. If they key we are watching DID change, then the queued DB
+        #    operations (the delete, in our case) are aborted and a Redis WatchError
+        #    exception will be raised, and the caller will have to decide how
+        #    to deal with it.
+        pipe.execute()
+
+        # If we get here, it means no exception was raised by pipe.execute, so we
+        # should return True to indicate that we deleted the entry
+        return True
+
+
+    @convert_db_watch_errors
+    def conditional_delete(self, key: DbKey, deletion_checker: EntryChecker) -> bool:
+        """
+        Retrieve the current entry data.
+        If the entry does not exist, raise DBNoEntryError.
+        Otherwise, call delete_check with the entry data.
+        If delete_check returns True, delete the entry.
+        If delete_check returns False, do not delete the entry.
+
+        Returns:
+        True if we deleted the entry,
+        False otherwise
+        """
+        # Set the time after which we will perform no more DB retries.
+        # Note that this is not the same as it being a hard timeout. If no Redis
+        # WatchErrors are raised after this time limit has been passed, then the method
+        # will run to completion, regardless of how long it takes. This is solely
+        # present to avoid a method which endlessly keeps retrying.
+        no_retries_after: float = time.time() + DB_BUSY_SECONDS
+
+        # The loop condition is a simple True because the logic for exiting the loop is
+        # contained inside the loop itself.
+        while True:
+            try:
+                # Call a helper function to try and delete the entry. If it is successful,
+                # it will return True (meaning it deleted it) or False (meaning the check
+                # function said it should not be deleted). Either way, we just return what
+                # it gives us. (If the entry does not exist, it will raise a DBNoEntryError)
+                #
+                # At the time of this writing, pylint is not clever enough to understand
+                # the function signature mutation performed by the @redis_pipeline
+                # decorator, and so it falsely reports that we are missing an argument
+                # here.
+                # pylint: disable=no-value-for-parameter
+                return self._conditional_delete(key=key,
+                                                deletion_checker=deletion_checker)
+            except redis.exceptions.WatchError as err:
+                # This means the entry changed values while the helper function was
+                # trying to delete it.
+                if time.time() > no_retries_after:
+                    # We are past the last allowed retry time, so re-raise the exception
+                    raise err
+
+                # We are not past the time limit, so just log a warning and we'll go back to the
+                # top of the loop.
+                LOGGER.warning("Key '%s' changed (%s); retrying", key, err)
+
+
+    @redis_pipeline
     def _delete_batch(
         self,
         pipe: redis.client.Pipeline,
