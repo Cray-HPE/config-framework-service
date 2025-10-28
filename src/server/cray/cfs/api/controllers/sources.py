@@ -186,7 +186,13 @@ def patch_source_v3(source_id):
         return error
     data = _set_auto_fields(data)
 
-    response_data = DB.patch(source_id, data, update_handler=_update_credentials_secret)
+    try:
+        response_data = DB.patch(source_id, data, update_handler=_update_credentials_secret)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Source not found.",
+            detail=f"Source {source_id} could not be found")
     return response_data, 200
 
 
@@ -206,14 +212,15 @@ def restore_source_v3(source_id):
     data = _set_auto_fields(data)
     data["name"] = source_id
 
-    if data["name"] in DB:
-        return connexion.problem(
-            detail=f"A source with the name {data["name"]} already exists",
-            status=409,
-            title="Conflicting source name"
-        )
-
-    return DB.put(data.get("name"), data), 201
+    if DB.put_if_not_set(source_id, data):
+        # This means we created the entry
+        return data, 201
+    # This means the entry already exists
+    return connexion.problem(
+        detail=f"A source with the name {data["name"]} already exists",
+        status=409,
+        title="Conflicting source name"
+    )
 
 
 def _validate_source(source):
