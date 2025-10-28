@@ -42,8 +42,8 @@ from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.utils.multitenancy import (
                                             get_tenant_from_header,
                                             reject_invalid_tenant,
-                                            IMMUTABLE_TENANT_NAME_FIELD,
-                                            TENANT_FORBIDDEN_OPERATION
+                                            ImmutableTenantNameField,
+                                            TenantForbiddenOperation
                                         )
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
@@ -214,7 +214,9 @@ def get_configuration_v3(configuration_id: str) -> V3GetConfigurationResponse:
         # This request is coming from a specific tenant.
         # Do not return the data unless it belongs to the requesting tenant.
         if requesting_tenant != v3_configuration_data.get('tenant_name', ''):
-            return TENANT_FORBIDDEN_OPERATION
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise TenantForbiddenOperation()
     return v3_configuration_data, 200
 
 
@@ -287,9 +289,13 @@ def put_configuration_v3(configuration_id, drop_branches=False):
     if requesting_tenant is not None:
         if all([existing_configuration,
                 existing_configuration.get('tenant_name', None) != requesting_tenant]):
-            return TENANT_FORBIDDEN_OPERATION
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise TenantForbiddenOperation()
         if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
-            return IMMUTABLE_TENANT_NAME_FIELD
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise ImmutableTenantNameField()
         data['tenant_name'] = requesting_tenant
     else:
         # The global admin is requesting the change; they can do everything, including putting over
@@ -385,7 +391,9 @@ def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationRespons
     tenant = get_tenant_from_header() or None
     if all([tenant,
             tenant != v3_configuration_data.get('tenant_name', '')]):
-        return TENANT_FORBIDDEN_OPERATION
+        # The @reject_invalid_tenant wrapper will catch this exception and return
+        # the appropriate connexion response
+        raise TenantForbiddenOperation()
 
     try:
         v3_configuration_data = _set_auto_fields(v3_configuration_data)
@@ -423,7 +431,9 @@ def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationRespons
                 status=404, title="Configuration not found",
                 detail=f"Configuration {configuration_id} could not be found")
         if existing_configuration.get('tenant_name', '') != requesting_tenant:
-            return TENANT_FORBIDDEN_OPERATION
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise TenantForbiddenOperation()
     # Getting here either means that the request is not on behalf of a tenant, or that
     # the request is on behalf of the tenant that owns this configuration. Either way,
     # the delete should proceed.
