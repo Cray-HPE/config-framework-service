@@ -614,12 +614,13 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
 
     LOGGER.debug("patch_session_v2(%s): data=%s", session_name, v2_patch_data)
     v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
+    # CASMCMS-9627: To minimize changes, only update the V3 API.
+    # This is fine because that is what cfs-operator uses. This also allows
+    # a way for an admin to bypass the restrictions, if for some reason it is ever
+    # needed.
+    patch_handler = partial(_patch_session, job_update_restrictions=False)
     try:
-        # CASMCMS-9627: To minimize changes, only update the V3 API.
-        # This is fine because that is what cfs-operator uses. This also allows
-        # a way for an admin to bypass the restrictions, if for some reason it is ever
-        # needed.
-        v3_session_data = _patch_session(session_name, v3_patch_data, job_update_restrictions=False)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -652,8 +653,9 @@ def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
             detail=str(err))
 
     LOGGER.debug("patch_session_v3(%s): data=%s", session_name, v3_patch_data)
+    patch_handler = partial(_patch_session, job_update_restrictions=True)
     try:
-        v3_session_data = _patch_session(session_name, v3_patch_data, job_update_restrictions=True)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -676,15 +678,14 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_name: str,
+def _patch_session(session_data: V3SessionData,
                    patch_data: V3SessionPatchData,
                    job_update_restrictions: bool) -> V3SessionData:
     """
     Applies the patch_data to the specified session, and returns the updated session data.
     If job_update_restrictions is true, call _enforce_job_update_restrictions.
     """
-    data = DB.get(session_name)
-    status = data['status']
+    status = session_data['status']
     artifacts = status['artifacts']
     session = status['session']
 
@@ -717,11 +718,9 @@ def _patch_session(session_name: str,
                     session[key] = value
             else:
                 session[key] = value
-    LOGGER.debug("_patch_session(%s): Writing new data to DB: %s", session_name, data)
-    db_resp = DB.put(session_name, data)
-    LOGGER.debug("_patch_session(%s): Returning %s", session_name, db_resp)
-    return db_resp
 
+    LOGGER.debug("_patch_session: Patched session data=%s", session_data)
+    return session_data
 
 def _enforce_job_update_restrictions(session_status_session_data,
                                      patch_status_session_data) -> None:
