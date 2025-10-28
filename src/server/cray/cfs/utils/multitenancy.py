@@ -22,15 +22,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+from collections.abc import Callable
 import functools
 import logging
-import hashlib
-import requests
+from typing import Optional
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
+import requests
 from requests.exceptions import HTTPError
+
 from cray.cfs.utils.core_client import exc_type_msg, PROTOCOL, retry_session_get
-from typing import Optional
+
 
 LOGGER = logging.getLogger('cfs.api.utils.multitenancy')
 
@@ -45,8 +48,22 @@ TENANT_ENDPOINT = f"{BASE_ENDPOINT}/tenants" # CASMPET-6433 changed this from te
 class InvalidTenantException(Exception):
     pass
 
+# Common Multitenancy specific connection responses
+TENANT_FORBIDDEN_OPERATION = connexion.problem(
+    status=403, title="Forbidden operation.",
+    detail="Tenant does not own the requested resources and is forbidden from making changes."
+)
+IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
+    status=403, title="Forbidden operation.",
+    detail="Modification to existing field 'tenant_name' is not permitted."
+)
 
-def get_tenant_from_header():
+INVALID_TENANT = connexion.problem(
+    status=400, title="Invalid tenant",
+    detail=str("The provided tenant does not exist")
+)
+
+def get_tenant_from_header() -> str:
     tenant = ""
     if TENANT_HEADER in connexion.request.headers:
         tenant = connexion.request.headers[TENANT_HEADER]
@@ -54,7 +71,7 @@ def get_tenant_from_header():
             tenant = ""
     return tenant
 
-def get_tenant_data(tenant, session: Optional[requests.Session] = None):
+def get_tenant_data(tenant: str, session: Optional[requests.Session] = None):
     url = f"{TENANT_ENDPOINT}/{tenant}"
     with retry_session_get(url, session=session) as response:
         try:
@@ -77,18 +94,19 @@ def validate_tenant_exists(tenant: str) -> bool:
         return False
 
 
-def reject_invalid_tenant(func):
-    """Decorator for preemptively validating the tenant exists"""
+def reject_invalid_tenant[**P, R](func: Callable[P, R]) -> Callable[P, R|CxResponse]:
+    """Decorator for preemptively validating the tenant exists,
+       and handling tenant-related exceptions
+    """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | CxResponse:
         tenant = get_tenant_from_header()
         if tenant and not validate_tenant_exists(tenant):
             LOGGER.debug("The provided tenant does not exist")
-            return connexion.problem(
-                status=400,
-                title="Invalid tenant",
-                detail=str("The provided tenant does not exist"))
-        return func(*args, **kwargs)
-
+            return INVALID_TENANT
+        try:
+            return func(*args, **kwargs)
+        except InvalidTenantException:
+            return INVALID_TENANT
     return wrapper

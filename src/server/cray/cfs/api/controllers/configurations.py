@@ -39,7 +39,12 @@ from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
 from cray.cfs.api.vault_utils import get_secret as get_vault_secret
-from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant
+from cray.cfs.utils.multitenancy import (
+                                            get_tenant_from_header,
+                                            reject_invalid_tenant,
+                                            IMMUTABLE_TENANT_NAME_FIELD,
+                                            TENANT_FORBIDDEN_OPERATION
+                                        )
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
@@ -73,15 +78,6 @@ def _matches_filter(data, tenant):
         return False
     return True
 
-# Common Multitenancy specific connection responses
-TENANT_FORBIDDEN_OPERATION = connexion.problem(
-    status=403, title="Forbidden operation.",
-    detail="Tenant does not own the requested resources and is forbidden from making changes."
-)
-IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
-    status=403, title="Forbidden operation.",
-    detail="Modification to existing field 'tenant_name' is not permitted."
-)
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
