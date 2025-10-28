@@ -677,7 +677,7 @@ STATUS_ORDERING = {
 
 
 def _patch_session(session_name: str,
-                   new_data: V3SessionPatchData,
+                   patch_data: V3SessionPatchData,
                    job_update_restrictions: bool) -> V3SessionData:
     """
     Applies the patch_data to the specified session, and returns the updated session data.
@@ -688,13 +688,13 @@ def _patch_session(session_name: str,
     artifacts = status['artifacts']
     session = status['session']
 
-    patch_session = new_data.get('status', {}).get('session', {})
+    patch_session = patch_data.get('status', {}).get('session', {})
 
     if job_update_restrictions:
         _enforce_job_update_restrictions(session, patch_session)
 
     # Artifacts
-    for artifact in new_data.get('status', {}).get('artifacts', []):
+    for artifact in patch_data.get('status', {}).get('artifacts', []):
         for existing_artifact in artifacts:
             for key in artifact.keys():
                 if existing_artifact.get(key) != artifact.get(key):
