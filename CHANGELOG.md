@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         - `patch_all` becomes `patch_all_return_keys`
     - Refactor `DBWrapper._update` method into `patch_dict` regular function
     - Add option to specify alternate patch handling function to `DBWrapper` patch methods
+    - Create `put_if_not_set` method for `DBWrapper`
 
 ## [1.27.0] - 07/03/2025
 ### Changed
