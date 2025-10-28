@@ -40,6 +40,9 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.components')
 DB = dbutils.get_wrapper(db='components')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+# If the anything is added, removed, or modified in the following
+# STATUS_* definitions, then the STATUS and StatusInt definitions
+# must also be updated to match.
 STATUS_UNCONFIGURED = 0
 STATUS_FAILED = 1
 STATUS_PENDING = 2
@@ -55,6 +58,9 @@ STATUS = {
 }
 
 # For rudimentary type annotation
+
+# This must match the STATUS_* definitions above
+StatusInt = Literal[0, 1, 2, 3, 4]
 
 # Marked as final because we do not intend to subclass this. It doesn't really
 # matter at this point, but if type checking is ever properly added, this helps
@@ -72,6 +78,9 @@ V3ComponentData = NewType("V3ComponentData", dbutils.JsonDict)
 
 V2ComponentPatch = NewType("V2ComponentPatch", dbutils.JsonDict)
 V3ComponentPatch = NewType("V3ComponentPatch", dbutils.JsonDict)
+
+V2ComponentStateLayer = NewType("V2ComponentStateLayer", dbutils.JsonDict)
+V3ComponentStateLayer = NewType("V3ComponentStateLayer", dbutils.JsonDict)
 
 V3FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured', '']
 V2FilterStatus = Literal['unconfigured', 'pending', 'failed', 'configured']
@@ -341,7 +350,7 @@ def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchCo
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    response = []
+    response: list[V2ComponentData] = []
     for component_id, component_data in components:
         component_data = dbutils.convert_data_from_v2(component_data, V2Component)
         component_data = _set_auto_fields(component_data)
@@ -483,7 +492,9 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
     # the KeyError being raised.
     patch.pop("id", None)
     patch = _set_auto_fields(patch)
-    component_ids = DB.patch_all_return_keys(component_filter, patch, update_handler=_update_handler)
+    component_ids = DB.patch_all_return_keys(component_filter,
+                                             patch,
+                                             update_handler=_update_handler)
     response = {"component_ids": component_ids}
     return response, 200
 
@@ -572,14 +583,14 @@ def patch_component_v2(component_id: str):
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
     try:
-        data = connexion.request.get_json()
+        v2_patch = connexion.request.get_json()
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    data = dbutils.convert_data_from_v2(data, V2Component)
-    data = _set_auto_fields(data)
-    response_data = DB.patch(component_id, data, update_handler=_update_handler)
+    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = _set_auto_fields(v3_patch)
+    response_data = DB.patch(component_id, v3_patch, update_handler=_update_handler)
     return convert_component_to_v2(response_data), 200
 
 
@@ -593,13 +604,13 @@ def patch_component_v3(component_id: str):
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
     try:
-        data = connexion.request.get_json()
+        v3_patch = connexion.request.get_json()
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    data = _set_auto_fields(data)
-    return DB.patch(component_id, data, update_handler=_update_handler), 200
+    v3_patch = _set_auto_fields(v3_patch)
+    return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
 
 
 @dbutils.redis_error_handler
@@ -631,34 +642,37 @@ def _delete_component(component_id: str) -> DeleteComponentResponse:
             detail=f"Component {component_id} could not be found")
 
 
-def _set_auto_fields(data):
-    data = _set_last_updated(data)
-    if 'error_count' in data:
-        return data
-    if 'desired_state' in data or 'desired_config' in data or data.get('state') == []:
-        data['error_count'] = 0
-    return data
+def _set_auto_fields[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
+    v3_data = _set_last_updated(v3_data)
+    if 'error_count' in v3_data:
+        return v3_data
+    if 'desired_state' in v3_data or 'desired_config' in v3_data or v3_data.get('state') == []:
+        v3_data['error_count'] = 0
+    return v3_data
 
 
-def _set_last_updated(data):
-    if isinstance(data.get('state'), list):
-        for layer in data['state']:
+def _set_last_updated[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
+    if isinstance(v3_data.get('state'), list):
+        for layer in v3_data['state']:
             if 'last_updated' not in layer:
                 layer['last_updated'] = datetime.now().strftime(TIME_FORMAT)
-    if isinstance(data.get('desired_state'), dict):
-        data['desired_state']['last_updated'] = datetime.now().strftime(TIME_FORMAT)
-    return data
+    if isinstance(v3_data.get('desired_state'), dict):
+        v3_data['desired_state']['last_updated'] = datetime.now().strftime(TIME_FORMAT)
+    return v3_data
 
-
-def _set_status(data, configs, config_details):
-    if 'desired_config' in data:
-        data['configuration_status'] = STATUS[_get_status(data, configs, config_details)]
+def _set_status(v3_data: V3ComponentData,
+                configs: configurations.Configurations,
+                config_details: Optional[bool]) -> V3ComponentData:
+    if 'desired_config' in v3_data:
+        v3_data['configuration_status'] = STATUS[_get_status(v3_data, configs, config_details)]
     else:
-        data['configuration_status'] = STATUS[STATUS_DEPRECATED]
-    return data
+        v3_data['configuration_status'] = STATUS[STATUS_DEPRECATED]
+    return v3_data
 
 
-def _get_status(data, configs, config_details):
+def _get_status(v3_data: V3ComponentData,
+                configs: configurations.Configurations,
+                config_details: Optional[bool]) -> StatusInt:
     """
     Returns the configuration status of a component
 
@@ -671,19 +685,19 @@ def _get_status(data, configs, config_details):
         if the error count exceeds the retry count, even if the errors are due to manual sessions.
     """
     max_retries = False
-    retries = data.get('retry_policy')
+    retries = v3_data.get('retry_policy')
     if retries is None:
         retries = options.Options().default_batcher_retry_policy
     retries = int(retries)
-    if retries != -1 and data['error_count'] >= retries:
+    if retries != -1 and v3_data['error_count'] >= retries:
         # This component has hit its retry limit
         max_retries = True
 
-    current_state = _get_current_state(data)
-    desired_state = _get_desired_state(data, configs=configs)
+    current_state = _get_current_state(v3_data)
+    desired_state = _get_desired_state(v3_data, configs=configs)
 
     if config_details:
-        data['desired_state'] = []
+        v3_data['desired_state'] = []
 
     if not desired_state:
         if not current_state:
@@ -702,11 +716,13 @@ def _get_status(data, configs, config_details):
         status = STATUS_FAILED
 
     if config_details:
-        data['desired_state'] = desired_state['layers']
+        v3_data['desired_state'] = desired_state['layers']
     return status
 
 
-def _get_layer_status(desired_state, current_state_layers, max_retries):
+def _get_layer_status(desired_state: V3ComponentStateLayer,
+                      current_state_layers: list[V3ComponentStateLayer],
+                      max_retries: bool) -> StatusInt:
     desired_clone_url = desired_state.get('clone_url', '')
     desired_playbook = desired_state.get('playbook', '')
     if not desired_playbook:
@@ -735,70 +751,72 @@ def _get_layer_status(desired_state, current_state_layers, max_retries):
     return STATUS_PENDING
 
 
-def _get_current_state(data):
-    config = data['state']
+def _get_current_state(v3_data: V3ComponentData) -> list[V3ComponentStateLayer]:
+    config = v3_data['state']
     return [config] if isinstance(config, dict) else config
 
 
-def _get_desired_state(data, configs=None):
+def _get_desired_state(
+    v3_data: V3ComponentData,
+    configs: Optional[configurations.Configurations]=None
+) -> configurations.V3ConfigurationData:
     if not configs:
         configs = configurations.Configurations()
-    config_name = data['desired_config']
+    config_name = v3_data['desired_config']
     config = configs.get_config(config_name)
     return config
 
 
-def _set_link(data):
+def _set_link(v3_data: V3ComponentData) -> V3ComponentData:
     if options.Options().include_ara_links:
-        data["logs"] = f"{get_ara_ui_url()}/hosts?name={data['id']}"
-    return data
+        v3_data["logs"] = f"{get_ara_ui_url()}/hosts?name={v3_data['id']}"
+    return v3_data
 
 
-def _update_handler(data):
-    data = _state_append_handler(data)
-    data = _tag_cleanup_handler(data)
-    return data
+def _update_handler(v3_data: V3ComponentData) -> V3ComponentData:
+    v3_data = _state_append_handler(v3_data)
+    v3_data = _tag_cleanup_handler(v3_data)
+    return v3_data
 
 
-def _tag_cleanup_handler(data):
-    tags = data.get('tags', {})
+def _tag_cleanup_handler(v3_data: V3ComponentData) -> V3ComponentData:
+    tags = v3_data.get('tags', {})
     clean_tags = {}
     for k, v in tags.items():
         if v:
             clean_tags[k] = v
-    data['tags'] = clean_tags
-    return data
+    v3_data['tags'] = clean_tags
+    return v3_data
 
 
-def _state_append_handler(data):
-    if 'state_append' not in data:
-        return data
-    state_append = data['state_append']
-    if not isinstance(data['state'], list):
-        LOGGER.info("Clearing non-list state field in data: %s", data)
-        data['state'] = []
+def _state_append_handler(v3_data: V3ComponentData) -> V3ComponentData:
+    if 'state_append' not in v3_data:
+        return v3_data
+    state_append = v3_data['state_append']
+    if not isinstance(v3_data['state'], list):
+        LOGGER.info("Clearing non-list state field in data: %s", v3_data)
+        v3_data['state'] = []
     if 'last_updated' not in state_append:
         state_append['last_updated'] = datetime.now().strftime(TIME_FORMAT)
     state_append = _convert_component_layer_to_v3(state_append)
     new_state = []
     # If this configuration was previously applied, update the layer rather than just appending
-    for layer in data['state']:
+    for layer in v3_data['state']:
         if (
             layer['clone_url'] != state_append['clone_url'] or
             layer['playbook'] != state_append['playbook']
         ):
             new_state.append(layer)
     new_state.append(state_append)
-    data['state'] = new_state
-    del data['state_append']
-    return data
+    v3_data['state'] = new_state
+    del v3_data['state_append']
+    return v3_data
 
 
 def convert_component_to_v2(data: V3ComponentData) -> V2ComponentData:
     converted_state = [_convert_component_layer_to_v2(layer) for layer in data["state"]]
     data["state"] = converted_state
-    data = dbutils.convert_data_to_v2(data, V2Component)
-    return data
+    return dbutils.convert_data_to_v2(data, V2Component)
 
 
 def convert_component_to_v3(data: V2ComponentData) -> V3ComponentData:
@@ -808,7 +826,7 @@ def convert_component_to_v3(data: V2ComponentData) -> V3ComponentData:
     return data
 
 
-def _convert_component_layer_to_v2(layer):
+def _convert_component_layer_to_v2(layer: V3ComponentStateLayer) -> V2ComponentStateLayer:
     if layer.get("status", "applied") != "applied":
         # This means "status" field is in layer, and it is not set to "applied"
         layer["commit"] = f"{layer['commit']}_{layer['status']}"
@@ -816,7 +834,7 @@ def _convert_component_layer_to_v2(layer):
     return layer
 
 
-def _convert_component_layer_to_v3(layer):
+def _convert_component_layer_to_v3(layer: V2ComponentStateLayer) -> V3ComponentStateLayer:
     if "_" in layer["commit"]:
         commit, status = layer["commit"].split("_")
         layer["commit"] = commit
