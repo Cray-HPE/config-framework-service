@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Add option to specify alternate patch handling function to `DBWrapper` patch methods
     - Create `put_if_not_set` method for `DBWrapper`
     - CASMCMS-9583: Create `conditional_delete` method for `DBWrapper`.
+    - CASMCMS-9584: Add default entry option to `DBWrapper.patch` method
 
 ## [1.27.0] - 07/03/2025
 ### Changed
