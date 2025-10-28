@@ -213,6 +213,18 @@ class DBWrapper:
         self.client.set(key, datastr)
         return new_data
 
+    @convert_db_watch_errors
+    def put_if_not_set(self, key: DbKey, new_data: DbEntry) -> bool:
+        """
+        Put data into the database only if the entry does not already exist.
+        If the entry already exists, does nothing.
+        Returns True if the entry did not exist (so we set it).
+        Returns False otherwise.
+        """
+        datastr = json.dumps(new_data)
+        # setnx returns 1 if the data was set, 0 otherwise
+        return bool(self.client.setnx(key, datastr))
+
     @redis_pipeline
     def _patch(self,
         pipe: redis.client.Pipeline,
