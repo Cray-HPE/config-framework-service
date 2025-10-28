@@ -48,11 +48,18 @@ TENANT_ENDPOINT = f"{BASE_ENDPOINT}/tenants" # CASMPET-6433 changed this from te
 class InvalidTenantException(Exception):
     pass
 
-# Common Multitenancy specific connection responses
+class TenantForbiddenOperation(Exception):
+    pass
+
+class ImmutableTenantNameField(Exception):
+    pass
+
+# Common Multitenancy-specific connection responses
 TENANT_FORBIDDEN_OPERATION = connexion.problem(
     status=403, title="Forbidden operation.",
     detail="Tenant does not own the requested resources and is forbidden from making changes."
 )
+
 IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
     status=403, title="Forbidden operation.",
     detail="Modification to existing field 'tenant_name' is not permitted."
@@ -62,6 +69,7 @@ INVALID_TENANT = connexion.problem(
     status=400, title="Invalid tenant",
     detail=str("The provided tenant does not exist")
 )
+
 
 def get_tenant_from_header() -> str:
     tenant = ""
@@ -107,6 +115,10 @@ def reject_invalid_tenant[**P, R](func: Callable[P, R]) -> Callable[P, R|CxRespo
             return INVALID_TENANT
         try:
             return func(*args, **kwargs)
+        except TenantForbiddenOperation:
+            return TENANT_FORBIDDEN_OPERATION
+        except ImmutableTenantNameField:
+            return IMMUTABLE_TENANT_NAME_FIELD
         except InvalidTenantException:
             return INVALID_TENANT
     return wrapper
