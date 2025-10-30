@@ -32,6 +32,7 @@ import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
+from cray.cfs.api.dbutils import JsonData, JsonDict
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
 
@@ -55,8 +56,6 @@ LogLevelUpdateLock = threading.Lock()
 
 # Rudimentary type hint definitions
 
-type JsonData = bool | dict [ str, JsonData] | float | int | list[JsonData] | None | str
-type JsonDict = dict[str, JsonData]
 V2OptionsData = NewType("V2OptionsData", JsonDict)
 V2OptionsPatch = NewType("V2OptionsPatch", JsonDict)
 V3OptionsData = NewType("V3OptionsData", JsonDict)
