@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- CASMCMS-9538: Process and thread ID now included in logging messages.
+- CASMCMS-9538: Logging messages now include process ID, thread ID, file name, line number, and function name.
 - CASMCMS-9573: Refactor dbutils into multiple files
 
 ### Fixed
