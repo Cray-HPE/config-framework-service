@@ -33,7 +33,7 @@ from cray.cfs.api.controllers import options
 from cray.cfs.api.controllers import sessions
 
 log_level = os.environ.get('STARTING_LOG_LEVEL', 'WARN')
-LOG_FORMAT = "%(asctime)-15s - %(process)d - %(thread)d - %(levelname)-7s - %(name)s - %(message)s"
+LOG_FORMAT = "%(asctime)-15s - %(process)d - %(thread)d - %(levelname)-7s - %(name)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s"
 logging.basicConfig(level=log_level, format=LOG_FORMAT)
 LOGGER = logging.getLogger(__name__)
 
