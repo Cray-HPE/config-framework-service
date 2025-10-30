@@ -208,7 +208,7 @@ def _patch_options(v3_patch):
     new_v3_data = patch_options_db(v3_patch)
     if "logging_level" in v3_patch:
         update_server_log_level()
-    return new_v3_data, 200
+    return new_v3_data
 
 
 class Options:
