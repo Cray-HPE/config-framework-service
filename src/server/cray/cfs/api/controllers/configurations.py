@@ -293,6 +293,14 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
         # same for the v2 and v3 endpoints
         return v3_patch_response
 
+    # v3_patch_response is the return value from the _patch_configuration_v3 function, so it should
+    # have type V3PatchConfigurationResponse. That is a type alias for:
+    # tuple[V3ConfigurationData, Literal[200]] | CxResponse
+    #
+    # After the previous conditional statement, we know that v3_patch_response is a tuple.
+    # which means it should be tuple[V3ConfigurationData, Literal[200]]
+    # If that is not the case, something has gone very wrong, so we will add a couple of guardrail asserts -- first
+    # to verify the tuple has exactly 2 elements, and next to verify that the second element of the tuple is 200.
     assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
     patched_v3_configuration_data, status_code = v3_patch_response
     assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"
