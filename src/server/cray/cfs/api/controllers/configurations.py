@@ -357,7 +357,7 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
 
-    # THe second argument to the lambda function is not used, but is present so that
+    # The second argument to the lambda function is not used, but is present so that
     # patch_handler matches the expected function signature for a patch function.
     patch_handler = lambda config_data, _: _set_auto_fields(v3_config_data)
 
@@ -368,6 +368,14 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
         # should not be raised, since we are not checking for that in our patch function
         return v3_patch_response
 
+    # v3_patch_response is the return value from the _patch_configuration_v3 function, so it should
+    # have type V3PatchConfigurationResponse. That is a type alias for:
+    # tuple[V3ConfigurationData, Literal[200]] | CxResponse
+    #
+    # After the previous conditional statement, we know that v3_patch_response is a tuple.
+    # which means it should be tuple[V3ConfigurationData, Literal[200]]
+    # If that is not the case, something has gone very wrong, so we will add a couple of guardrail asserts -- first
+    # to verify the tuple has exactly 2 elements, and next to verify that the second element of the tuple is 200.
     assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
     patched_v3_configuration_data, status_code = v3_patch_response
     assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"
@@ -383,7 +391,7 @@ def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationRespons
 
     tenant = get_tenant_from_header() or None
     # Our patch handler has to make sure that this operation is kosher for this
-    # tenant (if any). If not, it will raise an exception, which the @rjeect_invalid_tenant
+    # tenant (if any). If not, it will raise an exception, which the @reject_invalid_tenant
     # decorator will catch and handle
     patch_handler = partial(_check_tenant_patch_config, tenant=tenant)
 
