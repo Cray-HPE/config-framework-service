@@ -255,8 +255,15 @@ class DBWrapper:
 
         if data_str:
             orig_data = json.loads(data_str)
+
+            # Start by making a copy of the data, so that we can compare
+            # the final patched version to it, and see if it has been changed
+            # (this is necessary because many of the CFS patching functions change the
+            # data in place, as well as returning it)
+            new_data = copy.deepcopy(orig_data)
+
             # Apply the patch_data to the current data
-            new_data = patch_handler(orig_data, patch_data)
+            new_data = patch_handler(new_data, patch_data)
         elif default_entry is not None:
             # A default entry was specified, so we will apply the patch
             # on that.
@@ -429,9 +436,15 @@ class DBWrapper:
 
             # This key should be patched
 
+            # Start by making a copy of the data, so that we can compare
+            # the final patched version to it, and see if it has been changed
+            # (this is necessary because many of the CFS patching functions change the
+            # data in place, as well as returning it)
+            new_data = copy.deepcopy(orig_data)
+
             # Apply the patch to the current data,
             # and call the update_handler
-            new_data = patch_handler(orig_data, patch)
+            new_data = patch_handler(new_data, patch)
             if update_handler:
                 new_data = update_handler(new_data)
 
