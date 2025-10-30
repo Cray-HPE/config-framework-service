@@ -25,11 +25,12 @@
 import functools
 import logging
 import threading
-from typing import overload, Literal, NewType
+from typing import overload, Literal, NewType, TypeVar, Union
 
 import connexion
 
 from cray.cfs.api import dbutils
+from cray.cfs.api.dbutils import JsonData, JsonDict
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
 
@@ -50,6 +51,19 @@ DEFAULTS = {
 # Prevent multiple threads from updating the log level at the same time
 # (mainly to avoid noise in the log)
 LogLevelUpdateLock = threading.Lock()
+
+# Rudimentary type hint definitions
+
+V2OptionsData = NewType("V2OptionsData", JsonDict)
+V2OptionsPatch = NewType("V2OptionsPatch", JsonDict)
+V3OptionsData = NewType("V3OptionsData", JsonDict)
+V3OptionsPatch = NewType("V3OptionsPatch", JsonDict)
+
+# Even though it does not follow convention, a successful patch request to
+# both the CFS V2 and V3 endpoints results in a 200 status code
+V2PatchOptionsResponse: TypeVar = Union[tuple[V2OptionsData, Literal[200]], CxResponse]
+V3PatchOptionsResponse: TypeVar = Union[tuple[V3OptionsData, Literal[200]], CxResponse]
+
 
 def _init():
     """
