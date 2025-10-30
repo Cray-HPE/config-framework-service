@@ -289,7 +289,7 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
     patch_handler: PatchHandler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
 
     v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
-    if not isinstance(tuple, v3_patch_response):
+    if not isinstance(v3_patch_response, tuple):
         # This means it is a connexion error, in which case the responses are the
         # same for the v2 and v3 endpoints
         return v3_patch_response
