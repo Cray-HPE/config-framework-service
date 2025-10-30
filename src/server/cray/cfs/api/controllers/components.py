@@ -132,6 +132,8 @@ DeleteComponentResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse
 V2PatchComponentsResponse: TypeAlias = Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]
 V3PatchComponentsResponse: TypeAlias = Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]
 
+type V2PatchComponentResponse = tuple[V2ComponentData, Literal[200]] | CxResponse
+type V3PatchComponentResponse = tuple[V3ComponentData, Literal[200]] | CxResponse
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
@@ -594,7 +596,7 @@ def put_component_v3(component_id: str):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_component_v2(component_id: str):
+def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v2/components/%s invoked patch_component_v2", component_id)
     try:
@@ -619,7 +621,7 @@ def patch_component_v2(component_id: str):
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_component_v3(component_id: str):
+def patch_component_v3(component_id: str) -> V3PatchComponentResponse:
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v3/components/%s invoked patch_component_v3", component_id)
     try:
@@ -631,7 +633,7 @@ def patch_component_v3(component_id: str):
     return _patch_component_v3(component_id, v3_patch)
 
 
-def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch):
+def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch) -> V3PatchComponentResponse:
     v3_patch = _set_auto_fields(v3_patch)
     try:
         return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
