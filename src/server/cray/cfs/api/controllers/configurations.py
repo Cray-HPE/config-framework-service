@@ -35,6 +35,7 @@ import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
+from cray.cfs.api.dbutils import JsonDict, PatchHandler
 from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
@@ -359,7 +360,7 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
 
     # The second argument to the lambda function is not used, but is present so that
     # patch_handler matches the expected function signature for a patch function.
-    patch_handler = lambda config_data, _: _set_auto_fields(v3_config_data)
+    patch_handler: PatchHandler = lambda config_data, _: _set_auto_fields(v3_config_data)
 
     v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
     if not isinstance(tuple, v3_patch_response):
@@ -393,7 +394,7 @@ def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationRespons
     # Our patch handler has to make sure that this operation is kosher for this
     # tenant (if any). If not, it will raise an exception, which the @reject_invalid_tenant
     # decorator will catch and handle
-    patch_handler = partial(_check_tenant_patch_config, tenant=tenant)
+    patch_handler: PatchHandler = partial(_check_tenant_patch_config, tenant=tenant)
 
     return _patch_configuration_v3(configuration_id, patch_handler)
 
