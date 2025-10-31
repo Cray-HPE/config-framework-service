@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9588: Fix race conditions in configurations patch and delete endpoints
     - CASMCMS-9589: Fix race conditions and refactor options controller
 
+### Dependencies
+- Bump versions of several Python dependencies.
+
 ## [1.27.0] - 07/03/2025
 ### Changed
 - Use `redis` `RESP3` protocol
