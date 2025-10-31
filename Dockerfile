@@ -34,7 +34,7 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.21 AS base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.22 AS base
 WORKDIR /app
 ENV VIRTUAL_ENV=/app/venv
 COPY --from=codegen /app .
