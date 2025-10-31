@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 - Bump versions of several Python dependencies.
+- Use `v7.17` of `openapi-generator-cli`
 
 ## [1.27.0] - 07/03/2025
 ### Changed
