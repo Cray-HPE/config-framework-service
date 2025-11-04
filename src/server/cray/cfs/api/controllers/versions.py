@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,24 +25,27 @@
 
 
 import logging
+from typing import Literal
+
 import yaml
 
+from cray.cfs.api import dbutils
+from cray.cfs.api.controllers import options
 from cray.cfs.api.models.version import Version
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
 
+# For rudimentary type annotations
 
-def calc_version():
+# The response format for the get versions endpoints are all the same
+type GetVersionsResponse = tuple[Version, Literal[200]]
+
+
+def calc_version() -> Version:
     # parse open API spec file from docker image or local repository
     openapispec_f = '/app/lib/server/cray/cfs/api/openapi/openapi.yaml'
-    f = None
-    try:
-        f = open(openapispec_f, 'r')
-    except IOError as e:
-        LOGGER.debug('error opening openapi.yaml file: %s' % e)
-
-    openapispec_map = yaml.safe_load(f)
-    f.close()
+    with open(openapispec_f, 'r') as f:
+        openapispec_map = yaml.safe_load(f)
     major, minor, patch = openapispec_map['info']['version'].split('.')
     return Version(
         major=major,
@@ -51,11 +54,38 @@ def calc_version():
     )
 
 
-def get_version():
-    LOGGER.debug('in get_version')
+def _get_version() -> GetVersionsResponse:
+    LOGGER.debug('in _get_version')
     return calc_version(), 200
 
 
-get_versions = get_version
-get_versions_v2 = get_version
-get_versions_v3 = get_version
+@dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
+def get_version():
+    """Used by the GET / API operation"""
+    LOGGER.debug("GET /versions invoked get_versions")
+    return _get_version()
+
+
+@dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
+def get_versions() -> GetVersionsResponse:
+    """Used by the GET /versions API operation"""
+    LOGGER.debug("GET /versions invoked get_versions")
+    return _get_version()
+
+
+@dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
+def get_versions_v2() -> GetVersionsResponse:
+    """Used by the GET /v2 API operation"""
+    LOGGER.debug("GET /v2 invoked get_versions_v2")
+    return _get_version()
+
+
+@dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
+def get_versions_v3() -> GetVersionsResponse:
+    """Used by the GET /v3 API operation"""
+    LOGGER.debug("GET /v3 invoked get_versions_v3")
+    return _get_version()

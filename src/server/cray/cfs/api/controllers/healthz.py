@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,25 +24,49 @@
 # Cray-provided controllers for the Configuration Framework Service
 
 import logging
+from typing import Literal, Optional
 
-from cray.cfs.api import dbutils
-from cray.cfs.api import kafka_utils
+import redis
+
+from cray.cfs.api import dbutils, kafka_utils
+from cray.cfs.api.controllers import options
 from cray.cfs.api.models.healthz import Healthz
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.healthz')
 DB = dbutils.get_wrapper(db='options')
 KAFKA = None
 
-def get_healthz():
-    status_code = 200
+def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
+    """Used by the GET /healthz API operation"""
+    LOGGER.debug("GET /healthz invoked get_healthz")
+    # Unlike every other API controller, we do not use the
+    # options.refresh_options_update_loglevel decorator, for the same
+    # reason that we do not use the dbutils.redis_error_handler decorator.
+    # Because this is a health check endpoint, we do not want to generate a
+    # database error resulting in a generic 503, instead of a more nuanced
+    # response.
+    db_status: Optional[str] = None
+    status_code: int = 200
+    try:
+        options.update_server_log_level()
+    except redis.exceptions.ConnectionError as err:
+        LOGGER.error(err)
+        db_status = 'not_available'
+    except Exception as err:
+        # Because this could mean a non-DB error, we don't
+        # update the db_status field. But we do want to return
+        # a 500, to reflect that SOMETHING is wrong.
+        LOGGER.error(err)
+        status_code = 500
 
-    db_status = _get_db_status()
+    # If we already have detected a database error, no need to check again
+    if db_status is None:
+        db_status = _get_db_status()
     kafka_status = _get_kafka_status()
 
-    for status in [db_status, kafka_status]:
-        if status != 'ok':
-            status_code = 503
-            break
+    # Whether the current status_code value is 200 or 500, change that to 503 if we have detected Kafka or DB errors
+    if db_status != 'ok' or kafka_status != 'ok':
+        status_code = 503
 
     return Healthz(
         db_status=db_status,
@@ -50,20 +74,16 @@ def get_healthz():
     ), status_code
 
 
-def _get_db_status():
-    available = False
+def _get_db_status() -> str:
     try:
         if DB.info():
-            available = True
-    except Exception as e:
-        LOGGER.error(e)
-
-    if available:
-        return 'ok'
+            return 'ok'
+    except Exception as err:
+        LOGGER.error(err)
     return 'not_available'
 
 
-def _get_kafka_status():
+def _get_kafka_status() -> str:
     global KAFKA
     available = False
     try:

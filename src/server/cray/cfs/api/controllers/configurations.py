@@ -21,32 +21,55 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 from collections.abc import Container
-import connexion
 from datetime import datetime
 from functools import partial
 import logging
 import os
 import subprocess
 import tempfile
+from typing import Literal, NewType, Optional
+
+import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import components
-from cray.cfs.api.controllers import options
-from cray.cfs.api.controllers import sources
+from cray.cfs.api.dbutils import JsonDict, PatchHandler
+from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
-from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
-from cray.cfs.utils.multitenancy import get_tenant_from_header, reject_invalid_tenant
+from cray.cfs.api.vault_utils import get_secret as get_vault_secret
+from cray.cfs.utils.multitenancy import (
+                                            get_tenant_from_header,
+                                            reject_invalid_tenant,
+                                            ImmutableTenantNameField,
+                                            TenantForbiddenOperation
+                                        )
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
 SOURCES_DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+# For rudimentary type annotations
+V2ConfigurationData = NewType("V2ConfigurationData", dbutils.JsonDict)
+V3ConfigurationData = NewType("V3ConfigurationData", dbutils.JsonDict)
+
+type V2GetConfigurationResponse = tuple[V2ConfigurationData, Literal[200]] | CxResponse
+type V3GetConfigurationResponse = tuple[V3ConfigurationData, Literal[200]] | CxResponse
+
+# Even though it does not conform to convention, successful patch requests return 200 status
+type V2PatchConfigurationResponse = tuple[V2ConfigurationData, Literal[200]] | CxResponse
+type V3PatchConfigurationResponse = tuple[V3ConfigurationData, Literal[200]] | CxResponse
+
+# The response format for the delete configuration endpoint is the same for v2 and v3
+type DeleteConfigurationResponse = tuple[None, Literal[204]] | CxResponse
+
+
 def _get_filtered_configurations(tenant):
     response = DB.get_all()
-    if any([tenant]):
+    if tenant:
         response = [r for r in response if _matches_filter(r, tenant)]
     return response
 
@@ -56,37 +79,35 @@ def _matches_filter(data, tenant):
         return False
     return True
 
-# Common Multitenancy specific connection responses
-TENANT_FORBIDDEN_OPERATION = connexion.problem(
-    status=403, title="Forbidden operation.",
-    detail="Tenant does not own the requested resources and is forbidden from making changes."
-)
-IMMUTABLE_TENANT_NAME_FIELD = connexion.problem(
-    status=403, title="Forbidden operation.",
-    detail="Modification to existing field 'tenant_name' is not permitted."
-)
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_configurations_v2(in_use=None):
     """Used by the GET /configurations API operation"""
-    LOGGER.debug("GET /configurations invoked get_configurations")
+    LOGGER.debug("GET /v2/configurations invoked get_configurations_v2")
     configurations_data, next_page_exists = _get_configurations_data(in_use=in_use)
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
-    return [convert_configuration_to_v2(configuration) for configuration in configurations_data], 200
+            detail="The response size exceeds the default_page_size.  "
+                   "Use the v3 API to page through the results.")
+    return (
+        [convert_configuration_to_v2(configuration)for configuration in configurations_data],
+        200
+    )
 
 
 @dbutils.redis_error_handler
-@options.defaults(limit="default_page_size")
 @reject_invalid_tenant
+@options.refresh_options_update_loglevel
+@options.defaults(limit="default_page_size")
 def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
-    LOGGER.debug("GET /configurations invoked get_configurations")
+    LOGGER.debug("GET /v3/configurations invoked get_configurations_v3")
     called_parameters = locals()
     tenant = get_tenant_from_header() or None
-    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit, after_id=after_id,
+    configurations_data, next_page_exists = _get_configurations_data(in_use=in_use, limit=limit,
+                                                                     after_id=after_id,
                                                                      tenant=tenant)
     response = {"configurations": configurations_data, "next": None}
     if next_page_exists:
@@ -101,18 +122,23 @@ def _get_configurations_data(in_use=None, limit=1, after_id="", tenant=None):
     data_filters = []
     # CASMCMS-9197: Only specify a filter if we are actually filtering
     if in_use is not None:
-        data_filters.append(partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list()))
+        data_filters.append(partial(_configuration_filter, in_use=in_use,
+                                    in_use_list=_get_in_use_list()))
     if tenant:
-        # In the event a tenant is not set, the super administrator should be able to view configurations owned by ALL
-        # tenants. As such, we only reduce the effective set of configurations down when a tenant admin is requesting.
+        # In the event a tenant is not set, the super administrator should be able to view
+        # configurations owned by ALL tenants. As such, we only reduce the effective set of
+        # configurations down when a tenant admin is requesting.
         data_filters.append(partial(_tenancy_filter, tenant=tenant))
-    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=data_filters)
+    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                           data_filters=data_filters)
     return configuration_data_page, next_page_exists
 
 
-def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
+def _configuration_filter(configuration_data: dict, in_use: bool,
+                          in_use_list: Container[str]) -> bool:
     """
-    The purpose of this function is to filter CFS configurations that are referenced by any defined component.
+    The purpose of this function is to filter CFS configurations that are referenced by any
+    defined component.
 
     If in_use is true:
         Returns True if the name of the specified configuration is in in_use_list,
@@ -127,7 +153,8 @@ def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: C
 
 def _tenancy_filter(configuration_data: dict, tenant: str) -> bool:
     """
-    The purpose of this function is to reduce the total number of configurations to just those owned by an individual tenant.
+    The purpose of this function is to reduce the total number of configurations to just those
+    owned by an individual tenant.
     """
     return configuration_data.get('tenant_name', '') == tenant
 
@@ -136,7 +163,7 @@ def _get_in_use_list():
     in_use_list = set()
     for component in _iter_components_data():
         desired_state = component.get('desired_state', '')
-        if desired_state and type(desired_state) == str:
+        if desired_state and isinstance(desired_state, str):
             in_use_list.add(desired_state)
     return list(in_use_list)
 
@@ -145,8 +172,7 @@ def _iter_components_data():
     next_parameters = {}
     while True:
         data, _ = components.get_components_v3(**next_parameters)
-        for component in data["components"]:
-            yield component
+        yield from data["components"]
         next_parameters = data["next"]
         if not next_parameters:
             break
@@ -158,36 +184,48 @@ def _config_in_use(config_name: str) -> bool:
     return False
 
 @dbutils.redis_error_handler
-def get_configuration_v2(configuration_id):
+@options.refresh_options_update_loglevel
+def get_configuration_v2(configuration_id: str) -> V2GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
-    LOGGER.debug("GET /configurations/id invoked get_configuration")
-    if configuration_id not in DB:
+    LOGGER.debug("GET /v2/configurations/%s invoked get_configuration_v2", configuration_id)
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
-    return convert_configuration_to_v2(DB.get(configuration_id)), 200
+            detail=f"Configuration {configuration_id} could not be found")
+    return convert_configuration_to_v2(v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-def get_configuration_v3(configuration_id):
+@options.refresh_options_update_loglevel
+def get_configuration_v3(configuration_id: str) -> V3GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
-    LOGGER.debug("GET /configurations/id invoked get_configuration")
-    if configuration_id not in DB:
+    LOGGER.debug("GET /v3/configurations/%s invoked get_configuration_v3", configuration_id)
+    try:
+        v3_configuration_data = DB.get(configuration_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(status=404, title="Configuration not found",
-                                        detail="Configuration {} could not be found".format(configuration_id))
-    configuration_data = DB.get(configuration_id)
-    tenant = get_tenant_from_header() or None
-    if all([tenant,
-            tenant != configuration_data.get('tenant_name', '')]):
-        return TENANT_FORBIDDEN_OPERATION
-    return DB.get(configuration_id), 200
+                                 detail=f"Configuration {configuration_id} could not be found")
+    # Check if the get request comes from a specific tenant
+    if (requesting_tenant := get_tenant_from_header()):
+        # This request is coming from a specific tenant.
+        # Do not return the data unless it belongs to the requesting tenant.
+        if requesting_tenant != v3_configuration_data.get('tenant_name', ''):
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise TenantForbiddenOperation()
+    return v3_configuration_data, 200
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_configuration_v2(configuration_id):
     """Used by the PUT /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PUT /configurations/id invoked put_configuration")
+    LOGGER.debug("PUT /v2/configurations/%s invoked put_configuration_v2", configuration_id)
     try:
         data = connexion.request.get_json()
         data = convert_configuration_to_v3(data)
@@ -225,9 +263,10 @@ def put_configuration_v2(configuration_id):
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
+@options.refresh_options_update_loglevel
 def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PUT /configurations/id invoked put_configuration")
+    LOGGER.debug("PUT /v3/configurations/%s invoked put_configuration_v3", configuration_id)
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -235,25 +274,34 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             status=400, title="Error parsing the data provided.",
             detail=str(err))
 
-    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
-    # subsequent data puts and permission checks.
+    # If the put request comes from a specific tenant, make note of it in the record -- we're
+    # going to use it in subsequent data puts and permission checks.
     requesting_tenant = get_tenant_from_header() or None
 
-    # If the configuration already exists, and the configuration is not owned by the requesting put tenant, then we cannot
-    # allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id) or {}
-    LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'" %(requesting_tenant, existing_configuration))
+    # If the configuration already exists, and the configuration is not owned by the requesting put
+    # tenant, then we cannot allow them to overwrite the existing data for this key.
+    try:
+        existing_configuration = DB.get(configuration_id) or {}
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        existing_configuration = {}
+    LOGGER.debug("Requesting Tenant: '%s'; Existing Configuration: '%s'", requesting_tenant,
+                 existing_configuration)
     if requesting_tenant is not None:
         if all([existing_configuration,
                 existing_configuration.get('tenant_name', None) != requesting_tenant]):
-            return TENANT_FORBIDDEN_OPERATION
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise TenantForbiddenOperation()
         if data.get('tenant_name', None) not in set(['', None, requesting_tenant]):
-            return IMMUTABLE_TENANT_NAME_FIELD
+            # The @reject_invalid_tenant wrapper will catch this exception and return
+            # the appropriate connexion response
+            raise ImmutableTenantNameField()
         data['tenant_name'] = requesting_tenant
     else:
-        # The global admin is requesting the change; they can do everything, including putting over other people's
-        # stuff. This block is split out specifically for this comment, which is why we have it even though it is just
-        # a pass.
+        # The global admin is requesting the change; they can do everything, including putting over
+        # other people's stuff. This block is split out specifically for this comment, which is why
+        # we have it even though it is just a pass.
         pass
 
     for layer in iter_layers(data, include_additional_inventory=True):
@@ -265,14 +313,14 @@ def put_configuration_v3(configuration_id, drop_branches=False):
             return connexion.problem(
                 status=400, title="Error handling source",
                 detail='Either source or clone_url must be specified for each layer.')
-        if layer.get("source") and layer.get("source") not in SOURCES_DB:
-            return connexion.problem(
-                status=400, title="Source does not exist",
-                detail=f"The source {layer['source']} does not exist.")
         if 'branch' in layer and 'commit' in layer:
             return connexion.problem(
                 status=400, title="Error handling branches",
                 detail='Only branch or commit should be specified for each layer, not both.')
+        if layer.get("source") and layer.get("source") not in SOURCES_DB:
+            return connexion.problem(
+                status=400, title="Source does not exist",
+                detail=f"The source {layer['source']} does not exist.")
 
     try:
         data = _set_auto_fields(data)
@@ -293,107 +341,173 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     if drop_branches:
         for layer in iter_layers(data, include_additional_inventory=True):
-            if "branch" in layer:
-                del(layer["branch"])
+            # Remove the branch field if it exists (if it does not, do nothing).
+            # The pop call will raise a KeyError if the field does not exist, unless
+            # we specify a default return value. In this case, we do not care about
+            # the return value, but we specify a default of None purely to avoid
+            # the KeyError being raised.
+            layer.pop("branch", None)
 
     data['name'] = configuration_id
     return DB.put(configuration_id, data), 200
 
 
 @dbutils.redis_error_handler
-def patch_configuration_v2(configuration_id):
+@options.refresh_options_update_loglevel
+def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCHv2 /configurations/id invoked put_configuration")
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
-    data = DB.get(configuration_id)
-    try:
-        data = _set_auto_fields(data)
-    except BranchConversionException as e:
-        return connexion.problem(
-            status=400, title="Error converting branch name to commit",
-            detail=str(e))
+    LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
 
-    return convert_configuration_to_v2(DB.put(configuration_id, data)), 200
+    # The second argument to the lambda function is not used, but is present so that
+    # patch_handler matches the expected function signature for a patch function.
+    patch_handler: PatchHandler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
+
+    v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
+    if not isinstance(v3_patch_response, tuple):
+        # This means it is a connexion error, in which case the responses are the
+        # same for the v2 and v3 endpoints (except for tenancy-related errors, which
+        # should not be raised, since we are not checking for that in our patch function
+        return v3_patch_response
+
+    # v3_patch_response is the return value from the _patch_configuration_v3 function, so it should
+    # have type V3PatchConfigurationResponse. That is a type alias for:
+    # tuple[V3ConfigurationData, Literal[200]] | CxResponse
+    #
+    # After the previous conditional statement, we know that v3_patch_response is a tuple.
+    # which means it should be tuple[V3ConfigurationData, Literal[200]]
+    # If that is not the case, something has gone very wrong, so we will add a couple of guardrail asserts -- first
+    # to verify the tuple has exactly 2 elements, and next to verify that the second element of the tuple is 200.
+    assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
+    patched_v3_configuration_data, status_code = v3_patch_response
+    assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"
+    return convert_configuration_to_v2(patched_v3_configuration_data), 200
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-def patch_configuration_v3(configuration_id):
+@options.refresh_options_update_loglevel
+def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
-    LOGGER.debug("PATCHv3 /configurations/id invoked put_configuration")
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
-    data = DB.get(configuration_id)
+    LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
 
     tenant = get_tenant_from_header() or None
-    if all([tenant,
-            tenant != data.get('tenant_name', '')]):
-        return TENANT_FORBIDDEN_OPERATION
+    # Our patch handler has to make sure that this operation is kosher for this
+    # tenant (if any). If not, it will raise an exception, which the @reject_invalid_tenant
+    # decorator will catch and handle
+    patch_handler: PatchHandler = partial(_check_tenant_patch_config, tenant=tenant)
 
+    return _patch_configuration_v3(configuration_id, patch_handler)
+
+
+def _patch_configuration_v3(configuration_id: str,
+                            patch_handler: PatchHandler) -> V3PatchConfigurationResponse:
     try:
-        data = _set_auto_fields(data)
-    except BranchConversionException as e:
+        # When patching a configuration, no patch data is provided, because the
+        # data is updated based on its current values. Hence we pass an empty
+        # dictionary as the patch data.
+        patched_v3_configuration_data = DB.patch(configuration_id, {}, patch_handler=patch_handler)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Configuration not found",
+            detail=f"Configuration {configuration_id} could not be found")
+    except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(e))
+            detail=str(err))
 
-    return DB.put(configuration_id, data), 200
+    return patched_v3_configuration_data, 200
+
+
+
+def _check_tenant_patch_config(v3_config_data: V3ConfigurationData,
+                               _: JsonDict,
+                               *,
+                               tenant: Optional[str]) -> V3ConfigurationData:
+    """
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
+    if tenant and tenant != v3_config_data.get('tenant_name', ''):
+        raise TenantForbiddenOperation()
+    return _set_auto_fields(v3_config_data)
 
 
 @dbutils.redis_error_handler
-def delete_configuration_v2(configuration_id):
+@options.refresh_options_update_loglevel
+def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
-    LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
-    if configuration_id not in DB:
-        return connexion.problem(
-            status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
-    if _config_in_use(configuration_id):
-        return connexion.problem(
-            status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of "
-                   "some components".format(configuration_id))
-    return DB.delete(configuration_id), 204
+    LOGGER.debug("DELETE /v2/configurations/%s invoked delete_configuration_v2", configuration_id)
+    return _delete_configuration(configuration_id)
 
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-def delete_configuration_v3(configuration_id):
+@options.refresh_options_update_loglevel
+def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
-    LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
-    if configuration_id not in DB:
+    LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)
+    return _delete_configuration(configuration_id, requesting_tenant=get_tenant_from_header())
+
+
+class ConfigInUseError(Exception):
+    pass
+
+
+def _delete_configuration(
+    configuration_id: str,
+    *,
+    requesting_tenant: Optional[str] = None
+) -> DeleteConfigurationResponse:
+    """
+    Return a 400 error if the configuration is in use.
+    Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
+    Otherwise, return None, 204
+    """
+    deletion_checker = partial(_config_deletion_checker,
+                               configuration_id=configuration_id,
+                               requesting_tenant=requesting_tenant)
+
+    try:
+        db_response = DB.conditional_delete(configuration_id, deletion_checker=deletion_checker)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Configuration not found",
-            detail="Configuration {} could not be found".format(configuration_id))
-    if _config_in_use(configuration_id):
+            detail=f"Configuration {configuration_id} could not be found")
+    except ConfigInUseError:
         return connexion.problem(
             status=400, title="Configuration is in use.",
-            detail="Configuration {} is referenced by the desired state of "
-                   "some components".format(configuration_id))
-    # If the put request comes from a specific tenant, make note of it in the record -- we're going to use it in
-    # subsequent data puts and permission checks.
-    requesting_tenant = get_tenant_from_header() or None
-    # If the configuration already exists, and the tenant is not owned by the requesting delete tenant, then we cannot
-    # allow them to overwrite the existing data for this key.
-    existing_configuration = DB.get(configuration_id) or {}
-    if all([requesting_tenant is not None,
-            existing_configuration.get('tenant_name', '') != requesting_tenant]):
-        return TENANT_FORBIDDEN_OPERATION
-    return DB.delete(configuration_id), 204
+            detail=f"Configuration {configuration_id} is referenced by the desired state of "
+                   "some components")
+    assert db_response is True, f"Unexpected response from DB.conditional_delete: {db_response}"
+    return None, 204
+
+
+def _config_deletion_checker(
+    v3_config_data: V3ConfigurationData,
+    *,
+    configuration_id: str,
+    requesting_tenant: Optional[str]
+) -> Literal[True]:
+    """
+    If there is a requesting tenant, and this configuration belongs to a different tenant,
+    raise a TenantForbiddenOperation exception.
+    If this configuration is in use, raise a ConfigInUseError exception.
+    Otherwise, return True.
+    """
+    if requesting_tenant and v3_config_data.get('tenant_name', '') != requesting_tenant:
+        # This request has come from a tenant that is not the owner of this config
+        raise TenantForbiddenOperation()
+    if _config_in_use(configuration_id):
+        raise ConfigInUseError()
+    return True
 
 
 def iter_layers(config_data, include_additional_inventory=True):
-    if include_additional_inventory and config_data.get("additional_inventory"):
-        for layer in (config_data.get('layers') + [config_data.get('additional_inventory')]):
-            yield layer
-    else:
-        for layer in config_data.get('layers'):
-            yield layer
+    yield from config_data.get('layers')
+    if include_additional_inventory and (add_inv := config_data.get("additional_inventory")):
+        yield add_inv
 
 
 def _set_auto_fields(data):
@@ -401,10 +515,10 @@ def _set_auto_fields(data):
     try:
         data = _convert_branches_to_commits(data)
     except BranchConversionException as e:
-        LOGGER.error(f"Error converting branch name to commit: {e}")
+        LOGGER.error("Error converting branch name to commit: %s", e)
         raise
     except Exception as e:
-        LOGGER.exception(f"Unexpected error converting branch name to commit: {e}")
+        LOGGER.exception("Unexpected error converting branch name to commit: %s", e)
         raise BranchConversionException(e) from e
     return data
 
@@ -446,15 +560,14 @@ def _get_commit_id(repo_url, branch, source=None):
     Raises:
       BranchConversionException -- for errors encountered calling git
     """
+    split_url = repo_url.split('/')
+    repo_name = split_url[-1].split('.')[0]
     with tempfile.TemporaryDirectory(dir='/tmp') as tmp_dir:
-        repo_name = repo_url.split('/')[-1].split('.')[0]
         repo_dir = os.path.join(tmp_dir, repo_name)
-
-        split_url = repo_url.split('/')
         try:
             username, password = _get_git_credentials(source)
         except Exception as e:
-            LOGGER.error(f"Error retrieving git credentials: {e}")
+            LOGGER.error("Error retrieving git credentials: %s", e)
             raise
         ssl_info = _get_ssl_info(source, tmp_dir)
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
@@ -463,12 +576,12 @@ def _get_commit_id(repo_url, branch, source=None):
             creds_file.write(creds_url)
 
         config_command = 'git config --file .gitconfig credential.helper store'.split()
-        clone_command = 'git clone {}'.format(repo_url).split()
-        checkout_command = 'git checkout {}'.format(branch).split()
+        clone_command = f'git clone {repo_url}'.split()
+        checkout_command = f'git checkout {branch}'.split()
         parse_command = 'git rev-parse HEAD'.split()
         try:
-            # Setting HOME lets us keep the .git-credentials file in the temp directory rather than the
-            # HOME shared by all threads/calls.
+            # Setting HOME lets us keep the .git-credentials file in the temp directory rather
+            # than the HOME shared by all threads/calls.
             subprocess.check_call(config_command, cwd=tmp_dir,
                                   env={'HOME': tmp_dir, 'GIT_SSL_CAINFO': ssl_info},
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -478,11 +591,12 @@ def _get_commit_id(repo_url, branch, source=None):
             subprocess.check_call(checkout_command, cwd=repo_dir,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             output = subprocess.check_output(parse_command, cwd=repo_dir)
-            commit = output.decode("utf-8").strip()
-            LOGGER.info('Translated git branch {} to commit {}'.format(branch, commit))
-            return commit
         except subprocess.CalledProcessError as e:
-            raise BranchConversionException(f"Failed interacting with the specified clone_url: {e}") from e
+            raise BranchConversionException(
+                f"Failed interacting with the specified clone_url: {e}") from e
+    commit = output.decode("utf-8").strip()
+    LOGGER.info('Translated git branch %s to commit %s', branch, commit)
+    return commit
 
 
 def _get_git_credentials(source=None):
@@ -500,48 +614,55 @@ def _get_git_credentials(source=None):
         username = secret["username"]
         password = secret["password"]
     except Exception as e:
-        raise BranchConversionException(f"Error reading username and password from secret: {e}") from e
+        raise BranchConversionException(
+            f"Error reading username and password from secret: {e}") from e
     return username, password
 
 
 def _get_ssl_info(source=None, tmp_dir=""):
-    if source and source.get("ca_cert"):
-        cert_info = source.get("ca_cert")
-        configmap_name = cert_info["configmap_name"]
-        configmap_namespace = cert_info.get("configmap_namespace")
-        if configmap_namespace:
-            response = get_kubernetes_configmap(configmap_name, configmap_namespace)
-        else:
-            response = get_kubernetes_configmap(configmap_name)
-        data = response.data
-        file_name = list(data.keys())[0]
-        file_path = os.path.join(tmp_dir, file_name)
-        with open(file_path, 'w') as f:
-            f.write(data[file_name])
-        return file_path
-    else:
+    if not source or not (cert_info := source.get("ca_cert")):
         return os.environ['GIT_SSL_CAINFO']
+    configmap_name = cert_info["configmap_name"]
+    configmap_namespace = cert_info.get("configmap_namespace")
+    if configmap_namespace:
+        response = get_kubernetes_configmap(configmap_name, configmap_namespace)
+    else:
+        response = get_kubernetes_configmap(configmap_name)
+    data = response.data
+    file_name = list(data.keys())[0]
+    file_path = os.path.join(tmp_dir, file_name)
+    with open(file_path, 'w') as f:
+        f.write(data[file_name])
+    return file_path
 
 
-class Configurations(object):
-    def __init__(self):
+class Configurations:
+    """Helper class for other endpoints that need access to configurations"""
+
+    def __init__(self) -> None:
         # Some callers call the get_config method without checking if the configuration name is
         # set. If it is not set, calling the database will always just return None, so we can
         # save ourselves the network traffic of a database call here.
-        self.configs = { "": None, None: None }
+        self.configs: dict[Optional[str], Optional[V3ConfigurationData]] = { "": None, None: None }
 
-    """Helper class for other endpoints that need access to configurations"""
-    def get_config(self, key):
+    def get_config(self, key: str) -> Optional[V3ConfigurationData]:
         if key not in self.configs:
-            self.configs[key] = DB.get(key)
+            try:
+                self.configs[key] = DB.get(key)
+            except dbutils.DBNoEntryError as err:
+                LOGGER.debug(err)
+                # When this code was originally written, this is the value that
+                # would be stored in the case that the configuration did not exist in the
+                # database.
+                self.configs[key] = None
         return self.configs[key]
 
 
-def convert_configuration_to_v2(data):
+def convert_configuration_to_v2(data: V3ConfigurationData) -> V2ConfigurationData:
     data = dbutils.convert_data_to_v2(data, V2Configuration)
     return data
 
 
-def convert_configuration_to_v3(data):
+def convert_configuration_to_v3(data: V2ConfigurationData) -> V3ConfigurationData:
     data = dbutils.convert_data_from_v2(data, V2Configuration)
     return data

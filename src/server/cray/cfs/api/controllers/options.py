@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,12 +21,18 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
+from collections.abc import Callable
+import functools
 import logging
-import connexion
 import threading
-import time
+from typing import overload, Literal, NewType
+
+import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
+from cray.cfs.api.dbutils import JsonData, JsonDict
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
 
@@ -44,90 +50,166 @@ DEFAULTS = {
     'include_ara_links': True,
 }
 
+# Prevent multiple threads from updating the log level at the same time
+# (mainly to avoid noise in the log)
+LogLevelUpdateLock = threading.Lock()
+
+# Rudimentary type hint definitions
+
+V2OptionsData = NewType("V2OptionsData", JsonDict)
+V2OptionsPatch = NewType("V2OptionsPatch", JsonDict)
+V3OptionsData = NewType("V3OptionsData", JsonDict)
+V3OptionsPatch = NewType("V3OptionsPatch", JsonDict)
+
+# Even though it does not follow convention, a successful patch request to
+# both the CFS V2 and V3 endpoints results in a 200 status code
+type V2PatchOptionsResponse = tuple[V2OptionsData, Literal[200]] | CxResponse
+type V3PatchOptionsResponse = tuple[V3OptionsData, Literal[200]] | CxResponse
+
 
 def _init():
+    """
+    Called by cray.cfs.api.__main__ on server startup
+    """
     cleanup_old_options()
-    # Start options refresh
-    options_refresh = threading.Thread(target=periodically_refresh_options, args=())
-    options_refresh.start()
+    update_server_log_level()
 
 
-def cleanup_old_options():
-    data = DB.get(OPTIONS_KEY)
-    if not data:
-        return
-    # Cleanup
-    model_data = V2Options.from_dict(data).to_dict() | V3Options.from_dict(data).to_dict()
+def patch_options_db(
+    patch_data: V3OptionsPatch,
+    **kwargs
+) -> V3OptionsData:
+    """
+    By specifying a copy of the defaults dictionary as the default_entry, this
+    means that if the options data is not in the DB, the default values will be
+    written to the DB.
+    """
+    return DB.patch(OPTIONS_KEY, patch_data, default_entry=DEFAULTS.copy(), **kwargs)
+
+
+def cleanup_old_options() -> None:
+    """
+    For this patch call, no patch data is provided, because our cleanup function
+    does not need it. But DB.patch requires patch_data to be specified, so
+    we pass an empty dictionary as the patch data.
+    We also do not care about the return value here -- we just want to initialize
+    (if needed) and clean (if needed) the options data.
+    """
+    patch_options_db({}, patch_handler=_cleanup_old_options)
+
+
+def _cleanup_old_options(options_data: JsonDict,
+                         _: JsonDict) -> V3OptionsData:
+    """
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
+    if not options_data:
+        # Nothing to clean up in an empty dict
+        return options_data
+    model_data = V2Options.from_dict(options_data).to_dict() | V3Options.from_dict(options_data).to_dict()
     clean_data = {k: v for k, v in model_data.items() if v is not None}
-    DB.put(OPTIONS_KEY, clean_data)
+    return clean_data
+
+
+def refresh_options_update_loglevel[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    """
+    This is a decorator to put around all API controller functions (so that it runs on
+    all entrypoints into the server, other than initial startup). It simply calls
+    update_server_log_level() before calling the function. It does not change the
+    signature of the function.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        update_server_log_level()
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 @dbutils.redis_error_handler
+@refresh_options_update_loglevel
 def get_options_v2():
     """Used by the GET /options API operation"""
-    LOGGER.debug("GET /options invoked get_options")
+    LOGGER.debug("GET /v2/options invoked get_options_v2")
     data = get_options_data()
     response = convert_options_to_v2(data)
     return response, 200
 
 
 @dbutils.redis_error_handler
+@refresh_options_update_loglevel
 def get_options_v3():
     """Used by the GET /options API operation"""
-    LOGGER.debug("GET /options invoked get_options")
+    LOGGER.debug("GET /v3/options invoked get_options_v3")
     response = get_options_data()
     return response, 200
 
 
 def get_options_data():
-    return _check_defaults(DB.get(OPTIONS_KEY))
+    """
+    We pass an empty dict as the patch data, because our patch handler doesn't
+    need it.
+    We specify an empty dict as a default entry to guarantee that we will get back
+    options data (rather than DBNoEntryError)
+    This effectively is a very fancy GET operation in the case where all of the options
+    are already present in the DB
+    """
+    return patch_options_db({}, patch_handler=_set_defaults)
 
 
-def _check_defaults(data):
-    """Adds defaults to the options data if they don't exist"""
-    put = False
-    if not data:
-        data = {}
-        put = True
-    for key in DEFAULTS:
-        if key not in data:
-            data[key] = DEFAULTS[key]
-            put = True
-    if put:
-        return DB.put(OPTIONS_KEY, data)
-    return data
+def _set_defaults(options_data: V3OptionsData, _: JsonDict) -> V3OptionsData:
+    """
+    Adds defaults to the options data if they don't exist
+    The second argument is not used, and is only present to be compatible with
+    the expected interface for a patching function.
+    """
+    for key, value in DEFAULTS.items():
+        if key not in options_data:
+            options_data[key] = value
+    return options_data
 
 
 @dbutils.redis_error_handler
-def patch_options_v2():
+@refresh_options_update_loglevel
+def patch_options_v2() -> V2PatchOptionsResponse:
     """Used by the PATCH /options API operation"""
-    LOGGER.debug("PATCH /options invoked patch_options")
+    LOGGER.debug("PATCH /v2/options invoked patch_options_v2")
     try:
-        data = connexion.request.get_json()
+        v2_patch: V2OptionsPatch = connexion.request.get_json()
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    if OPTIONS_KEY not in DB:
-        DB.put(OPTIONS_KEY, {})
-    data = dbutils.convert_data_from_v2(data, V2Options)
-    result = DB.patch(OPTIONS_KEY, data)
-    return dbutils.convert_data_to_v2(result, V2Options), 200
+    v3_patch = convert_options_from_v2(v2_patch)
+    new_v3_data = _patch_options(v3_patch)
+    return convert_options_to_v2(new_v3_data), 200
 
 
 @dbutils.redis_error_handler
-def patch_options_v3():
+@refresh_options_update_loglevel
+def patch_options_v3() -> V3PatchOptionsResponse:
     """Used by the PATCH /options API operation"""
-    LOGGER.debug("PATCH /options invoked patch_options")
+    LOGGER.debug("PATCH /v3/options invoked patch_options_v3")
     try:
-        data = connexion.request.get_json()
+        v3_patch: V3OptionsPatch = connexion.request.get_json()
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    if OPTIONS_KEY not in DB:
-        DB.put(OPTIONS_KEY, {})
-    return DB.patch(OPTIONS_KEY, data), 200
+    return _patch_options(v3_patch), 200
+
+
+def _patch_options(v3_patch: V3OptionsPatch) -> V3OptionsData:
+    """
+    Helper function to do the work of applying a V3 patch, since
+    this is also used by the V2 patch process.
+    """
+    new_v3_data = patch_options_db(v3_patch)
+    if "logging_level" in v3_patch:
+        update_server_log_level()
+    return new_v3_data
 
 
 class Options:
@@ -165,11 +247,10 @@ class Options:
         except KeyError as e:
             if default is not None:
                 LOGGER.warning(
-                    'Option {} has not been initialized.  Defaulting to {}'.format(key, default))
+                    'Option %s has not been initialized.  Defaulting to %s', key, default)
                 return default
-            else:
-                LOGGER.error('Option {} has not been initialized.'.format(key))
-                raise e
+            LOGGER.error('Option %s has not been initialized.', key)
+            raise e
 
     @property
     def batcher_check_interval(self):
@@ -212,47 +293,70 @@ class Options:
         return self.get_option('additional_inventory_source', str, default="")
 
 
-def update_log_level(new_level_str):
-    new_level = logging.getLevelName(new_level_str.upper())
-    current_level = LOGGER.getEffectiveLevel()
-    if current_level != new_level:
-        LOGGER.log(current_level, 'Changing logging level from {} to {}'.format(
-            logging.getLevelName(current_level), logging.getLevelName(new_level)))
-        logger = logging.getLogger()
-        logger.setLevel(new_level)
-        LOGGER.log(new_level, 'Logging level changed from {} to {}'.format(
-            logging.getLevelName(current_level), logging.getLevelName(new_level)))
+def do_update_log_level(current_level_int: int, new_level_int: int, new_level_str: str) -> None:
+    """
+    Change the logging level of the current process to the specified new level
+    """
+    current_level_str = logging.getLevelName(current_level_int)
+    LOGGER.log(current_level_int, 'Changing logging level from %s to %s',
+               current_level_str, new_level_str)
+    logging.getLogger().setLevel(new_level_int)
+    LOGGER.log(new_level_int, 'Logging level changed from %s to %s',
+               current_level_str, new_level_str)
 
 
-def periodically_refresh_options():
-    """Caching and refreshing options saves time during calls"""
+def update_server_log_level() -> Options:
+    """
+    Refresh CFS options and update the log level for this process, if needed.
+    Returns the refreshed options data, in case the caller wants it.
+    """
     options = Options()
-    while True:
-        try:
-            options.refresh()
-            if options.logging_level:
-                update_log_level(options.logging_level)
-        except Exception as e:
-            LOGGER.debug(e)
-        time.sleep(2)
+    options.refresh()
+    desired_level_str = options.logging_level.upper()
+    desired_level_int = logging.getLevelName(desired_level_str)
+    current_level_int = LOGGER.getEffectiveLevel()
+    if current_level_int == desired_level_int:
+        # No update needed
+        return options
+    # Take a lock to prevent multiple threads from doing this
+    with LogLevelUpdateLock:
+        if current_level_int != desired_level_int:
+            do_update_log_level(current_level_int, desired_level_int, desired_level_str)
+    return options
+
+@overload
+def convert_options_to_v2(v3_data: V3OptionsData) -> V2OptionsData: ...
+
+@overload
+def convert_options_to_v2(v3_data: V3OptionsPatch) -> V2OptionsPatch: ...
+
+def convert_options_to_v2(v3_data: V3OptionsData|V3OptionsPatch) -> V2OptionsData|V2OptionsPatch:
+    return dbutils.convert_data_to_v2(v3_data, V2Options)
 
 
-def convert_options_to_v2(data):
-    data = dbutils.convert_data_to_v2(data, V2Options)
-    return data
+@overload
+def convert_options_from_v2(v2_data: V2OptionsData) -> V3OptionsData: ...
+
+@overload
+def convert_options_from_v2(v2_data: V2OptionsPatch) -> V3OptionsPatch: ...
+
+def convert_options_from_v2(v2_data: V2OptionsData|V2OptionsPatch) -> V3OptionsData|V3OptionsPatch:
+    return dbutils.convert_data_from_v2(v2_data, V2Options)
 
 
 def defaults(**default_kwargs):
     """
-    Allows controller functions to specify parameters that have defaults stored in options
+    Allows controller functions to specify parameters that have defaults stored in options.
+    It also calls update_server_log_level
     """
     def wrap(f):
+        @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             options = Options()
             options.refresh()
-            for key in default_kwargs:
+            for key, value in default_kwargs.items():
                 if key not in kwargs:
-                    kwargs[key] = getattr(options, default_kwargs[key])
+                    kwargs[key] = getattr(options, value)
             return f(*args, **kwargs)
         return wrapped_f
     return wrap

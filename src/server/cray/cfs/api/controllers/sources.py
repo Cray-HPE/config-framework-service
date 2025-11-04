@@ -21,34 +21,41 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 from collections.abc import Container
-import connexion
 from datetime import datetime
 from functools import partial
 import logging
-import uuid
+from typing import Literal, NewType
 import urllib.parse
+import uuid
+
+import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import configurations
-from cray.cfs.api.controllers import options
-
-from cray.cfs.api.vault_utils import put_secret as put_vault_secret
+from cray.cfs.api.controllers import configurations, options
 from cray.cfs.api.vault_utils import delete_secret as delete_vault_secret
+from cray.cfs.api.vault_utils import put_secret as put_vault_secret
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-
+# For rudimentary type annotation
+type SourceData = NewType("SourceData", dbutils.JsonDict)
+type DeleteSourceResponse = tuple[None, Literal[204]] | CxResponse
+type GetSourceResponse = tuple[SourceData, Literal[200]] | CxResponse
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
-    LOGGER.debug("GET /sources invoked get_sources_v3")
+    LOGGER.debug("GET /v3/sources invoked get_sources_v3")
     called_parameters = locals()
-    sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit, after_id=after_id)
+    sources_data, next_page_exists = _get_sources_data(in_use=in_use, limit=limit,
+                                                       after_id=after_id)
     response = {"sources": sources_data, "next": None}
     if next_page_exists:
         next_data = called_parameters
@@ -63,7 +70,8 @@ def _get_sources_data(in_use=None, limit=1, after_id=""):
     filters = []
     if in_use is not None:
         filters.append(partial(_source_filter, in_use=in_use, in_use_list=_get_in_use_list()))
-    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
+    source_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                    data_filters=filters)
     return source_data_page, next_page_exists
 
 
@@ -97,29 +105,32 @@ def _iter_configurations_data():
     next_parameters = {}
     while True:
         data, _ = configurations.get_configurations_v3(**next_parameters)
-        for component in data["configurations"]:
-            yield component
+        yield from data["configurations"]
         next_parameters = data["next"]
         if not next_parameters:
             break
 
 
 @dbutils.redis_error_handler
-def get_source_v3(source_id):
+@options.refresh_options_update_loglevel
+def get_source_v3(source_id: str) -> GetSourceResponse:
     """Used by the GET /sources/{source_id} API operation"""
-    LOGGER.debug(f"GET /sources/{source_id} invoked get_source_v3")
+    LOGGER.debug("GET /v3/sources/%s invoked get_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
-    if source_id not in DB:
+    try:
+        return DB.get(source_id), 200
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Source not found",
-            detail="Source {} could not be found".format(source_id))
-    return DB.get(source_id), 200
+            detail=f"Source {source_id} could not be found")
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def post_source_v3():
     """Used by the POST /sources/ API operation"""
-    LOGGER.debug("POST /sources/ invoked post_source_v3")
+    LOGGER.debug("POST /v3/sources invoked post_source_v3")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -144,7 +155,7 @@ def post_source_v3():
 
     if data["name"] in DB:
         return connexion.problem(
-            detail="A source with the name {} already exists".format(data["name"]),
+            detail=f"A source with the name {data["name"]} already exists",
             status=409,
             title="Conflicting source name"
         )
@@ -154,14 +165,15 @@ def post_source_v3():
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_source_v3(source_id):
     """Used by the PATCH /sources/{source_id} API operation"""
-    LOGGER.debug(f"PATCH /sources/{source_id} invoked patch_source_v3")
+    LOGGER.debug("PATCH /v3/sources/%s invoked patch_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     if source_id not in DB:
         return connexion.problem(
             status=404, title="Source not found.",
-            detail="Source {} could not be found".format(source_id))
+            detail=f"Source {source_id} could not be found")
     try:
         data = connexion.request.get_json()
     except Exception as err:
@@ -174,14 +186,21 @@ def patch_source_v3(source_id):
         return error
     data = _set_auto_fields(data)
 
-    response_data = DB.patch(source_id, data, update_handler=_update_credentials_secret)
+    try:
+        response_data = DB.patch(source_id, data, update_handler=_update_credentials_secret)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Source not found.",
+            detail=f"Source {source_id} could not be found")
     return response_data, 200
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
-    LOGGER.debug(f"POST /sources/{source_id} invoked restore_source_v3")
+    LOGGER.debug("POST /v3/sources/%s invoked restore_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
     try:
         data = connexion.request.get_json()
@@ -193,26 +212,27 @@ def restore_source_v3(source_id):
     data = _set_auto_fields(data)
     data["name"] = source_id
 
-    if data["name"] in DB:
-        return connexion.problem(
-            detail="A source with the name {} already exists".format(data["name"]),
-            status=409,
-            title="Conflicting source name"
-        )
-
-    return DB.put(data.get("name"), data), 201
+    if DB.put_if_not_set(source_id, data):
+        # This means we created the entry
+        return data, 201
+    # This means the entry already exists
+    return connexion.problem(
+        detail=f"A source with the name {data["name"]} already exists",
+        status=409,
+        title="Conflicting source name"
+    )
 
 
 def _validate_source(source):
-    source_credentials = source.get("credentials")
-    if source_credentials:
-        source_credentials_type = source_credentials.get("authentication_method")
-        if not source_credentials_type or source_credentials_type == "password":
-            if not (source_credentials.get("username") and source_credentials.get("password")):
-                return connexion.problem(
-                    status=400, title="Invalid credentials",
-                    detail="Both username and password must be provided for password authentication credentials")
-    return None
+    if not (source_credentials := source.get("credentials")):
+        return None
+    if source_credentials.get("authentication_method", "password") != "password":
+        return None
+    if source_credentials.get("username") and source_credentials.get("password"):
+        return None
+    return connexion.problem(
+        status=400, title="Invalid credentials",
+        detail="Both username and password must be provided for password authentication credentials")
 
 
 def _update_credentials_secret(source):
@@ -244,23 +264,29 @@ def _clean_credentials_data(data):
 
 
 @dbutils.redis_error_handler
-def delete_source_v3(source_id):
+@options.refresh_options_update_loglevel
+def delete_source_v3(source_id: str) -> DeleteSourceResponse:
     """Used by the DELETE /sources/{source_id} API operation"""
-    LOGGER.debug(f"DELETE /sources/{source_id} invoked delete_source_v3")
+    LOGGER.debug("DELETE /v3/sources/%s invoked delete_source_v3", source_id)
     source_id = urllib.parse.unquote(source_id)
-    if source_id not in DB:
-        return connexion.problem(
-            status=404, title="Source not found",
-            detail="Source {} could not be found".format(source_id))
     if source_id in _get_in_use_list():
         return connexion.problem(
             status=400, title="Source is in use.",
-            detail="Source {} is referenced by some configurations".format(source_id))
-    source = DB.get(source_id)
+            detail=f"Source {source_id} is referenced by some configurations")
+
+    try:
+        source = DB.get_delete(source_id)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=404, title="Source not found",
+            detail=f"Source {source_id} could not be found")
+
     source_credentials = source.get("credentials", {})
     if source_credentials and source_credentials.get("secret_name"):
         delete_vault_secret(source_credentials["secret_name"])
-    return DB.delete(source_id), 204
+
+    return None, 204
 
 
 def _set_auto_fields(data):

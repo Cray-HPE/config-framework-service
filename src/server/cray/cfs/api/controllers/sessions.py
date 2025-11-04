@@ -21,25 +21,27 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+
 import argparse
 import datetime
-import dateutil
 from functools import partial
 import logging
 import re
 import shlex
+from typing import final, Literal, NewType, Optional, TypedDict
 from uuid import UUID
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
+import dateutil
 
-from cray.cfs.api import dbutils
-from cray.cfs.api import kafka_utils
-from cray.cfs.api.k8s_utils import get_ara_ui_url
+from cray.cfs.api import dbutils, kafka_utils
 from cray.cfs.api.controllers import options
+from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
 from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
-from cray.cfs.api.models.v3_session_data import V3SessionData as V3Session  # noqa: E501
 from cray.cfs.api.models.v3_session_create import V3SessionCreate  # noqa: E501
+from cray.cfs.api.models.v3_session_data import V3SessionData as V3Session  # noqa: E501
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
@@ -47,6 +49,37 @@ CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
 _kafka = None
 
+# For rudimentary type annotations
+
+V2SessionData = NewType("V2SessionData", dbutils.JsonDict)
+V3SessionData = NewType("V3SessionData", dbutils.JsonDict)
+
+V2SessionPatchData = NewType("V2SessionPatchData", dbutils.JsonDict)
+V3SessionPatchData = NewType("V3SessionPatchData", dbutils.JsonDict)
+
+# Marked as final because we do not intend to subclass this. It doesn't really
+# matter at this point, but if type checking is ever properly added, this helps
+# the type checker.
+@final
+class SessionIdListDict(TypedDict):
+    """
+    Used for type hinting the v3 session endpoints which return ID list dicts
+    """
+    session_ids: list[str]
+
+
+# The response format for the delete session endpoint is the same for v2 and v3
+type DeleteSessionResponse = tuple[None, Literal[204]] | CxResponse
+
+type V2GetSessionResponse = tuple[V2SessionData, Literal[200]] | CxResponse
+type V3GetSessionResponse = tuple[V3SessionData, Literal[200]] | CxResponse
+
+type V2DeleteSessionsResponse = tuple[None, Literal[204]] | CxResponse
+type V3DeleteSessionsResponse = tuple[SessionIdListDict, Literal[200]] | CxResponse
+
+# Although it does not conform to convention, the successful patch requests return 200 status
+type V2PatchSessionResponse = tuple[V2SessionData, Literal[200]] | CxResponse
+type V3PatchSessionResponse = tuple[V3SessionData, Literal[200]] | CxResponse
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
@@ -55,18 +88,19 @@ def _init(topic='cfs-session-events'):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def create_session_v2():  # noqa: E501
     """Create a Config Framework Session
 
-    Creates a new V2Session # noqa: E501
+    Creates a new V2Session
 
     :rtype: V2Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v2/sessions invoked create_session")
+    LOGGER.debug("POST /v2/sessions invoked create_session_v2")
     try:
         data = connexion.request.get_json()
-        LOGGER.debug("Create content: ", data)
+        LOGGER.debug("Create content: %s", data)
         v2_session_create = V2SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
         # This is a workaround for the addition of the configuration name max length in v3
         # The configuration name is restored later
@@ -83,14 +117,14 @@ def create_session_v2():  # noqa: E501
 
     if session_create.name in DB:
         return connexion.problem(
-            detail="A session with the name {} already exists".format(session_create.name),
+            detail=f"A session with the name {session_create.name} already exists",
             status=409,
             title="Conflicting session name"
         )
 
     if v2_session_configuration not in CONFIG_DB:
         return connexion.problem(
-            detail="No configurations exist named {}".format(v2_session_configuration),
+            detail=f"No configurations exist named {v2_session_configuration}",
             status=400,
             title="Invalid configuration"
         )
@@ -115,26 +149,28 @@ def create_session_v2():  # noqa: E501
     # This is a workaround for the addition of the configuration name max length in v3
     session_data['configuration']['name'] = v2_session_configuration
     # end workaround
-    session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
+    session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(
+                                                                                timespec='seconds')
     _kafka.produce(event_type='CREATE', data=session_data)
     response_data = DB.put(session_data['name'], session_data)
     return convert_session_to_v2(response_data), 200
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def create_session_v3():  # noqa: E501
     """Create a Config Framework Session
 
-    Creates a new V3Session # noqa: E501
+    Creates a new V3Session
 
     :rtype: V3Session
     """
     # Create the session object, do openapi field validation
-    LOGGER.debug("POST /v3/sessions invoked create_session")
+    LOGGER.debug("POST /v3/sessions invoked create_session_v3")
     try:
         data = connexion.request.get_json()
-        LOGGER.debug("Create content: ", data)
-        session_create = V3SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
+        LOGGER.debug("Create content: %s", data)
+        session_create = V3SessionCreate.from_dict(connexion.request.get_json())
     except Exception as err:
         return connexion.problem(
             detail=err,
@@ -144,14 +180,14 @@ def create_session_v3():  # noqa: E501
 
     if session_create.name in DB:
         return connexion.problem(
-            detail="A session with the name {} already exists".format(session_create.name),
+            detail=f"A session with the name {session_create.name} already exists",
             status=409,
             title="Conflicting session name"
         )
 
-    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):
+    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):  # noqa: E501
         return connexion.problem(
-            detail="No configurations exist named {}".format(session_create.configuration_name),
+            detail=f"No configurations exist named {session_create.configuration_name}",
             status=400,
             title="Invalid configuration"
         )
@@ -215,107 +251,60 @@ def _create_session(session_create):
 
 
 @dbutils.redis_error_handler
-def delete_session_v2(session_name):  # noqa: E501
+@options.refresh_options_update_loglevel
+def delete_session_v2(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
-    if session_name not in DB:
-        return connexion.problem(
-            status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    session = DB.get(session_name)
-    DB.delete(session_name)
-    _kafka.produce(event_type='DELETE', data=session)
-    return None, 204
+    LOGGER.debug("DELETE /v2/sessions/%s invoked delete_session_v2", session_name)
+    return _delete_session(session_name)
 
 
 @dbutils.redis_error_handler
-def delete_session_v3(session_name):  # noqa: E501
+@options.refresh_options_update_loglevel
+def delete_session_v3(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v3/sessions/id invoked delete_session")
-    if session_name not in DB:
-        return connexion.problem(
-            status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    session = DB.get(session_name)
-    DB.delete(session_name)
-    _kafka.produce(event_type='DELETE', data=session)
-    return None, 204
+    LOGGER.debug("DELETE /v3/sessions/%s invoked delete_session_v3", session_name)
+    return _delete_session(session_name)
 
 
-@dbutils.redis_error_handler
-def delete_sessions_v2(age=None,  min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
-    """Delete Config Framework Sessions
-
-     # noqa: E501
-
-    :param age: An age filter in the form 1d.
-    :type age: str
-    :param min_age: An age filter in the form 1d.
-    :type min_age: str
-    :param max_age: An age filter in the form 1d.
-    :type max_age: str
-    :param status: A session status filter
-    :type status: str
-    :param name_contains: A filter on session names
-    :type name_contains: str
-    :param succeeded: A filter on session success
-    :type succeeded: bool
-    :param tags: A filter on session tags
-    :type tags: bool
-
-    :rtype: None
+def _delete_session(session_name: str) -> DeleteSessionResponse:
     """
-    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions")
-    tag_list = []
-    if tags:
-        try:
-            tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
-            for tag in tag_list:
-                assert(len(tag) == 2)
-        except Exception as err:
-            return connexion.problem(
-                status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+    Deletes the session from the database.
+    If it does not exist, return a 404 error.
+    Otherwise, add a delete event for this session to the Kafka bus, and return None, 204
+    """
     try:
-        sessions_data, _ = _get_filtered_sessions(age=age, min_age=min_age, max_age=max_age,
-                                                  status=status, name_contains=name_contains,
-                                                  succeeded=succeeded, tag_list=tag_list)
-        for session in sessions_data:
-            session_name = session['name']
-            DB.delete(session_name)
-            _kafka.produce(event_type='DELETE', data=session)
-    except ParsingException as err:
+        session = DB.get_delete(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
-            detail=str(err),
-            status=400,
-            title='Error parsing age field'
-        )
+            status=404, title="Session not found.",
+            detail=f"Session {session_name} could not be found")
+    _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
 
 @dbutils.redis_error_handler
-def delete_sessions_v3(age=None,  min_age=None, max_age=None,
-                       status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
+@options.refresh_options_update_loglevel
+def delete_sessions_v2(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> V2DeleteSessionsResponse:
     """Delete Config Framework Sessions
-
-     # noqa: E501
 
     :param age: An age filter in the form 1d.
     :type age: str
@@ -334,13 +323,92 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions")
+    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
+    # This endpoint is the same as the v3 version except for what it returns when successful:
+    # the v3 endpoint returns 204 status and a dict containing the deleted IDs
+    # the v2 endpoint returns 200 status and None
+    #
+    # Because of this, both endpoints use a common function to do the actual work.
+    response, status_code = delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                                           status=status, name_contains=name_contains,
+                                           succeeded=succeeded, tags=tags)
+    if status_code == 200:
+        # This means it was successful. The v2 endpoint returns None, 204 in this case.
+        return None, 204
+
+    # This means there was an error, in which case the v2 and v3 endpoints are the same in
+    # in terms of the response.
+    return response, status_code
+
+
+@dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
+def delete_sessions_v3(age: Optional[str] = None,
+                       min_age: Optional[str] = None,
+                       max_age: Optional[str] = None,
+                       status: Optional[str] = None,
+                       name_contains: Optional[str] = None,
+                       succeeded: Optional[str] = None,
+                       tags: Optional[str] = None) -> V3DeleteSessionsResponse:
+    """Delete Config Framework Sessions
+
+    :param age: An age filter in the form 1d.
+    :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
+    :param status: A session status filter
+    :type status: str
+    :param name_contains: A filter on session names
+    :type name_contains: str
+    :param succeeded: A filter on session success
+    :type succeeded: bool
+    :param tags: A filter on session tags
+    :type tags: bool
+
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
+    """
+    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions_v3")
+    return delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                          status=status, name_contains=name_contains,
+                          succeeded=succeeded, tags=tags)
+
+
+def delete_sessions(age: Optional[str],
+                    min_age: Optional[str],
+                    max_age: Optional[str],
+                    status: Optional[str],
+                    name_contains: Optional[str],
+                    succeeded: Optional[str],
+                    tags: Optional[str]) -> V3DeleteSessionsResponse:
+    """Delete Config Framework Sessions
+
+    :param age: An age filter in the form 1d.
+    :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
+    :param status: A session status filter
+    :type status: str
+    :param name_contains: A filter on session names
+    :type name_contains: str
+    :param succeeded: A filter on session success
+    :type succeeded: bool
+    :param tags: A filter on session tags
+    :type tags: bool
+
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
+    """
     tag_list = []
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -349,74 +417,76 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
         session_filter = _get_session_filter(age=age, min_age=min_age, max_age=max_age,
                                              status=status, name_contains=name_contains,
                                              succeeded=succeeded, tag_list=tag_list)
-        deletion_handler = partial(_kafka.produce, event_type='DELETE')
-        session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     except ParsingException as err:
         return connexion.problem(
             detail=str(err),
             status=400,
             title='Error parsing age field'
         )
+    deletion_handler = partial(_kafka.produce, event_type='DELETE')
+    session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     response = {"session_ids": session_ids}
     return response, 200
 
 
 @dbutils.redis_error_handler
-def get_session_v2(session_name):  # noqa: E501
+@options.refresh_options_update_loglevel
+def get_session_v2(session_name: str) -> V2GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
 
     :rtype: V2Session
     """
-    LOGGER.debug("GET /v2/sessions/id invoked get_session")
-    if session_name not in DB:
+    LOGGER.debug("GET /v2/sessions/%s invoked get_session_v2", session_name)
+    try:
+        v3_session_data = DB.get(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    return convert_session_to_v2(DB.get(session_name)), 200
+            detail=f"Session {session_name} could not be found")
+    return convert_session_to_v2(v3_session_data), 200
 
 
 @dbutils.redis_error_handler
-def get_session_v3(session_name):  # noqa: E501
+@options.refresh_options_update_loglevel
+def get_session_v3(session_name: str) -> V3GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
-
-     # noqa: E501
 
     :param session_name: Config Framework Session name
     :type session_name: str
 
     :rtype: V3Session
     """
-    LOGGER.debug("GET /v3/sessions/id invoked get_session")
-    if session_name not in DB:
+    LOGGER.debug("GET /v3/sessions/%s invoked get_session_v3", session_name)
+    try:
+        v3_session_data = DB.get(session_name)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    session_data = DB.get(session_name)
-    _set_link(session_data)
-    return session_data, 200
+            detail=f"Session {session_name} could not be found")
+    _set_link(v3_session_data)
+    return v3_session_data, 200
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
 
-     # noqa: E501
-
     :rtype: List[V2Session]
     """
-    LOGGER.debug("GET /v2/sessions invoked get_sessions")
+    LOGGER.debug("GET /v2/sessions invoked get_sessions_v2")
     tag_list = []
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -426,28 +496,27 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
+            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")  # noqa: E501
     return [convert_session_to_v2(session) for session in sessions_data], 200
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None, limit=1, after_id=""):  # noqa: E501
     """List Config Framework Sessions
 
-     # noqa: E501
-
     :rtype: List[V3Session]
     """
-    LOGGER.debug("GET /v3/sessions invoked get_sessions")
+    LOGGER.debug("GET /v3/sessions invoked get_sessions_v3")
     called_parameters = locals()
     tag_list = []
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -466,58 +535,60 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
 
 @dbutils.redis_error_handler
-def patch_session_v2(session_name):
+@options.refresh_options_update_loglevel
+def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
     """Update a Config Framework Session
 
     Updates a new V2Session # noqa: E501
 
     :rtype: V2Session
     """
-    LOGGER.debug("PATCH /v2/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v2/sessions/%s invoked patch_session_v2", session_name)
     try:
-        data = connexion.request.get_json()
-        for key in data.keys():
-            if key != 'status':
-                raise Exception('Only status can be updated after session creation')
+        v2_patch_data = connexion.request.get_json()
+        if any(key != 'status' for key in v2_patch_data):
+            raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
             detail=str(err))
-
-    if session_name not in DB:
+    v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
+    try:
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    data = dbutils.convert_data_from_v2(data, V2Session)
-    response_data = _patch_session(session_name, data)
-    return convert_session_to_v2(response_data), 200
+            detail=f"Session {session_name} could not be found")
+    return convert_session_to_v2(v3_session_data), 200
 
 
 @dbutils.redis_error_handler
-def patch_session_v3(session_name):
+@options.refresh_options_update_loglevel
+def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     """Update a Config Framework Session
 
     Updates a new V3Session # noqa: E501
 
     :rtype: V3Session
     """
-    LOGGER.debug("PATCH /v3/sessions/id invoked patch_session")
+    LOGGER.debug("PATCH /v3/sessions/%s invoked patch_session_v3", session_name)
     try:
-        data = connexion.request.get_json()
-        for key in data.keys():
-            if key != 'status':
-                raise Exception('Only status can be updated after session creation')
+        v3_patch_data = connexion.request.get_json()
+        if any(key != 'status' for key in v3_patch_data):
+            raise Exception('Only status can be updated after session creation')
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
             detail=str(err))
-
-    if session_name not in DB:
+    try:
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
+    except dbutils.DBNoEntryError as err:
+        LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    response_data = _patch_session(session_name, data)
-    return response_data, 200
+            detail=f"Session {session_name} could not be found")
+    return v3_session_data, 200
 
 
 # Some status fields should not progress backwards.
@@ -528,14 +599,16 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_name, new_data):
-    data = DB.get(session_name)
-    status = data['status']
+def _patch_session(session_data: V3SessionData, patch_data: V3SessionPatchData) -> V3SessionData:
+    """
+    Applies the patch_data to the specified session_data, and returns the updated session data.
+    """
+    status = session_data['status']
     artifacts = status['artifacts']
     session = status['session']
 
     # Artifacts
-    for artifact in new_data.get('status', {}).get('artifacts', []):
+    for artifact in patch_data.get('status', {}).get('artifacts', []):
         for existing_artifact in artifacts:
             for key in artifact.keys():
                 if existing_artifact.get(key) != artifact.get(key):
@@ -546,7 +619,7 @@ def _patch_session(session_name, new_data):
             artifacts.append(artifact)  # No artifacts matched
 
     # Session Status
-    for key, value in new_data.get('status', {}).get('session', {}).items():
+    for key, value in patch_data.get('status', {}).get('session', {}).items():
         if value:  # Never overwrite with an empty field
             if key in STATUS_ORDERING:
                 ordering = STATUS_ORDERING[key]
@@ -558,7 +631,8 @@ def _patch_session(session_name, new_data):
                     session[key] = value
             else:
                 session[key] = value
-    return DB.put(session_name, data)
+
+    return session_data
 
 
 def _validate_session_target(target):
@@ -574,10 +648,10 @@ def _validate_session_target(target):
     if not target:
         # Use dynamic inventory by default
         return None
-    elif target.definition in ('repo', 'dynamic'):
+    if target.definition in ('repo', 'dynamic'):
         if target.groups:
             return connexion.problem(
-                detail="'{}' target definitions must not contain groups specifications.".format(target.definition),  # noqa: E501
+                detail=f"'{target.definition}' target definitions must not contain groups specifications.",  # noqa: E501
                 status=status,
                 title=title
             )
@@ -588,7 +662,7 @@ def _validate_session_target(target):
                 title=title,
                 detail="At least one target group must be specified."
             )
-        if any([getattr(grp, 'members', None) is None for grp in target.groups]):
+        if any(getattr(grp, 'members', None) is None for grp in target.groups):
             # Although members is required for a group, swagger is not checking if another
             # data type such as a string or array is passed instead of an object
             return connexion.problem(
@@ -596,13 +670,13 @@ def _validate_session_target(target):
                 title=title,
                 detail="Groups must be an object with the members property."
             )
-        if any([grp.members == [] for grp in target.groups]):
+        if any(grp.members == [] for grp in target.groups):
             return connexion.problem(
                 status=status,
                 title=title,
                 detail="Group member lists must not be empty."
             )
-        if any([member == "" for grp in target.groups for member in grp.members]):  # noqa: E501
+        if any(member == "" for grp in target.groups for member in grp.members):  # noqa: E501
             return connexion.problem(
                 status=status,
                 title=title,
@@ -621,7 +695,7 @@ def _validate_session_target(target):
                 return connexion.problem(
                     status=status,
                     title=title,
-                    detail="The following Image target group member(s) are not valid UUIDs: %s." % naughty_list  # noqa: E501
+                    detail=f"The following Image target group member(s) are not valid UUIDs: {naughty_list}."  # noqa: E501
                 )
     else:
         # Model validation will handle this case
@@ -659,7 +733,7 @@ def _validate_ansible_passthrough(passthrough):
         parser.parse_args(passthrough_arguments)
     except Exception as e:
         return connexion.problem(
-            detail="Error validating ansible-passthrough: {}".format(e),  # noqa: E501
+            detail=f"Error validating ansible-passthrough: {e}",
             status=400,
             title='Bad Request'
         )
@@ -667,10 +741,13 @@ def _validate_ansible_passthrough(passthrough):
 
 
 @options.defaults(limit="default_page_size")
-def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list, limit=1, after_id=""):
+def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list,
+                           limit=1, after_id=""):
     filters = []
-    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list))
-    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=filters)
+    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
+                                       tag_list))
+    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+                                                     data_filters=filters)
     return session_data_page, next_page_exists
 
 
@@ -681,31 +758,33 @@ def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
         try:
             max_start = _age_to_timestamp(age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse age: %s', age)
             raise ParsingException(e) from e
     if min_age:
         try:
             max_start = _age_to_timestamp(min_age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse min_age: %s', min_age)
             raise ParsingException(e) from e
     if max_age:
         try:
             min_start = _age_to_timestamp(max_age)
         except Exception as e:
-            LOGGER.warning('Unable to parse age: {}'.format(age))
+            LOGGER.warning('Unable to parse max_age: %s', max_age)
             raise ParsingException(e) from e
-    session_filter = partial(_session_filter, min_start=min_start, max_start=max_start, status=status,
-                             name_contains=name_contains, succeeded=succeeded, tag_list=tag_list)
+    session_filter = partial(_session_filter, min_start=min_start, max_start=max_start,
+                             status=status, name_contains=name_contains,
+                             succeeded=succeeded, tag_list=tag_list)
     return session_filter
 
 
-def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded, tag_list):
+def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded,
+                    tag_list):
     if any([min_start, max_start, status, name_contains, succeeded, tag_list]):
-        return _matches_filter(session_data, min_start, max_start, status, name_contains, succeeded, tag_list)
-    else:
-        # No filter is being used so all components are valid
-        return True
+        return _matches_filter(session_data, min_start, max_start, status, name_contains,
+                               succeeded, tag_list)
+    # No filter is being used so all components are valid
+    return True
 
 
 def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags):
@@ -725,7 +804,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     if max_start and (not session_start or session_start > max_start):
         return False
-    if tags and any([data.get('tags', {}).get(k) != v for k, v in tags]):
+    if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
         return False
     return True
 
@@ -733,7 +812,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
 def _age_to_timestamp(age):
     delta = {}
     for interval in ['weeks', 'days', 'hours', 'minutes']:
-        result = re.search('(\d+)\w*{}'.format(interval[0]), age, re.IGNORECASE)
+        result = re.search(rf'(\d+)\w*{interval[0]}', age, re.IGNORECASE)
         if result:
             delta[interval] = int(result.groups()[0])
     delta = datetime.timedelta(**delta)
@@ -746,12 +825,12 @@ def _set_link(data):
     return data
 
 
-def convert_session_to_v2(data):
+def convert_session_to_v2(data: V3SessionData) -> V2SessionData:
     data = dbutils.convert_data_to_v2(data, V2Session)
     return data
 
 
-def convert_session_to_v3(data):
+def convert_session_to_v3(data: V2SessionData) -> V3SessionData:
     data = dbutils.convert_data_from_v2(data, V2Session)
     return data
 

@@ -6,6 +6,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 10/30/2025
+
+### Changed
+- CASMCMS-9538: Logging messages now include process ID, thread ID, file name, line number, and function name.
+- CASMCMS-9573: Refactor dbutils into multiple files
+
+### Fixed
+- CASMCMS-9571: Fixed bug preventing CFS log level from updating correctly on the running server
+- CASMCMS-9538: Fix race condition problems
+    - CASMCMS-9553: Make DBWrapper.iter_values smart enough to handle the case where
+      a DB entry is deleted while it is executing
+    - CASMCMS-9556: Consolidate duplicate DBWrapper code
+    - CASMCMS-9557: Add basic type annotations to dbutils
+    - CASMCMS-9559: Add `get_delete` method to the DB wrapper
+    - CASMCMS-9561: Consolidate back-end code for multi-session-delete endpoints
+    - CASMCMS-9562: Consolidate back-end code for multi-component-patch endpoints
+    - CASMCMS-9564: Create `DBNoEntryError` and `DBTooBusyError` exceptions
+    - CASMCMS-9554: Update DBWrapper `delete`/`get_delete` calls to use `DBNoEntryError`
+    - CASMCMS-9568: Update DBWrapper `get` calls to use `DBNoEntryError`
+    - CASMCMS-9572: `DBWrapper.delete_all`: Use Redis watch/execute pipeline
+    - CASMCMS-9577: `DBWrapper.patch`: Use Redis watch/execute pipeline
+    - CASMCMS-9576: Create `redis_pipeline` decorator; modify `DBWrapper.delete_all` and
+      `DBWrapper.patch` to use it
+    - CASMCMS-9578: `DBWrapper.patch_all_entries`: Use Redis watch/execute pipeline
+    - CASMCMS-9563: Create `DBWrapper.patch_list`
+    - CASMCMS-9580: Modify `patch_all` so it does not call `patch_all_entries`, in order to avoid the
+      unnecessary memory usage of storing all the patched entry data
+    - CASMCMS-9580: Modify `patch_all_entries` so that it just returns the entries, not tuples of ids and entries,
+      since that was only being done for the benefit of `patch_all`
+    - CASMCMS-9580: Rename `patch_all*` methods to better reflect their behavior
+        - `patch_all_entries` becomes `patch_all_return_entries`
+        - `patch_all` becomes `patch_all_return_keys`
+    - Refactor `DBWrapper._update` method into `patch_dict` regular function
+    - Add option to specify alternate patch handling function to `DBWrapper` patch methods
+    - Create `put_if_not_set` method for `DBWrapper`
+    - CASMCMS-9583: Create `conditional_delete` method for `DBWrapper`.
+    - CASMCMS-9584: Add default entry option to `DBWrapper.patch` method
+    - CASMCMS-9585: Fix race conditions in session patch endpoints
+    - CASMCMS-9586: Fix race conditions in source patch and restore endpoints
+    - CASMCMS-9587: Fix race conditions in component patch endpoints
+    - CASMCMS-9588: Fix race conditions in configurations patch and delete endpoints
+    - CASMCMS-9589: Fix race conditions and refactor options controller
+
+### Dependencies
+- Bump versions of several Python dependencies.
+- Use `v7.17` of `openapi-generator-cli`
+- Use Alpine 3.22
+
 ## [1.27.0] - 07/03/2025
 ### Changed
 - Use `redis` `RESP3` protocol

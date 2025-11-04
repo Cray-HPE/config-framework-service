@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Generate API
-FROM openapitools/openapi-generator-cli:v7.8.0 AS codegen
+FROM openapitools/openapi-generator-cli:v7.17.0 AS codegen
 WORKDIR /app
 COPY api/openapi.yaml api/openapi.yaml
 COPY config/autogen-server.json config/autogen-server.json
@@ -34,7 +34,7 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.21 AS base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.22 AS base
 WORKDIR /app
 ENV VIRTUAL_ENV=/app/venv
 COPY --from=codegen /app .
@@ -60,9 +60,9 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 list --format freeze
 COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
+COPY src/server/cray/cfs/api/dbutils lib/server/cray/cfs/api/dbutils
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
-     src/server/cray/cfs/api/dbutils.py \
      src/server/cray/cfs/api/kafka_utils.py \
      src/server/cray/cfs/api/k8s_utils.py \
      src/server/cray/cfs/api/vault_utils.py \
