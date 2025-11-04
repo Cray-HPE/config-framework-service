@@ -30,6 +30,7 @@ import time
 from typing import Optional
 
 import redis
+from redis.maint_notifications import MaintNotificationsConfig
 import ujson as json
 
 from .conversions import patch_dict
@@ -88,7 +89,10 @@ class DBWrapper:
                      "host: %s port: %s database: %s",
                      DB_HOST, DB_PORT, self.db_id)
         try:
-            return redis.Redis(host=DB_HOST, port=DB_PORT, db=self.db_id, protocol=3)
+            # explicitly disabling maint_notifications, to avoid a warning message being logged, as
+            # they're not supported (although it causes no problems beyond the warning message)
+            return redis.Redis(host=DB_HOST, port=DB_PORT, db=self.db_id, protocol=3,
+                               maint_notifications_config=MaintNotificationsConfig(enabled=False))
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
                          self.db_id, err)
