@@ -35,6 +35,7 @@ jobs:
     uses: Cray-HPE/.github/.github/workflows/charts-lint-test-scan.yml@main
     with:
       lint-charts: ${{ github.event_name == 'pull_request' }}
+      target-branch: ${{ github.event.pull_request.base.ref || 'master' }}
     secrets:
       snyk-token: ${{ secrets.SNYK_TOKEN }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
