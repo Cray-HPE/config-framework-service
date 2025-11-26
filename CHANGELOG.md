@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.1] - 11/26/2025
+
 ### Fixed
 - CASMCMS-9598: Bulk patch operations now correctly report success for patches where
   the patch succeeds but does not actually change the entry.
