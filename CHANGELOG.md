@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9598: Bulk patch operations now correctly report success for patches where
   the patch succeeds but does not actually change the entry.
 
+### Dependencies
+- CASMCMS-9599: Update Redis Python module from 7.0 to 7.1
+
 ## [1.29.0] - 11/06/2025
 
 ### Changed
