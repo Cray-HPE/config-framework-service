@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9587: Fix race conditions in component patch endpoints
     - CASMCMS-9588: Fix race conditions in configurations patch and delete endpoints
     - CASMCMS-9589: Fix race conditions and refactor options controller
+- CASMCMS-9598: Bulk patch operations now correctly report success for patches where
+  the patch succeeds but does not actually change the entry.
 
 ## [1.23.8] - 05/18/2026
 ### Added
