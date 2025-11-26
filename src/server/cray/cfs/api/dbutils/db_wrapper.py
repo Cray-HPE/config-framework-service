@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from collections.abc import Collection, Generator, Iterable, Sequence
+from collections.abc import Collection, Generator, Iterable, MutableMapping, Sequence
 import copy
 import itertools
 import logging
@@ -381,8 +381,9 @@ class DBWrapper:
         patch: JsonDict,
         update_handler: Optional[UpdateHandler],
         patch_handler: PatchHandler,
-        keys_done: set[str]
-    ) -> dict[str, DbEntry]:
+        keys_done: set[str],
+        patched_data_map: MutableMapping[str, DbEntry]
+    ) -> None:
         """
         Helper for patch_all_entries method
 
@@ -393,28 +394,34 @@ class DBWrapper:
         Given a list of keys, tries to apply the specified patch to all of the keys
         which exist in the database and which meet the specified filter.
 
-        Before attempting the patch, as keys are excluded based on
-        the above criteria, they are added to 'keys_done'.
+        Before attempting the patch:
+        
+        - As keys are excluded based on the above criteria, they are added to 'keys_done'.
+
+        - Any entries which are supposed to be patched but which are unchanged by
+          the patch will immediately be written to patched_data_map as though they
+          had been successfully patched. There is no need to actually do a no-op
+          write to the DB for them.
+
+        If no keys meet the criteria for patching, then this function
+        returns.
 
         If the patch fails because of database changes that occur,
         then a Redis WatchError will be raised, which the caller must
         handle as they see fit.
 
-        If the patch succeeds, this function returns a mapping from keys to the
-        corresponding patched entry data
-
-        If no keys meet the criteria for patching, then this function
-        will return an empty dict.
+        If the patch succeeds, this function updates patched_data_map with
+        the newly patched data, and returns.
         """
-        # Mapping from keys to the updated data
-        patched_data_map: dict[str, DbEntry] = {}
+        # Mapping from keys to the updated data that we need to write to the DB
+        pending_patched_data_map: dict[str, DbEntry] = {}
 
         # If no keys were specified we're done already
         if not keys:
-            return patched_data_map
+            return
 
         # Mapping from keys to the updated JSON-encoded data strings
-        patched_datastr_map: dict[str, str] = {}
+        pending_patched_datastr_map: dict[str, str] = {}
 
         # Start by watching all of the keys in this batch
         # This has to be done before we call mget for them.
@@ -453,42 +460,47 @@ class DBWrapper:
                 new_data = update_handler(new_data)
 
             # If this did not actually change the entry, then there is no need to
-            # actually patch it
+            # actually patch it. Be we pretend that we did, by adding it to
+            # patched_data_map. This is because the patch technically succeeded,
+            # even though it did nothing.
             if new_data == orig_data:
                 keys_done.add(key)
+                patched_data_map[key] = new_data
                 continue
 
-            patched_data_map[key] = new_data
-            patched_datastr_map[key] = json.dumps(new_data)
+            pending_patched_data_map[key] = new_data
+            pending_patched_datastr_map[key] = json.dumps(new_data)
 
-        if patched_datastr_map:
-            # Begin our transaction
-            # After this call to pipe.multi(), the database calls are NOT executed immediately.
-            pipe.multi()
+        if not pending_patched_datastr_map:
+            # Nothing to do
+            return
 
-            # Queue the DB command to updated the specified keys with the patched data
-            pipe.mset(patched_datastr_map)
+        # Begin our transaction
+        # After this call to pipe.multi(), the database calls are NOT executed immediately.
+        pipe.multi()
 
-            # Execute the pipeline
-            #
-            # At this point, if any entries still being watched have been changed since we
-            # started watching them (including being created or deleted), then a Redis
-            # WatchError exception will be raised and the mset command will not be executed.
-            # The caller of this function will include logic that decides how to handle this.
-            #
-            # Instead, if none of those entries has changed, then Redis will atomically execute
-            # all of the queued database commands. The return value of the pipe.execute()
-            # call is a list with the return values for all of the queued DB commands. In this
-            # case, that is just the mset call, and we do not care about its return value.
-            # If the mset failed, it would raise an exception, and that's all we really care
-            # about.
-            pipe.execute()
+        # Queue the DB command to updated the specified keys with the patched data
+        pipe.mset(pending_patched_datastr_map)
 
-        # If we get here, it means that either the pipe executed successfully, or (if we had no
-        # keys to be patched in this batch) it was not executed at all. Either way, add the
-        # patched keys (if any) to the done list, and then return the patched data map.
-        keys_done.update(patched_data_map)
-        return patched_data_map
+        # Execute the pipeline
+        #
+        # At this point, if any entries still being watched have been changed since we
+        # started watching them (including being created or deleted), then a Redis
+        # WatchError exception will be raised and the mset command will not be executed.
+        # The caller of this function will include logic that decides how to handle this.
+        #
+        # Instead, if none of those entries has changed, then Redis will atomically execute
+        # all of the queued database commands. The return value of the pipe.execute()
+        # call is a list with the return values for all of the queued DB commands. In this
+        # case, that is just the mset call, and we do not care about its return value.
+        # If the mset failed, it would raise an exception, and that's all we really care
+        # about.
+        pipe.execute()
+
+        # If we get here, it means that the pipe executed successfully. Add the
+        # patched keys to the done list and update the master patched data map.
+        keys_done.update(pending_patched_data_map)
+        patched_data_map.update(pending_patched_data_map)
 
     @convert_db_watch_errors
     def patch_all_return_entries(
@@ -557,18 +569,18 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_patched_data_map = self._patch_batch(keys=key_batch,
-                                                               data_filter=data_filter,
-                                                               patch=patch,
-                                                               update_handler=update_handler,
-                                                               patch_handler=patch_handler,
-                                                               keys_done=keys_done)
+                    self._patch_batch(keys=key_batch,
+                                      data_filter=data_filter,
+                                      patch=patch,
+                                      update_handler=update_handler,
+                                      patch_handler=patch_handler,
+                                      keys_done=keys_done,
+                                      patched_data_map=patched_data_map)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
                     # keys that did not need to be patched, and any keys that were patched.
-
-                    # Update our master patched data map from this batch
-                    patched_data_map.update(batch_patched_data_map)
+                    # It also will have updated our master patched data map with any patches
+                    # that were applied successfully in this batch.
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
                 # we went to update the DB with the patched data.
@@ -619,12 +631,29 @@ class DBWrapper:
         # in the current iteration of the loop.
         keys_done: set[str] = set()
 
+        # Mapping from keys to updated data for a given batch of keys
+        batch_patched_data_map: dict[str, DbEntry] = {}
+
         # Keep looping until either we have processed all of the keys in our keys_left list -- we
         # do not worry about keys that are created after this method starts running.
         #
         # The DB busy scenario is handled by an exception being raised, so it bypasses the
         # regular loop logic.
         while keys_left:
+            if batch_patched_data_map:
+                # This will only be the case if a previous iteration of this loop encountered a
+                # Redis WatchError exception when trying to patch one of its batches. The
+                # exception means that the DB was unchanged, BUT if patched_data_map is not empty,
+                # it means we still had some "successful" patches that did not require DB writes.
+                # These happen when the patched data matches the current data, and so no DB write
+                # is required. We want to make sure to capture these here.
+
+                # Append the keys of batch_patched_data_map to the end of the patched_ids list.
+                patched_ids.extend(batch_patched_data_map)
+
+                # Clear batch_patched_data_map, since we have extracted the IDs from it
+                batch_patched_data_map.clear()
+
             if keys_done:
                 # keys_done is non-empty, which means that some keys were processed on
                 # the previous iteration of the loop. So we remove those from our list of
@@ -657,14 +686,19 @@ class DBWrapper:
                                                                patch=patch,
                                                                update_handler=update_handler,
                                                                patch_handler=patch_handler,
-                                                               keys_done=keys_done)
+                                                               keys_done=keys_done,
+                                                               patched_data_map=batch_patched_data_map)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
                     # keys that did not need to be patched, and any keys that were patched.
+                    # It also will have updated patched_data_map with any patches
+                    # that were applied successfully in this batch.
 
                     # Update patched_ids from this batch
                     # This appends the keys of batch_patched_data_map to the end of the patched_ids list.
                     patched_ids.extend(batch_patched_data_map)
+                    # Clear the patched_data_map, since we have extracted the IDs from it
+                    batch_patched_data_map.clear()
             except redis.exceptions.WatchError as err:
                 # This means one of the keys changed values between when we filtered it and when
                 # we went to update the DB with the patched data.
