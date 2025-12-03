@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.2] - 12/03/2025
+
+### Fixed
+- CASMCMS-9610: Fix exception raised when performing bulk patch operation
+
 ## [1.29.1] - 11/26/2025
 
 ### Fixed
