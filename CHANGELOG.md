@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9589: Fix race conditions and refactor options controller
 - CASMCMS-9598: Bulk patch operations now correctly report success for patches where
   the patch succeeds but does not actually change the entry.
+- CASMCMS-9610: Fix exception raised when performing bulk patch operation
 
 ## [1.23.8] - 05/18/2026
 ### Added
