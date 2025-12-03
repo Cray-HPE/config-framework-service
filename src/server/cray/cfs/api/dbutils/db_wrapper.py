@@ -681,13 +681,13 @@ class DBWrapper:
                     # decorator, and so it falsely reports that we are missing an argument
                     # here.
                     # pylint: disable=no-value-for-parameter
-                    batch_patched_data_map = self._patch_batch(keys=key_batch,
-                                                               data_filter=data_filter,
-                                                               patch=patch,
-                                                               update_handler=update_handler,
-                                                               patch_handler=patch_handler,
-                                                               keys_done=keys_done,
-                                                               patched_data_map=batch_patched_data_map)
+                    self._patch_batch(keys=key_batch,
+                                      data_filter=data_filter,
+                                      patch=patch,
+                                      update_handler=update_handler,
+                                      patch_handler=patch_handler,
+                                      keys_done=keys_done,
+                                      patched_data_map=batch_patched_data_map)
                     # If we get here, it means the patches (if any) completed successfully.
                     # The helper function will have already updated keys_done with any
                     # keys that did not need to be patched, and any keys that were patched.
