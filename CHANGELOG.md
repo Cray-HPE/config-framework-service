@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.3] - 12/18/2025
+
+### Fixed
+- CASMTRIAGE-8951: `DBWrapper._patch_list`: Fix bug in logic that constructs the map of actually-changed data
+
 ## [1.29.2] - 12/03/2025
 
 ### Fixed
