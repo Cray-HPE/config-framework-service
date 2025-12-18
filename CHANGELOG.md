@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9598: Bulk patch operations now correctly report success for patches where
   the patch succeeds but does not actually change the entry.
 - CASMCMS-9610: Fix exception raised when performing bulk patch operation
+- CASMTRIAGE-8951: `DBWrapper._patch_list`: Fix bug in logic that constructs the map of actually-changed data
 
 ## [1.23.8] - 05/18/2026
 ### Added
