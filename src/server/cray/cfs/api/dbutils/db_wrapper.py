@@ -820,7 +820,7 @@ class DBWrapper:
         # as a result of the patch, encoded into JSON data strings
         patched_datastr_map = { key: json.dumps(patched_data)
                                 for key, patched_data in patched_data_map.items()
-                                if patched_data != orig_data[key] }
+                                if patched_data != orig_data_map[key] }
 
         if patched_datastr_map:
             # Begin our transaction
