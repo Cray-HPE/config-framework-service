@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - CASMCMS-9274: Prevent [`SNYK-PYTHON-WERKZEUG-6808933`](https://security.snyk.io/vuln/SNYK-PYTHON-WERKZEUG-6808933) from causing builds to fail.
 - CASMCMS-9538: Process and thread ID now included in logging messages.
+- CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
+  `status.session.job` field from being updated if the field has previously been set. Return a 409 error in
+  that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
+  jobs for the same CFS session.
 
 ### Fixed
 - Added missing spaces in two error messages.
