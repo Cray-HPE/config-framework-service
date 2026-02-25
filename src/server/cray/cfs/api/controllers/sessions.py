@@ -225,8 +225,9 @@ def create_session_v3():  # noqa: E501
     # Call Kafka twice, to simulate the customer issue in CAST-39551, and to test CASMCMS-9627
     LOGGER.info("Calling Kafka first time for %s", session_create.name)
     _kafka.produce(event_type='CREATE', data=data)
-    LOGGER.info("Calling Kafka second time for %s", session_create.name)
-    _kafka.produce(event_type='CREATE', data=data)
+    if data['limit'] == 'x3000c0s3b0n0':
+        LOGGER.info("Calling Kafka second time for %s", session_create.name)
+        _kafka.produce(event_type='CREATE', data=data)
     LOGGER.info("Writing DB entry for %s", session_create.name)
     response_data = DB.put(data['name'], data)
     LOGGER.info("Done writing DB entry for %s", session_create.name)
