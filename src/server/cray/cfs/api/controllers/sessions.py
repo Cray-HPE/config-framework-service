@@ -222,8 +222,14 @@ def create_session_v3():  # noqa: E501
     session = _create_session(session_create)
     data = session.to_dict()
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
+    # Call Kafka twice, to simulate the customer issue in CAST-39551, and to test CASMCMS-9627
+    LOGGER.info("Calling Kafka first time for %s", session_create.name)
     _kafka.produce(event_type='CREATE', data=data)
+    LOGGER.info("Calling Kafka second time for %s", session_create.name)
+    _kafka.produce(event_type='CREATE', data=data)
+    LOGGER.info("Writing DB entry for %s", session_create.name)
     response_data = DB.put(data['name'], data)
+    LOGGER.info("Done writing DB entry for %s", session_create.name)
     _set_link(response_data)
     return response_data, 201
 
