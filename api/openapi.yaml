@@ -393,6 +393,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    JobAlreadySet:
+      description: The patch cannot be applied because the job field cannot be updated after it is set.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
   schemas:
     Version:
       description: Version data
@@ -2595,6 +2601,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         404:
           $ref: '#/components/responses/ResourceNotFound'
+        409:
+          $ref: '#/components/responses/JobAlreadySet'
     delete:
       summary: Delete a configuration framework session
       tags:
