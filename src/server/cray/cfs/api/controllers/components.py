@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -344,7 +344,7 @@ def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchCo
         while v2_patch_list:
             # Pop each entry off the input list in order to reduce memory use
             v2_patch = v2_patch_list.pop(0)
-            v3_patch_list.append(dbutils.convert_data_from_v2(v2_patch, V2Component))
+            v3_patch_list.append(convert_component_patch_to_v3(v2_patch))
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
@@ -406,7 +406,7 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     # the return value, but we specify a default of None purely to avoid
     # the KeyError being raised.
     v2_patch.pop("id", None)
-    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = convert_component_patch_to_v3(v2_patch)
     v3_patch = _set_auto_fields(v3_patch)
 
     response = [ convert_component_to_v2(v3_patched_comp)
@@ -604,7 +604,7 @@ def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = convert_component_patch_to_v3(v2_patch)
     v3_patch_response = _patch_component_v3(component_id, v3_patch)
     if not isinstance(v3_patch_response, tuple):
         # This means it is a failure CxResponse.
@@ -853,6 +853,19 @@ def convert_component_to_v3(data: V2ComponentData) -> V3ComponentData:
     data = dbutils.convert_data_from_v2(data, V2Component)
     converted_state = [_convert_component_layer_to_v3(layer) for layer in data["state"]]
     data["state"] = converted_state
+    return data
+
+
+def convert_component_patch_to_v3(data: V2ComponentPatch) -> V3ComponentPatch:
+    """
+    Exactly the same as convert_component_to_v3, except that we should not raise
+    an exception if the state field is absent (because it is okay to have a patch
+    operation which does not modify it)
+    """
+    data = dbutils.convert_data_from_v2(data, V2Component)
+    if "state" in data:
+        converted_state = [_convert_component_layer_to_v3(layer) for layer in data["state"]]
+        data["state"] = converted_state
     return data
 
 
