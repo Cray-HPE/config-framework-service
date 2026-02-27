@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
   jobs for the same CFS session.
 
+### Fixed
+- CASMCMS-9630: When patching component state using CFS v2, generate the state layer `status` fields.
+
 ## [1.29.3] - 12/18/2025
 
 ### Fixed
