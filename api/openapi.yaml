@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1375,6 +1375,7 @@ components:
         sessionName:
           type: string
           description: The name of the CFS session that last configured the component.
+      required: [cloneUrl, commit, lastUpdated, playbook, sessionName]
       additionalProperties: false
     V3ConfigurationStateLayer:
       description: |
@@ -1405,6 +1406,7 @@ components:
         session_name:
           type: string
           description: The name of the CFS session that last configured the component.
+      required: [clone_url, commit, last_updated, playbook, session_name, status]
       additionalProperties: false
     V2ComponentState:
       description: |
