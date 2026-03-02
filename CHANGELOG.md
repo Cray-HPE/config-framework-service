@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Reduce duplication in API spec by creating schemas for common fields
 - CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
   `status.session.job` field from being updated if the field has previously been set. Return a 409 error in
   that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes

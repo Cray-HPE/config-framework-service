@@ -580,6 +580,14 @@ components:
           description: If true, session and component records will include links to ARA dashboards for the logs
       additionalProperties: false
     ## SESSIONS ENDPOINT ##
+    SessionName:
+      type: string
+      description: Name of the session. The length of the name is restricted to 45 characters.
+      example: "session-20190728032600"
+      # These validation parameters are restricted by Kubernetes naming conventions.
+      minLength: 1
+      maxLength: 45
+      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
     SessionTargetSection:
       type: object
       description: >
@@ -823,13 +831,7 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+          $ref: '#/components/schemas/SessionName'
         configuration:
           $ref: '#/components/schemas/SessionConfigurationSection'
         ansible:
@@ -852,13 +854,7 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+          $ref: '#/components/schemas/SessionName'
         configuration:
           $ref: '#/components/schemas/SessionConfigurationSection'
         ansible:
@@ -892,13 +888,7 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+          $ref: '#/components/schemas/SessionName'
         configurationName:
           type: string
           description: The name of a CFS configuration to apply
@@ -961,13 +951,7 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: Name of the session. The length of the name is restricted to 45 characters.
-          example: "session-20190728032600"
-          # These validation parameters are restricted by Kubernetes naming conventions.
-          minLength: 1
-          maxLength: 45
-          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+          $ref: '#/components/schemas/SessionName'
         configuration_name:
           type: string
           description: The name of a CFS configuration to apply
@@ -1059,30 +1043,48 @@ components:
           items:
             type: string
     ## CONFIGURATIONS ENDPOINT ##
+    ConfigurationLayerName:
+      type: string
+      description: The name of the configuration layer.
+      example: sample-config
+      minLength: 1
+      maxLength: 45
+    ConfigurationLayerCloneUrl:
+      type: string
+      description: The clone URL of the configuration content repository.
+      example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+      pattern: '^[^\s;]*$'
+    ConfigurationLayerPlaybook:
+      type: string
+      description: The Ansible playbook to run.
+      example: site.yml
+      pattern: '^[^\s;]*$'
+    ConfigurationLayerCommit:
+      type: string
+      description: The commit hash of the configuration repository when the state is set.
+      pattern: '^[a-f0-9]{40}$'
+    ConfigurationLayerBranch:
+      type: string
+      description: |
+        The repository branch to use. This will automatically set `commit` to master on the branch
+        when the configuration is added.
+      pattern: '^[^\s;]*$'
+    ConfigurationLayerSource:
+      type: string
+      description: A CFS source with directions to the configuration content repository
     V2AdditionalInventoryLayer:
       description: |
         An inventory reference to include in a set of configurations.
       type: object
       properties:
         name:
-          type: string
-          description: The name of the inventory layer.
-          example: sample-inventory
+          $ref: '#/components/schemas/ConfigurationLayerName'
         cloneUrl:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://vcs.domain/vcs/org/inventory.git
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
-          pattern: '^[a-f0-9]{40}$'
+          $ref: '#/components/schemas/ConfigurationLayerCommit'
         branch:
-          type: string
-          description: |
-            The repository branch to use. This will automatically set `commit` to master on the branch
-            when the configuration is added.
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerBranch'
       required: [cloneUrl]
       additionalProperties: false
     V3AdditionalInventoryLayer:
@@ -1093,29 +1095,15 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: The name of the inventory layer.
-          example: sample-inventory
-          minLength: 1
-          maxLength: 45
+          $ref: '#/components/schemas/ConfigurationLayerName'
         clone_url:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://vcs.domain/vcs/org/inventory.git
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         source:
-          type: string
-          description: A CFS source with directions to the configuration content repository
+          $ref: '#/components/schemas/ConfigurationLayerSource'
         commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
-          pattern: '^[a-f0-9]{40}$'
+          $ref: '#/components/schemas/ConfigurationLayerCommit'
         branch:
-          type: string
-          description: |
-            The repository branch to use. This will automatically set `commit` to master on the branch
-            when the configuration is added.
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerBranch'
       additionalProperties: false
     V2ConfigurationLayer:
       description: |
@@ -1123,29 +1111,15 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: The name of the configuration layer.
-          example: sample-config
+          $ref: '#/components/schemas/ConfigurationLayerName'
         cloneUrl:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         playbook:
-          type: string
-          description: The Ansible playbook to run.
-          example: site.yml
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerPlaybook'
         commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
-          pattern: '^[a-f0-9]{40}$'
+          $ref: '#/components/schemas/ConfigurationLayerCommit'
         branch:
-          type: string
-          description: |
-            The configuration branch to use.  This will automatically set commit to master on the branch
-            when the configuration is added.
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerBranch'
         specialParameters:
           type: object
           description: |
@@ -1167,34 +1141,17 @@ components:
       type: object
       properties:
         name:
-          type: string
-          description: The name of the configuration layer.
-          example: sample-config
-          minLength: 1
-          maxLength: 45
+          $ref: '#/components/schemas/ConfigurationLayerName'
         clone_url:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         source:
-          type: string
-          description: A CFS source with directions to the configuration content repository
+          $ref: '#/components/schemas/ConfigurationLayerSource'
         playbook:
-          type: string
-          description: The Ansible playbook to run.
-          example: site.yml
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerPlaybook'
         commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
-          pattern: '^[a-f0-9]{40}$'
+          $ref: '#/components/schemas/ConfigurationLayerCommit'
         branch:
-          type: string
-          description: |
-            The configuration branch to use.  This will automatically set commit to master on the branch
-            when the configuration is added.
-          pattern: '^[^\s;]*$'
+          $ref: '#/components/schemas/ConfigurationLayerBranch'
         special_parameters:
           type: object
           description: |
@@ -1280,6 +1237,10 @@ components:
         next:
           $ref: '#/components/schemas/V3NextData'
     ## COMPONENTS ENDPOINT ##
+    ConfigurationLayerStatus:
+        type: string
+        description: The status of the configuration layer.
+        enum: ['applied', 'failed', 'skipped']
     ComponentId:
       type: string
       description: The component's id. e.g. xname for hardware components
@@ -1332,13 +1293,9 @@ components:
       type: object
       properties:
         cloneUrl:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         playbook:
-          type: string
-          description: The Ansible playbook to run.
-          example: site.yml
+          $ref: '#/components/schemas/ConfigurationLayerPlaybook'
         commit:
           type: string
           description: The commit hash of the configuration repository when the state is set.
@@ -1349,8 +1306,7 @@ components:
           format: date-time
           readOnly: true
         sessionName:
-          type: string
-          description: The name of the CFS session that last configured the component.
+          $ref: '#/components/schemas/SessionName'
       additionalProperties: false
     V3ConfigurationStateLayer:
       description: |
@@ -1358,20 +1314,13 @@ components:
       type: object
       properties:
         clone_url:
-          type: string
-          description: The clone URL of the configuration content repository.
-          example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+          $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
         playbook:
-          type: string
-          description: The Ansible playbook to run.
-          example: site.yml
+          $ref: '#/components/schemas/ConfigurationLayerPlaybook'
         commit:
-          type: string
-          description: The commit hash of the configuration repository when the state is set.
+          $ref: '#/components/schemas/ConfigurationLayerCommit'
         status:
-          type: string
-          description: The status of the configuration layer.
-          enum: ['applied', 'failed', 'skipped']
+          $ref: '#/components/schemas/ConfigurationLayerStatus'
         last_updated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
@@ -1379,8 +1328,7 @@ components:
           format: date-time
           readOnly: true
         session_name:
-          type: string
-          description: The name of the CFS session that last configured the component.
+          $ref: '#/components/schemas/SessionName'
       additionalProperties: false
     V2ComponentState:
       description: |
@@ -1402,19 +1350,14 @@ components:
           description: A single state that will be appended to the list of current states.
           properties:
             cloneUrl:
-              type: string
-              description: The clone URL of the configuration content repository.
-              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+              $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
             playbook:
-              type: string
-              description: The Ansible playbook to run.
-              example: site.yml
+              $ref: '#/components/schemas/ConfigurationLayerPlaybook'
             commit:
               type: string
               description: The commit hash of the configuration repository when the state is set.
             sessionName:
-              type: string
-              description: The name of the CFS session that last configured the component.
+              $ref: '#/components/schemas/SessionName'
           additionalProperties: false
           writeOnly: true
         desiredConfig:
@@ -1468,23 +1411,17 @@ components:
           description: A single state that will be appended to the list of current states.
           properties:
             clone_url:
-              type: string
-              description: The clone URL of the configuration content repository.
-              example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
+              $ref: '#/components/schemas/ConfigurationLayerCloneUrl'
             playbook:
-              type: string
-              description: The Ansible playbook to run.
-              example: site.yml
+              $ref: '#/components/schemas/ConfigurationLayerPlaybook'
             commit:
-              type: string
-              description: The commit hash of the configuration repository when the state is set.
+              $ref: '#/components/schemas/ConfigurationLayerCommit'
             status:
               type: string
               description: The status of the configuration layer.
               enum: ['applied', 'failed', 'skipped']
             session_name:
-              type: string
-              description: The name of the CFS session that last configured the component.
+              $ref: '#/components/schemas/SessionName'
           additionalProperties: false
           writeOnly: true
         desired_state:
