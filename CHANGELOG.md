@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - API spec: Added information to `description` field of configuration layer schemas; specifically,
   added details on mutually exclusive fields.
+- CASMCMS-9634: Additional debug logging around Kafka bus operations
 
 ### Changed
 - CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
