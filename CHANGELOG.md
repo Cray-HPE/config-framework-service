@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- API spec: Added information to `description` field of configuration layer schemas; specifically,
+  added details on mutually exclusive fields.
+
 ### Changed
 - CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
   `status.session.job` field from being updated if the field has previously been set. Return a 409 error in

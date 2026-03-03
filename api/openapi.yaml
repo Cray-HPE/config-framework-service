@@ -1062,6 +1062,7 @@ components:
     V2AdditionalInventoryLayer:
       description: |
         An inventory reference to include in a set of configurations.
+        commit and branch are mutually exclusive.
       type: object
       properties:
         name:
@@ -1075,19 +1076,23 @@ components:
           pattern: '^[^\s;]*$'
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set.
+            Mutually exclusive with branch field.
           pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The repository branch to use. This will automatically set `commit` to master on the branch
             when the configuration is added.
+            Mutually exclusive with commit field.
           pattern: '^[^\s;]*$'
       required: [cloneUrl]
       additionalProperties: false
     V3AdditionalInventoryLayer:
       description: |
         An inventory reference to include in a set of configurations.
+        commit and branch are mutually exclusive.
         Either clone_url or source must be specified -- it is required to specify one,
         but they are mutually exclusive.
       type: object
@@ -1100,26 +1105,34 @@ components:
           maxLength: 45
         clone_url:
           type: string
-          description: The clone URL of the configuration content repository.
+          description: |
+            The clone URL of the configuration content repository.
+            Mutually exclusive with source field.
           example: https://vcs.domain/vcs/org/inventory.git
           pattern: '^[^\s;]*$'
         source:
           type: string
-          description: A CFS source with directions to the configuration content repository
+          description: |
+            A CFS source with directions to the configuration content repository.
+            Mutually exclusive with clone_url field.
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set.
+            Mutually exclusive with branch field.
           pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The repository branch to use. This will automatically set `commit` to master on the branch
             when the configuration is added.
+            Mutually exclusive with commit field.
           pattern: '^[^\s;]*$'
       additionalProperties: false
     V2ConfigurationLayer:
       description: |
         A single desired configuration state for a component.
+        commit and branch are mutually exclusive.
       type: object
       properties:
         name:
@@ -1138,13 +1151,16 @@ components:
           pattern: '^[^\s;]*$'
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set.
+            Mutually exclusive with branch field.
           pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The configuration branch to use.  This will automatically set commit to master on the branch
             when the configuration is added.
+            Mutually exclusive with commit field.
           pattern: '^[^\s;]*$'
         specialParameters:
           type: object
@@ -1162,6 +1178,7 @@ components:
     V3ConfigurationLayer:
       description: |
         A single desired configuration state for a component.
+        commit and branch are mutually exclusive.
         Either clone_url or source must be specified -- it is required to specify one,
         but they are mutually exclusive.
       type: object
@@ -1174,12 +1191,16 @@ components:
           maxLength: 45
         clone_url:
           type: string
-          description: The clone URL of the configuration content repository.
+          description: |
+            The clone URL of the configuration content repository.
+            Mutually exclusive with source field.
           example: https://api-gw-service-nmn.local/vcs/cray/config-management.git
           pattern: '^[^\s;]*$'
         source:
           type: string
-          description: A CFS source with directions to the configuration content repository
+          description: |
+            A CFS source with directions to the configuration content repository.
+            Mutually exclusive with clone_url field.
         playbook:
           type: string
           description: The Ansible playbook to run.
@@ -1187,13 +1208,16 @@ components:
           pattern: '^[^\s;]*$'
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set.
+            Mutually exclusive with branch field.
           pattern: '^[a-f0-9]{40}$'
         branch:
           type: string
           description: |
             The configuration branch to use.  This will automatically set commit to master on the branch
             when the configuration is added.
+            Mutually exclusive with commit field.
           pattern: '^[^\s;]*$'
         special_parameters:
           type: object
