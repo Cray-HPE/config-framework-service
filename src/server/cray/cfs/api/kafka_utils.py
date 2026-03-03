@@ -21,9 +21,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-import ujson as json
 import logging
 import os
+import threading
 import time
 
 from kafka import KafkaProducer
@@ -31,6 +31,8 @@ from kafka.errors import KafkaTimeoutError
 
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
+
+import ujson as json
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,11 +51,19 @@ class ProducerWrapper:
     """A wrapper around a Kafka connection"""
 
     def __init__(self, topic=None, ensure_init=True):
+        self._init_lock = threading.Lock()
         self.topic = topic
         self.producer = None
         self._init_producer(retry=ensure_init)
 
-    def _init_producer(self, retry=True):
+    def _init_producer(self, retry: bool=True) -> None:
+        with self._init_lock:
+            self._do_init_producer(retry=retry)
+
+    def _do_init_producer(self, retry: bool=True) -> None:
+        """
+        This should only be called while self._init_lock is held
+        """
         if self.producer:
             LOGGER.debug("_init_producer: calling self.producer.close()")
             try:
@@ -100,7 +110,7 @@ class ProducerWrapper:
     def _produce(self, topic, data):
         LOGGER.debug("_produce: Calling self.producer.send(), topic=%s", topic)
         self.producer.send(topic, data)
-        LOGGER.debug("_produce: Calling self.producer.flush(timeout=%d)", KAFKA_TIMEOUT)
+        LOGGER.debug("_produce: Calling self.producer.flush(timeout=%s)", KAFKA_TIMEOUT)
         self.producer.flush(timeout=KAFKA_TIMEOUT)
         LOGGER.debug("_produce: Done")
 
