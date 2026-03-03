@@ -412,7 +412,8 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     response = [ convert_component_to_v2(v3_patched_comp)
                  for v3_patched_comp in DB.patch_all_return_entries(component_filter,
                                                                     v3_patch,
-                                                                    update_handler=_update_handler)
+                                                                    update_handler=_update_handler,
+                                                                    patch_handler=_apply_component_patch)
                ]
     return response, 200
 
@@ -462,7 +463,9 @@ def _patch_v3_components_list(
             detail=str(err))
 
     try:
-        return DB.patch_list(id_patch_tuples, update_handler=_update_handler)
+        return DB.patch_list(id_patch_tuples,
+                             update_handler=_update_handler,
+                             patch_handler=_apply_component_patch)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -514,7 +517,8 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
     patch = _set_auto_fields(patch)
     component_ids = DB.patch_all_return_keys(component_filter,
                                              patch,
-                                             update_handler=_update_handler)
+                                             update_handler=_update_handler,
+                                             patch_handler=_apply_component_patch)
     response = {"component_ids": component_ids}
     return response, 200
 
@@ -635,7 +639,9 @@ def patch_component_v3(component_id: str) -> V3PatchComponentResponse:
 def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch) -> V3PatchComponentResponse:
     v3_patch = _set_auto_fields(v3_patch)
     try:
-        return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
+        return DB.patch(component_id, v3_patch,
+                        update_handler=_update_handler,
+                        patch_handler=_apply_component_patch), 200
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -670,6 +676,54 @@ def _delete_component(component_id: str) -> DeleteComponentResponse:
         return connexion.problem(
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
+
+
+def _apply_component_patch(v3_data: V3ComponentData,
+                           v3_patch: V3ComponentPatch) -> V3ComponentData:
+    """
+    If patching state layers, preserve timestamps of unchanged layers.
+    Then call the generic dbutils.patch_dict to do the actual patching.
+    """
+    if isinstance(v3_data.get('state'), list) and isinstance(v3_patch.get('state'), list):
+        for layer in v3_patch['state']:
+            _set_layer_timestamp(layer, v3_data['state'])
+    return dbutils.patch_dict(v3_data, v3_patch)
+
+
+def _set_layer_timestamp(v3_patch_layer: V3ComponentStateLayer,
+                         v3_data_layers: list[V3ComponentStateLayer]) -> None:
+    """
+    Check to see if any of the v3_data_layers exactly match the v3_patch_layer,
+    ignoring the last_updated field. If so, and if the matching layer has a non-empty
+    last_updated field set, then preserve this field value for that layer.
+    Changes v3_patch_layer in place and returns nothing.
+
+    It should never be the case that this function is called with a patch layer that
+    does not already have its last_updated field set (because the patch endpoints
+    call _set_auto_fields on the patch data), but if that is the case, then this
+    function will add a last_updated field to the patch layer (either the value
+    from a matching layer, or a new timestamp of the current time).
+    """
+    # This should always already be set, but just for caution, assume it may not be
+    layer_timestamp: str | None = v3_patch_layer.pop("last_updated", None)
+
+    for layer in v3_data_layers:
+        v3_patch_layer["last_updated"] = layer.get("last_updated")
+        if v3_patch_layer == layer:
+            # The patch layer is identical to the current layer (ignoring the last_updated field),
+            # so do not modify the existing last_updated field (if it is set to a non-empty value)
+            if v3_patch_layer["last_updated"]:
+                # It is set to a non-empty value
+                return
+
+    if not layer_timestamp:
+        # In theory this should never happen, since we should have already set this.
+        # But just in case.
+        layer_timestamp = datetime.now().strftime(TIME_FORMAT)
+
+    # No existing layer matches this one, so there is no last_updated timestamp to preserve
+    v3_patch_layer["last_updated"] = layer_timestamp
+    return
 
 
 def _set_auto_fields[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
