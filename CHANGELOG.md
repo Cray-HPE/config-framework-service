@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
   jobs for the same CFS session.
 - CASMCMS-9628: Mark all component state layer fields as required in API spec.
+- CASMCMS-9629: Update API spec to prevent CFS v2 commits with invalid status suffixes or invalid formats
 
 ### Fixed
 - CASMCMS-9630: When patching component state using CFS v2, generate the state layer `status` fields.

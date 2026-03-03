@@ -1365,7 +1365,12 @@ components:
           example: site.yml
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set,
+            possibly with one of the following suffixes: _failed, _skipped, _applied.
+            The suffix indicates the status of this layer. The absence of a suffix is
+            interpreted by CFS the same way as the _applied suffix.
+          pattern: '^[^_]*(_(applied|failed|skipped))?$'
         lastUpdated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
