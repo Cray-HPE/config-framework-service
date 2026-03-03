@@ -96,7 +96,9 @@ class JobFieldAlreadySet(Exception):
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
     global _kafka
+    LOGGER.debug("_init: Initializing ProducerWrapper")
     _kafka = kafka_utils.ProducerWrapper(topic)
+    LOGGER.debug("_init: ProducerWrapper initialized")
 
 
 @dbutils.redis_error_handler
@@ -164,7 +166,10 @@ def create_session_v2():  # noqa: E501
     session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(
                                                                                 timespec='seconds')
     _kafka.produce(event_type='CREATE', data=session_data)
-    response_data = DB.put(session_data['name'], session_data)
+    session_name = session_data['name']
+    LOGGER.debug("create_session_v2: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, session_data)
+    LOGGER.debug("create_session_v2: DB put complete for '%s'", session_name)
     return convert_session_to_v2(response_data), 200
 
 
@@ -223,7 +228,10 @@ def create_session_v3():  # noqa: E501
     data = session.to_dict()
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=data)
-    response_data = DB.put(data['name'], data)
+    session_name = data['name']
+    LOGGER.debug("create_session_v3: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, data)
+    LOGGER.debug("create_session_v3: DB put complete for '%s'", session_name)
     _set_link(response_data)
     return response_data, 201
 
@@ -296,6 +304,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
     If it does not exist, return a 404 error.
     Otherwise, add a delete event for this session to the Kafka bus, and return None, 204
     """
+    LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
     try:
         session = DB.get_delete(session_name)
     except dbutils.DBNoEntryError as err:
@@ -303,6 +312,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
+    LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
     _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
