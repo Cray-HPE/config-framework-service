@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - API spec: Added information to `description` field of configuration layer schemas; specifically,
   added details on mutually exclusive fields.
+- CASMCMS-9634: Additional debug logging around Kafka bus operations
 
 ### Changed
 - CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
@@ -17,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   jobs for the same CFS session.
 - CASMCMS-9628: Mark all component state layer fields as required in API spec.
 - CASMCMS-9629: Update API spec to prevent CFS v2 commits with invalid status suffixes or invalid formats
+- CASMCMS-9632: When patching component state data, preserve the `last_updated` fields for layers that are
+  not changed by the patch.
 
 ### Fixed
 - CASMCMS-9630: When patching component state using CFS v2, generate the state layer `status` fields.
