@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added missing spaces in two error messages.
 
+### Dependencies
+- Updated `pyasn1` to `0.6.2` to resolve CVE:
+  - https://snyk.io/vuln/SNYK-PYTHON-PYASN1-15032639
+- Updated the following modules to meet the new version requirements caused by the above update:
+  - `pyasn1-modules` to `0.4.2`
+
 ## [1.23.6] - 01/29/2025
 ### Changed
 - CASMCMS-9263: Make database scanning more performant
