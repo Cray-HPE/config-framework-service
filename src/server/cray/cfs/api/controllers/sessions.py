@@ -591,7 +591,7 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def patch_session_v3(session_name: str, start_time: Optional[str]=None) -> V3PatchSessionResponse:
+def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     """Update a Config Framework Session
 
     Updates a V3Session # noqa: E501
