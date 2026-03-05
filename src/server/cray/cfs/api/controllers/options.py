@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -347,7 +347,6 @@ def convert_options_from_v2(v2_data: V2OptionsData|V2OptionsPatch) -> V3OptionsD
 def defaults(**default_kwargs):
     """
     Allows controller functions to specify parameters that have defaults stored in options.
-    It also calls update_server_log_level
     """
     def wrap(f):
         @functools.wraps(f)
