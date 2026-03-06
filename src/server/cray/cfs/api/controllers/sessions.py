@@ -34,6 +34,7 @@ from uuid import UUID
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 import dateutil
+from kafka.errors import KafkaTimeoutError
 
 from cray.cfs.api import dbutils, kafka_utils
 from cray.cfs.api.controllers import options
@@ -47,7 +48,7 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
 CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
-_kafka = None
+KAFKA = None
 
 # For rudimentary type annotations
 
@@ -95,9 +96,9 @@ class JobFieldAlreadySet(Exception):
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
-    global _kafka
+    global KAFKA
     LOGGER.debug("_init: Initializing ProducerWrapper")
-    _kafka = kafka_utils.ProducerWrapper(topic)
+    KAFKA = kafka_utils.ProducerWrapper(topic)
     LOGGER.debug("_init: ProducerWrapper initialized")
 
 
@@ -163,13 +164,11 @@ def create_session_v2():  # noqa: E501
     # This is a workaround for the addition of the configuration name max length in v3
     session_data['configuration']['name'] = v2_session_configuration
     # end workaround
-    session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(
-                                                                                timespec='seconds')
-    _kafka.produce(event_type='CREATE', data=session_data)
-    session_name = session_data['name']
-    LOGGER.debug("create_session_v2: Writing new session '%s' to database", session_name)
-    response_data = DB.put(session_name, session_data)
-    LOGGER.debug("create_session_v2: DB put complete for '%s'", session_name)
+
+    response_data = _finish_session_create(session_data)
+    if isinstance(response_data, CxResponse):
+        return response_data
+
     return convert_session_to_v2(response_data), 200
 
 
@@ -226,12 +225,11 @@ def create_session_v3():  # noqa: E501
 
     session = _create_session(session_create)
     data = session.to_dict()
-    data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    _kafka.produce(event_type='CREATE', data=data)
-    session_name = data['name']
-    LOGGER.debug("create_session_v3: Writing new session '%s' to database", session_name)
-    response_data = DB.put(session_name, data)
-    LOGGER.debug("create_session_v3: DB put complete for '%s'", session_name)
+
+    response_data = _finish_session_create(data)
+    if isinstance(response_data, CxResponse):
+        return response_data
+
     _set_link(response_data)
     return response_data, 201
 
@@ -268,6 +266,42 @@ def _create_session(session_create):
     else:
         body['target'] = {'definition': 'dynamic'}
     return V3Session.from_dict(body)
+
+
+def _finish_session_create(data: V3SessionData) -> CxResponse | V3SessionData:
+    """
+    Common function shared between v2 and v3 which does the following:
+
+    1. Set the session start time
+    2. Send the CREATE event to the Kafka bus
+    3. Write the session to the database
+    """
+    data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
+    try:
+        KAFKA.produce(event_type='CREATE', data=data)
+    except kafka_utils.LockTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Timeout taking KafkaProducer lock"
+        )
+    except kafka_utils.ProducerInitTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Timeout initializing KafkaProducer"
+        )
+    except KafkaTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Kafka timeout error"
+        )
+    session_name = data['name']
+    LOGGER.debug("_finish_session_create: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, data)
+    LOGGER.debug("_finish_session_create: DB put complete for '%s'", session_name)
+    return response_data
 
 
 @dbutils.redis_error_handler
@@ -313,7 +347,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
     LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
-    _kafka.produce(event_type='DELETE', data=session)
+    KAFKA.produce(event_type='DELETE', data=session)
     return None, 204
 
 
@@ -445,7 +479,7 @@ def delete_sessions(age: Optional[str],
             status=400,
             title='Error parsing age field'
         )
-    deletion_handler = partial(_kafka.produce, event_type='DELETE')
+    deletion_handler = partial(KAFKA.produce, event_type='DELETE')
     session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     response = {"session_ids": session_ids}
     return response, 200

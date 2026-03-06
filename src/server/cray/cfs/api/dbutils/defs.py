@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,8 @@ from typing import Final
 from kubernetes import config, client
 from kubernetes.config.config_exception import ConfigException
 
-from .env_vars import get_pos_int_env_var_or_default
+from cray.cfs.api.env_utils import get_pos_int_env_var_or_default
+
 from .typing import DatabaseNames
 
 LOGGER = logging.getLogger(__name__)
