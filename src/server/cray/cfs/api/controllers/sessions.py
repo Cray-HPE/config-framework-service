@@ -23,7 +23,6 @@
 #
 import argparse
 import datetime
-import dateutil
 from functools import partial
 import logging
 import re
@@ -31,9 +30,11 @@ import shlex
 from uuid import UUID
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
+import dateutil
+from kafka.errors import KafkaTimeoutError
 
-from cray.cfs.api import dbutils
-from cray.cfs.api import kafka_utils
+from cray.cfs.api import dbutils, kafka_utils
 from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.controllers import options
 from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
@@ -45,7 +46,7 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
 CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
-_kafka = None
+KAFKA = None
 
 
 class JobFieldAlreadySet(Exception):
@@ -61,9 +62,9 @@ class JobFieldAlreadySet(Exception):
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
-    global _kafka
+    global KAFKA
     LOGGER.debug("_init: Initializing ProducerWrapper")
-    _kafka = kafka_utils.ProducerWrapper(topic)
+    KAFKA = kafka_utils.ProducerWrapper(topic)
     LOGGER.debug("_init: ProducerWrapper initialized")
 
 
@@ -129,15 +130,14 @@ def create_session_v2():  # noqa: E501
     # This is a workaround for the addition of the configuration name max length in v3
     session_data['configuration']['name'] = v2_session_configuration
     # end workaround
-    session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    _kafka.produce(event_type='CREATE', data=session_data)
-    session_name = session_data['name']
-    LOGGER.debug("create_session_v2: Writing new session '%s' to database", session_name)
-    response_data = DB.put(session_name, session_data)
-    LOGGER.debug("create_session_v2: DB put complete for '%s'", session_name)
-    resp_body = convert_session_to_v2(response_data)
-    LOGGER.debug("create_session_v2: Sending 200 response with body: %s", resp_body)
-    return resp_body, 200
+
+    response_data = _finish_session_create(session_data)
+    if isinstance(response_data, CxResponse):
+        return response_data
+
+    v2_response_data = convert_session_to_v2(response_data)
+    LOGGER.debug("create_session_v3: Sending 201 response with body: %s", v2_response_data)
+    return v2_response_data, 200
 
 
 @dbutils.redis_error_handler
@@ -193,12 +193,11 @@ def create_session_v3():  # noqa: E501
 
     session = _create_session(session_create)
     data = session.to_dict()
-    data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    _kafka.produce(event_type='CREATE', data=data)
-    session_name = data['name']
-    LOGGER.debug("create_session_v3: Writing new session '%s' to database", session_name)
-    response_data = DB.put(session_name, data)
-    LOGGER.debug("create_session_v3: DB put complete for '%s'", session_name)
+
+    response_data = _finish_session_create(data)
+    if isinstance(response_data, CxResponse):
+        return response_data
+
     _set_link(response_data)
     LOGGER.debug("create_session_v3: Sending 201 response with body: %s", response_data)
     return response_data, 201
@@ -238,6 +237,42 @@ def _create_session(session_create):
     return V3Session.from_dict(body)
 
 
+def _finish_session_create(data):
+    """
+    Common function shared between v2 and v3 which does the following:
+
+    1. Set the session start time
+    2. Send the CREATE event to the Kafka bus
+    3. Write the session to the database
+    """
+    data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
+    try:
+        KAFKA.produce(event_type='CREATE', data=data)
+    except kafka_utils.LockTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Timeout taking KafkaProducer lock"
+        )
+    except kafka_utils.ProducerInitTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Timeout initializing KafkaProducer"
+        )
+    except KafkaTimeoutError as err:
+        return connexion.problem(
+            detail=str(err),
+            status=503,
+            title="Kafka timeout error"
+        )
+    session_name = data['name']
+    LOGGER.debug("_finish_session_create: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, data)
+    LOGGER.debug("_finish_session_create: DB put complete for '%s'", session_name)
+    return response_data
+
+
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
 def delete_session_v2(session_name):  # noqa: E501
@@ -251,17 +286,7 @@ def delete_session_v2(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v2/sessions/id invoked delete_session")
-    if session_name not in DB:
-        return connexion.problem(
-            status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    session = DB.get(session_name)
-    LOGGER.debug("delete_session_v2: Deleting '%s' in database", session_name)
-    DB.delete(session_name)
-    LOGGER.debug("delete_session_v2: Deleted '%s' in database", session_name)
-    _kafka.produce(event_type='DELETE', data=session)
-    LOGGER.debug("delete_session_v2: Kafka DELETE event sent for '%s'", session_name)
-    return None, 204
+    return _delete_session(session_name)
 
 
 @dbutils.redis_error_handler
@@ -277,22 +302,35 @@ def delete_session_v3(session_name):  # noqa: E501
     :rtype: None
     """
     LOGGER.debug("DELETE /v3/sessions/id invoked delete_session")
-    if session_name not in DB:
+    return _delete_session(session_name)
+
+
+def _delete_session(session_name):  # noqa: E501
+    """Delete Config Framework Session
+
+     # noqa: E501
+
+    :param session_name: Config Framework Session name
+    :type session_name: str
+
+    :rtype: None
+    """
+    session = DB.get(session_name)
+    if not session:
         return connexion.problem(
             status=404, title="Session not found.",
-            detail="Session {} could not be found".format(session_name))
-    session = DB.get(session_name)
-    LOGGER.debug("delete_session_v3: Deleting '%s' in database", session_name)
+            detail=f"Session {session_name} could not be found")
+    LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
     DB.delete(session_name)
-    LOGGER.debug("delete_session_v3: Deleted '%s' in database", session_name)
-    _kafka.produce(event_type='DELETE', data=session)
-    LOGGER.debug("delete_session_v3: Kafka DELETE event sent for '%s'", session_name)
+    LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
+    KAFKA.produce(event_type='DELETE', data=session)
+    LOGGER.debug("_delete_session: Kafka DELETE event sent for '%s'", session_name)
     return None, 204
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v2(age=None,  min_age=None, max_age=None,
+def delete_sessions_v2(age=None, min_age=None, max_age=None,
                        status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
 
@@ -315,39 +353,27 @@ def delete_sessions_v2(age=None,  min_age=None, max_age=None,
 
     :rtype: None
     """
-    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions")
-    tag_list = []
-    if tags:
-        try:
-            tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
-            for tag in tag_list:
-                assert(len(tag) == 2)
-        except Exception as err:
-            return connexion.problem(
-                status=400, title="Error parsing the tags provided.",
-                detail=str(err))
-    try:
-        sessions_data, _ = _get_filtered_sessions(age=age, min_age=min_age, max_age=max_age,
-                                                  status=status, name_contains=name_contains,
-                                                  succeeded=succeeded, tag_list=tag_list)
-        for session in sessions_data:
-            session_name = session['name']
-            LOGGER.debug("delete_sessions_v2: Deleting '%s' in database", session_name)
-            DB.delete(session_name)
-            LOGGER.debug("delete_sessions_v2: Deleted '%s' in database", session_name)
-            _kafka.produce(event_type='DELETE', data=session)
-    except ParsingException as err:
-        return connexion.problem(
-            detail=str(err),
-            status=400,
-            title='Error parsing age field'
-        )
-    return None, 204
+    LOGGER.debug("DELETE /v2/sessions invoked delete_sessions_v2")
+    # This endpoint is the same as the v3 version except for what it returns when successful:
+    # the v3 endpoint returns 204 status and a dict containing the deleted IDs
+    # the v2 endpoint returns 200 status and None
+    #
+    # Because of this, both endpoints use a common function to do the actual work.
+    response, status_code = delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                                           status=status, name_contains=name_contains,
+                                           succeeded=succeeded, tags=tags)
+    if status_code == 200:
+        # This means it was successful. The v2 endpoint returns None, 204 in this case.
+        return None, 204
+
+    # This means there was an error, in which case the v2 and v3 endpoints are the same in
+    # in terms of the response.
+    return response, status_code
 
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v3(age=None,  min_age=None, max_age=None,
+def delete_sessions_v3(age=None, min_age=None, max_age=None,
                        status=None, name_contains=None, succeeded=None, tags=None):  # noqa: E501
     """Delete Config Framework Sessions
 
@@ -368,15 +394,43 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
     :param tags: A filter on session tags
     :type tags: bool
 
-    :rtype: None
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
     """
-    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions")
+    LOGGER.debug("DELETE /v3/sessions invoked delete_sessions_v3")
+    return delete_sessions(age=age, min_age=min_age, max_age=max_age,
+                          status=status, name_contains=name_contains,
+                          succeeded=succeeded, tags=tags)
+
+
+def delete_sessions(age, min_age, max_age,
+                    status, name_contains, succeeded, tags):
+    """Delete Config Framework Sessions
+
+    :param age: An age filter in the form 1d.
+    :type age: str
+    :param min_age: An age filter in the form 1d.
+    :type min_age: str
+    :param max_age: An age filter in the form 1d.
+    :type max_age: str
+    :param status: A session status filter
+    :type status: str
+    :param name_contains: A filter on session names
+    :type name_contains: str
+    :param succeeded: A filter on session success
+    :type succeeded: bool
+    :param tags: A filter on session tags
+    :type tags: bool
+
+    :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
+    Otherwise returns a connexion.problem object
+    """
     tag_list = []
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
             for tag in tag_list:
-                assert(len(tag) == 2)
+                assert len(tag) == 2
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
@@ -385,14 +439,14 @@ def delete_sessions_v3(age=None,  min_age=None, max_age=None,
         session_filter = _get_session_filter(age=age, min_age=min_age, max_age=max_age,
                                              status=status, name_contains=name_contains,
                                              succeeded=succeeded, tag_list=tag_list)
-        deletion_handler = partial(_kafka.produce, event_type='DELETE')
-        session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     except ParsingException as err:
         return connexion.problem(
             detail=str(err),
             status=400,
             title='Error parsing age field'
         )
+    deletion_handler = partial(KAFKA.produce, event_type='DELETE')
+    session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     response = {"session_ids": session_ids}
     return response, 200
 
