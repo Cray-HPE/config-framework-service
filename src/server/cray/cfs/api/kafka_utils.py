@@ -100,7 +100,7 @@ class ProducerWrapper:
     def _produce(self, topic, data):
         LOGGER.debug("_produce: Calling self.producer.send(), topic=%s", topic)
         self.producer.send(topic, data)
-        LOGGER.debug("_produce: Calling self.producer.flush(timeout=%d)", KAFKA_TIMEOUT)
+        LOGGER.debug("_produce: Calling self.producer.flush(timeout=%s)", KAFKA_TIMEOUT)
         self.producer.flush(timeout=KAFKA_TIMEOUT)
         LOGGER.debug("_produce: Done")
 
