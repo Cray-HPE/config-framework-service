@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2024, 2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -43,6 +43,7 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
@@ -106,6 +107,7 @@ def _iter_configurations_data():
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_source_v3(source_id):
     """Used by the GET /sources/{source_id} API operation"""
     LOGGER.debug(f"GET /sources/{source_id} invoked get_source_v3")
@@ -118,6 +120,7 @@ def get_source_v3(source_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def post_source_v3():
     """Used by the POST /sources/ API operation"""
     LOGGER.debug("POST /sources/ invoked post_source_v3")
@@ -155,6 +158,7 @@ def post_source_v3():
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_source_v3(source_id):
     """Used by the PATCH /sources/{source_id} API operation"""
     LOGGER.debug(f"PATCH /sources/{source_id} invoked patch_source_v3")
@@ -180,6 +184,7 @@ def patch_source_v3(source_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
     LOGGER.debug(f"POST /sources/{source_id} invoked restore_source_v3")
@@ -245,6 +250,7 @@ def _clean_credentials_data(data):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_source_v3(source_id):
     """Used by the DELETE /sources/{source_id} API operation"""
     LOGGER.debug(f"DELETE /sources/{source_id} invoked delete_source_v3")

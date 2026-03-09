@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,6 +45,7 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_configurations_v2(in_use=None):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /configurations invoked get_configurations")
@@ -57,6 +58,7 @@ def get_configurations_v2(in_use=None):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 @options.defaults(limit="default_page_size")
 def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
@@ -121,6 +123,7 @@ def _config_in_use(config_name: str) -> bool:
     return False
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_configuration_v2(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /configurations/id invoked get_configuration")
@@ -132,6 +135,7 @@ def get_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def get_configuration_v3(configuration_id):
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /configurations/id invoked get_configuration")
@@ -143,6 +147,7 @@ def get_configuration_v3(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_configuration_v2(configuration_id):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /configurations/id invoked put_configuration")
@@ -182,6 +187,7 @@ def put_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /configurations/id invoked put_configuration")
@@ -237,6 +243,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_configuration_v2(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /configurations/id invoked put_configuration")
@@ -256,6 +263,7 @@ def patch_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def patch_configuration_v3(configuration_id):
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /configurations/id invoked put_configuration")
@@ -276,6 +284,7 @@ def patch_configuration_v3(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_configuration_v2(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")
@@ -292,6 +301,7 @@ def delete_configuration_v2(configuration_id):
 
 
 @dbutils.redis_error_handler
+@options.refresh_options_update_loglevel
 def delete_configuration_v3(configuration_id):
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /configurations/id invoked delete_configuration")

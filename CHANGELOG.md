@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Added missing spaces in two error messages.
+- CASMCMS-9571: Fixed bug preventing CFS log level from updating correctly on the running server
 
 ### Dependencies
 - Updated `pyasn1` to `0.6.2` to resolve CVE:
