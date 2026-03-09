@@ -193,6 +193,8 @@ def create_session_v3():  # noqa: E501
     data = session.to_dict()
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=data)
+    LOGGER.info("Calling Kafka produce again, to simulate CAST-39551")
+    _kafka.produce(event_type='CREATE', data=data)
     session_name = data['name']
     LOGGER.debug("create_session_v3: Writing new session '%s' to database", session_name)
     response_data = DB.put(session_name, data)
