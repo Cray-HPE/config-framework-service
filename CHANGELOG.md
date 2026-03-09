@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.7] - 03/09/2026
 ### Added
 - API spec: Added information to `description` field of configuration layer schemas; specifically,
   added details on mutually exclusive fields.
