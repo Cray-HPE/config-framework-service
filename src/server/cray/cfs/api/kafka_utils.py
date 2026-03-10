@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -55,16 +55,19 @@ class ProducerWrapper:
 
     def _init_producer(self, retry=True):
         if self.producer:
+            LOGGER.debug("_init_producer: calling self.producer.close()")
             try:
                 self.producer.close(timeout=KAFKA_TIMEOUT)
             except KafkaTimeoutError as e:
                 LOGGER.warning('Unable to close previous Kafka producer: {}'.format(e))
+            LOGGER.debug("_init_producer: self.producer.close() completed")
             self.producer = None
         while not self.producer:
             svc_obj = k8ssvcs.read_namespaced_service("cray-shared-kafka-kafka-bootstrap",
                                                       "services")
             host = svc_obj.spec.cluster_ip
             kafka = host+':'+KAFKA_PORT
+            LOGGER.debug("_init_producer: Initializing KafkaProducer, bootstrap_server %s", kafka)
             try:
                 self.producer = KafkaProducer(
                     bootstrap_servers=[kafka],
@@ -75,9 +78,10 @@ class ProducerWrapper:
                 if not retry:
                     return
                 time.sleep(5)
-
+            LOGGER.debug("_init_producer: KafkaProducer successfully initialized")
 
     def produce(self, data, event_type, topic=None):
+        LOGGER.debug("produce: event_type=%s, data=%s", event_type, data)
         if not topic:
             topic = self.topic
         event = {
@@ -94,8 +98,13 @@ class ProducerWrapper:
         self._produce(topic, event)
 
     def _produce(self, topic, data):
+        LOGGER.debug("_produce: Calling self.producer.send(), topic=%s", topic)
         self.producer.send(topic, data)
+        LOGGER.debug("_produce: Calling self.producer.flush(timeout=%s)", KAFKA_TIMEOUT)
         self.producer.flush(timeout=KAFKA_TIMEOUT)
+        LOGGER.debug("_produce: Done")
 
     def flush(self):
+        LOGGER.debug("flush: Calling self.producer.flush()")
         self.producer.flush()
+        LOGGER.debug("flush: Done")
