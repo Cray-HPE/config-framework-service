@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1365,7 +1365,12 @@ components:
           example: site.yml
         commit:
           type: string
-          description: The commit hash of the configuration repository when the state is set.
+          description: |
+            The commit hash of the configuration repository when the state is set,
+            possibly with one of the following suffixes: _failed, _skipped, _applied.
+            The suffix indicates the status of this layer. The absence of a suffix is
+            interpreted by CFS the same way as the _applied suffix.
+          pattern: '^[^_]*(_(applied|failed|skipped))?$'
         lastUpdated:
           type: string
           description: The date/time when the state was last updated in RFC 3339 format.
@@ -1375,6 +1380,7 @@ components:
         sessionName:
           type: string
           description: The name of the CFS session that last configured the component.
+      required: [cloneUrl, commit, lastUpdated, playbook, sessionName]
       additionalProperties: false
     V3ConfigurationStateLayer:
       description: |
@@ -1405,6 +1411,7 @@ components:
         session_name:
           type: string
           description: The name of the CFS session that last configured the component.
+      required: [clone_url, commit, last_updated, playbook, session_name, status]
       additionalProperties: false
     V2ComponentState:
       description: |
