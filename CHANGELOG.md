@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `status.session.job` field from being updated if the field has previously been set. Return a 409 error in
   that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
   jobs for the same CFS session.
+- Ensure Snyk failures reported by Jenkins are ones that require review
 
 ### Dependencies
 - Bumped minimum version of `pyasn1` from `0.6.1` to `0.6.2`
