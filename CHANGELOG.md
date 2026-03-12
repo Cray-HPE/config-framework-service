@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
   jobs for the same CFS session.
 
+### Dependencies
+- Bumped minimum version of `pyasn1` from `0.6.1` to `0.6.2`
+- Bumped minimum version of `PyYAML` from `6.0.1` to `6.0.2`
+
 ## [1.29.3] - 12/18/2025
 
 ### Fixed
