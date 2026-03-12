@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] - 03/12/2026
+
+### Added
+- API spec: Added information to `description` field of configuration layer schemas; specifically,
+  added details on mutually exclusive fields.
+- CASMCMS-9634: Additional debug logging around Kafka bus operations
+
+### Changed
+- CASMCMS-9627: When patching a session using the `/v3/sessions/{session_name}` PATCH endpoint, prevent the
+  `status.session.job` field from being updated if the field has previously been set. Return a 409 error in
+  that situation. This is primarily to handle the case where `cfs-operator` attempts to create two Kubernetes
+  jobs for the same CFS session.
+- Ensure Snyk failures reported by Jenkins are ones that require review
+
+### Dependencies
+- Bumped minimum version of `pyasn1` from `0.6.1` to `0.6.2`
+- Bumped minimum version of `PyYAML` from `6.0.1` to `6.0.2`
+
 ## [1.29.3] - 12/18/2025
 
 ### Fixed

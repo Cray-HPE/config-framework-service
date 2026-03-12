@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -81,10 +81,24 @@ type V3DeleteSessionsResponse = tuple[SessionIdListDict, Literal[200]] | CxRespo
 type V2PatchSessionResponse = tuple[V2SessionData, Literal[200]] | CxResponse
 type V3PatchSessionResponse = tuple[V3SessionData, Literal[200]] | CxResponse
 
+
+class JobFieldAlreadySet(Exception):
+    """
+    CASMCMS-9627: Raised when attempting to patch a status.session.job field when it is already set
+    """
+    def __init__(self, patch_job: str, actual_job: str) -> None:
+        super().__init__(
+            "status.session.job field cannot be updated after it has been set; "
+            f"current value: {actual_job}, patch value: {patch_job}"
+        )
+
+
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
     global _kafka
+    LOGGER.debug("_init: Initializing ProducerWrapper")
     _kafka = kafka_utils.ProducerWrapper(topic)
+    LOGGER.debug("_init: ProducerWrapper initialized")
 
 
 @dbutils.redis_error_handler
@@ -152,7 +166,10 @@ def create_session_v2():  # noqa: E501
     session_data['status']['session']['start_time'] = datetime.datetime.now().isoformat(
                                                                                 timespec='seconds')
     _kafka.produce(event_type='CREATE', data=session_data)
-    response_data = DB.put(session_data['name'], session_data)
+    session_name = session_data['name']
+    LOGGER.debug("create_session_v2: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, session_data)
+    LOGGER.debug("create_session_v2: DB put complete for '%s'", session_name)
     return convert_session_to_v2(response_data), 200
 
 
@@ -211,7 +228,10 @@ def create_session_v3():  # noqa: E501
     data = session.to_dict()
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
     _kafka.produce(event_type='CREATE', data=data)
-    response_data = DB.put(data['name'], data)
+    session_name = data['name']
+    LOGGER.debug("create_session_v3: Writing new session '%s' to database", session_name)
+    response_data = DB.put(session_name, data)
+    LOGGER.debug("create_session_v3: DB put complete for '%s'", session_name)
     _set_link(response_data)
     return response_data, 201
 
@@ -284,6 +304,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
     If it does not exist, return a 404 error.
     Otherwise, add a delete event for this session to the Kafka bus, and return None, 204
     """
+    LOGGER.debug("_delete_session: Deleting '%s' in database", session_name)
     try:
         session = DB.get_delete(session_name)
     except dbutils.DBNoEntryError as err:
@@ -291,6 +312,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
+    LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
     _kafka.produce(event_type='DELETE', data=session)
     return None, 204
 
@@ -539,8 +561,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
     """Update a Config Framework Session
 
-    Updates a new V2Session # noqa: E501
-
+    Updates a V2Session # noqa: E501
     :rtype: V2Session
     """
     LOGGER.debug("PATCH /v2/sessions/%s invoked patch_session_v2", session_name)
@@ -553,8 +574,13 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
             status=400, title="Bad Request",
             detail=str(err))
     v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
+    # CASMCMS-9627: To minimize changes, only update the V3 API.
+    # This is fine because that is what cfs-operator uses. This also allows
+    # a way for an admin to bypass the restrictions, if for some reason it is ever
+    # needed.
+    patch_handler = partial(_patch_session, job_update_restrictions=False)
     try:
-        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -568,7 +594,9 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
 def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     """Update a Config Framework Session
 
-    Updates a new V3Session # noqa: E501
+    Updates a V3Session # noqa: E501
+
+    If the job field is being patched, return a 409 if the job field has already been set
 
     :rtype: V3Session
     """
@@ -581,13 +609,19 @@ def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
         return connexion.problem(
             status=400, title="Bad Request",
             detail=str(err))
+    patch_handler = partial(_patch_session, job_update_restrictions=True)
     try:
-        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=_patch_session)
+        v3_session_data = DB.patch(session_name, v3_patch_data, patch_handler=patch_handler)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
+    except JobFieldAlreadySet as err:
+        LOGGER.debug(err)
+        return connexion.problem(
+            status=409, title="Session patch conflict.",
+            detail=f"Session {session_name} could not be patched: {err}")
     return v3_session_data, 200
 
 
@@ -599,13 +633,21 @@ STATUS_ORDERING = {
 }
 
 
-def _patch_session(session_data: V3SessionData, patch_data: V3SessionPatchData) -> V3SessionData:
+def _patch_session(session_data: V3SessionData,
+                   patch_data: V3SessionPatchData,
+                   job_update_restrictions: bool) -> V3SessionData:
     """
     Applies the patch_data to the specified session_data, and returns the updated session data.
+    If job_update_restrictions is true, call _enforce_job_update_restrictions.
     """
     status = session_data['status']
     artifacts = status['artifacts']
     session = status['session']
+
+    patch_session = patch_data.get('status', {}).get('session', {})
+
+    if job_update_restrictions:
+        _enforce_job_update_restrictions(session, patch_session)
 
     # Artifacts
     for artifact in patch_data.get('status', {}).get('artifacts', []):
@@ -619,7 +661,7 @@ def _patch_session(session_data: V3SessionData, patch_data: V3SessionPatchData) 
             artifacts.append(artifact)  # No artifacts matched
 
     # Session Status
-    for key, value in patch_data.get('status', {}).get('session', {}).items():
+    for key, value in patch_session.items():
         if value:  # Never overwrite with an empty field
             if key in STATUS_ORDERING:
                 ordering = STATUS_ORDERING[key]
@@ -634,6 +676,28 @@ def _patch_session(session_data: V3SessionData, patch_data: V3SessionPatchData) 
 
     return session_data
 
+
+def _enforce_job_update_restrictions(session_status_session_data: dbutils.JsonDict,
+                                     patch_status_session_data: dbutils.JsonDict) -> None:
+    """
+    Raise JobFieldAlreadySet exception if the patch is setting the job field after
+    it already has been set.
+
+    session_status_session_data = .status.session for the existing CFS session
+    patch_status_session_data = .status.session for the patch
+    """
+    try:
+        session_job = session_status_session_data["job"]
+        patch_job = patch_status_session_data["job"]
+    except KeyError:
+        # No problem if the field is not present in the existing CFS entry,
+        # or not in the patch data
+        return
+
+    # The field is present in both the CFS DB and the patch data. Raise an exception if
+    # the CFS DB field has already been set and the patch is trying to set it.
+    if session_job and patch_job:
+        raise JobFieldAlreadySet(patch_job, session_job)
 
 def _validate_session_target(target):
     """Validate the target section
