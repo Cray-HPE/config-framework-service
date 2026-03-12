@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022, 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,13 +28,13 @@ from typing import Literal, Optional
 
 import redis
 
-from cray.cfs.api import dbutils, kafka_utils
+from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import options
+from cray.cfs.api.controllers.sessions import KAFKA
 from cray.cfs.api.models.healthz import Healthz
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.healthz')
 DB = dbutils.get_wrapper(db='options')
-KAFKA = None
 
 def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
     """Used by the GET /healthz API operation"""
@@ -84,16 +84,12 @@ def _get_db_status() -> str:
 
 
 def _get_kafka_status() -> str:
-    global KAFKA
     available = False
     try:
-        if not KAFKA or not KAFKA.producer:
-            KAFKA = kafka_utils.ProducerWrapper(ensure_init=False)
-            available = True
-        elif KAFKA.producer.metrics():
+        if KAFKA.producer.metrics():
             available = True
     except Exception as e:
-        LOGGER.error(e)
+        LOGGER.error("%s: %s", type(e).__name__, e)
 
     if available:
         return 'ok'
