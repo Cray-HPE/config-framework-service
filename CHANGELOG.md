@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CASMCMS-9629: Update API spec to prevent CFS v2 commits with invalid status suffixes or invalid formats
 - CASMCMS-9632: When patching component state data, preserve the `last_updated` fields for layers that are
   not changed by the patch.
+- Ensure Snyk failures reported by Jenkins are ones that require review
 
 ### Fixed
 - CASMCMS-9630: When patching component state using CFS v2, generate the state layer `status` fields.
