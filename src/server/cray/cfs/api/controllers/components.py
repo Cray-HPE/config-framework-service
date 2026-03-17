@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -344,7 +344,7 @@ def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchCo
         while v2_patch_list:
             # Pop each entry off the input list in order to reduce memory use
             v2_patch = v2_patch_list.pop(0)
-            v3_patch_list.append(dbutils.convert_data_from_v2(v2_patch, V2Component))
+            v3_patch_list.append(convert_component_patch_to_v3(v2_patch))
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
@@ -406,13 +406,14 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
     # the return value, but we specify a default of None purely to avoid
     # the KeyError being raised.
     v2_patch.pop("id", None)
-    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = convert_component_patch_to_v3(v2_patch)
     v3_patch = _set_auto_fields(v3_patch)
 
     response = [ convert_component_to_v2(v3_patched_comp)
                  for v3_patched_comp in DB.patch_all_return_entries(component_filter,
                                                                     v3_patch,
-                                                                    update_handler=_update_handler)
+                                                                    update_handler=_update_handler,
+                                                                    patch_handler=_apply_component_patch)
                ]
     return response, 200
 
@@ -462,7 +463,9 @@ def _patch_v3_components_list(
             detail=str(err))
 
     try:
-        return DB.patch_list(id_patch_tuples, update_handler=_update_handler)
+        return DB.patch_list(id_patch_tuples,
+                             update_handler=_update_handler,
+                             patch_handler=_apply_component_patch)
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -514,7 +517,8 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
     patch = _set_auto_fields(patch)
     component_ids = DB.patch_all_return_keys(component_filter,
                                              patch,
-                                             update_handler=_update_handler)
+                                             update_handler=_update_handler,
+                                             patch_handler=_apply_component_patch)
     response = {"component_ids": component_ids}
     return response, 200
 
@@ -604,7 +608,7 @@ def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
-    v3_patch = dbutils.convert_data_from_v2(v2_patch, V2Component)
+    v3_patch = convert_component_patch_to_v3(v2_patch)
     v3_patch_response = _patch_component_v3(component_id, v3_patch)
     if not isinstance(v3_patch_response, tuple):
         # This means it is a failure CxResponse.
@@ -635,7 +639,9 @@ def patch_component_v3(component_id: str) -> V3PatchComponentResponse:
 def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch) -> V3PatchComponentResponse:
     v3_patch = _set_auto_fields(v3_patch)
     try:
-        return DB.patch(component_id, v3_patch, update_handler=_update_handler), 200
+        return DB.patch(component_id, v3_patch,
+                        update_handler=_update_handler,
+                        patch_handler=_apply_component_patch), 200
     except dbutils.DBNoEntryError as err:
         LOGGER.debug(err)
         return connexion.problem(
@@ -670,6 +676,54 @@ def _delete_component(component_id: str) -> DeleteComponentResponse:
         return connexion.problem(
             status=404, title="Component not found.",
             detail=f"Component {component_id} could not be found")
+
+
+def _apply_component_patch(v3_data: V3ComponentData,
+                           v3_patch: V3ComponentPatch) -> V3ComponentData:
+    """
+    If patching state layers, preserve timestamps of unchanged layers.
+    Then call the generic dbutils.patch_dict to do the actual patching.
+    """
+    if isinstance(v3_data.get('state'), list) and isinstance(v3_patch.get('state'), list):
+        for layer in v3_patch['state']:
+            _set_layer_timestamp(layer, v3_data['state'])
+    return dbutils.patch_dict(v3_data, v3_patch)
+
+
+def _set_layer_timestamp(v3_patch_layer: V3ComponentStateLayer,
+                         v3_data_layers: list[V3ComponentStateLayer]) -> None:
+    """
+    Check to see if any of the v3_data_layers exactly match the v3_patch_layer,
+    ignoring the last_updated field. If so, and if the matching layer has a non-empty
+    last_updated field set, then preserve this field value for that layer.
+    Changes v3_patch_layer in place and returns nothing.
+
+    It should never be the case that this function is called with a patch layer that
+    does not already have its last_updated field set (because the patch endpoints
+    call _set_auto_fields on the patch data), but if that is the case, then this
+    function will add a last_updated field to the patch layer (either the value
+    from a matching layer, or a new timestamp of the current time).
+    """
+    # This should always already be set, but just for caution, assume it may not be
+    layer_timestamp: str | None = v3_patch_layer.pop("last_updated", None)
+
+    for layer in v3_data_layers:
+        v3_patch_layer["last_updated"] = layer.get("last_updated")
+        if v3_patch_layer == layer:
+            # The patch layer is identical to the current layer (ignoring the last_updated field),
+            # so do not modify the existing last_updated field (if it is set to a non-empty value)
+            if v3_patch_layer["last_updated"]:
+                # It is set to a non-empty value
+                return
+
+    if not layer_timestamp:
+        # In theory this should never happen, since we should have already set this.
+        # But just in case.
+        layer_timestamp = datetime.now().strftime(TIME_FORMAT)
+
+    # No existing layer matches this one, so there is no last_updated timestamp to preserve
+    v3_patch_layer["last_updated"] = layer_timestamp
+    return
 
 
 def _set_auto_fields[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
@@ -853,6 +907,19 @@ def convert_component_to_v3(data: V2ComponentData) -> V3ComponentData:
     data = dbutils.convert_data_from_v2(data, V2Component)
     converted_state = [_convert_component_layer_to_v3(layer) for layer in data["state"]]
     data["state"] = converted_state
+    return data
+
+
+def convert_component_patch_to_v3(data: V2ComponentPatch) -> V3ComponentPatch:
+    """
+    Exactly the same as convert_component_to_v3, except that we should not raise
+    an exception if the state field is absent (because it is okay to have a patch
+    operation which does not modify it)
+    """
+    data = dbutils.convert_data_from_v2(data, V2Component)
+    if "state" in data:
+        converted_state = [_convert_component_layer_to_v3(layer) for layer in data["state"]]
+        data["state"] = converted_state
     return data
 
 
