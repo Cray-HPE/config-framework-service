@@ -399,6 +399,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    KafkaTimeout:
+      description: The request could not be completed because of a Kafka-related timeout.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
   schemas:
     Version:
       description: Version data
@@ -1990,6 +1996,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         409:
           $ref: '#/components/responses/ConflictingSessionName'
+        503:
+          $ref: '#/components/responses/KafkaTimeout'
     delete:
       summary: Delete multiple configuration framework sessions
       tags:
@@ -2534,6 +2542,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         409:
           $ref: '#/components/responses/ConflictingSessionName'
+        503:
+          $ref: '#/components/responses/KafkaTimeout'
     delete:
       summary: Delete multiple configuration framework sessions
       tags:

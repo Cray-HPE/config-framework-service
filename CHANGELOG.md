@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - CASMCMS-9630: When patching component state using CFS v2, generate the state layer `status` fields.
+- CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
 
 ## [1.30.0] - 03/12/2026
 

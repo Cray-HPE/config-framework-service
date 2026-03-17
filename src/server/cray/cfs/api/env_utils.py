@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -65,4 +65,39 @@ def get_pos_int_env_var_or_default(env_var_name: str, default_value: int) -> int
     if value_from_env is not None:
         return value_from_env
     LOGGER.debug("Using default value (%d) for %s", default_value, env_var_name)
+    return default_value
+
+def get_pos_float_env_var(varname: str) -> Optional[float]:
+    """
+    If the specified environment variable is set to a positive base-10 float string
+    value, return it (as a float). Otherwise, log a relevant warning message and return None.
+    """
+    env_value = os.environ.get(varname)
+    if env_value is None:
+        LOGGER.debug("%s environment variable not set", varname)
+        return None
+    try:
+        env_value_float = float(env_value)
+    except ValueError as err:
+        LOGGER.debug("ValueError parsing %s environment variable: %s", varname, err)
+        LOGGER.warning("%s environment variable not a base 10 number: %s", varname, env_value)
+        return None
+    if env_value_float > 0:
+        LOGGER.debug("%s environment variable set to %f", varname, env_value_float)
+        return env_value_float
+    LOGGER.warning(
+        "%s environment variable not a positive base 10 number: %f", varname, env_value_float
+    )
+    return None
+
+def get_pos_float_env_var_or_default(env_var_name: str, default_value: float) -> float:
+    """
+    If the specified environment variable is set to a positive base-10 float string
+    value, return it (as a float). Otherwise, log a relevant warning message and return the
+    default value.
+    """
+    value_from_env = get_pos_float_env_var(env_var_name)
+    if value_from_env is not None:
+        return value_from_env
+    LOGGER.debug("Using default value (%f) for %s", default_value, env_var_name)
     return default_value
