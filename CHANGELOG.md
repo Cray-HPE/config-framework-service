@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 03/17/2026
+
 ### Changed
 - CASMCMS-9628: Mark all component state layer fields as required in API spec.
 - CASMCMS-9629: Update API spec to prevent CFS v2 commits with invalid status suffixes or invalid formats
