@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.1] - 04/20/2026
+
 ### Changed
 - CASMCMS-9643: Updated outdated type annotations to best practices for current CFS Python version (3.12)
 
