@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies
+- CASMCMS-9643: Remove unnecessary constraints from `constraints.txt`, and added missing ones
+  (set to match the versions currently being used)
+
 ## [1.31.0] - 03/17/2026
 
 ### Changed
