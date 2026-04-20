@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,6 @@
 from collections.abc import Callable
 import functools
 import logging
-from typing import Optional
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -79,7 +78,7 @@ def get_tenant_from_header() -> str:
             tenant = ""
     return tenant
 
-def get_tenant_data(tenant: str, session: Optional[requests.Session] = None):
+def get_tenant_data(tenant: str, session: requests.Session | None = None):
     url = f"{TENANT_ENDPOINT}/{tenant}"
     with retry_session_get(url, session=session) as response:
         try:

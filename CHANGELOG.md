@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- CASMCMS-9643: Updated outdated type annotations to best practices for current CFS Python version (3.12)
+
 ### Fixed
 - CASMCMS-9643: Added missing import in `src/server/cray/cfs/utils/core_client.py`
 

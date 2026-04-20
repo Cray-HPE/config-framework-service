@@ -28,11 +28,10 @@ Utilities for getting information from environment variables
 
 import logging
 import os
-from typing import Optional
 
 LOGGER = logging.getLogger(__name__)
 
-def get_pos_int_env_var(varname: str) -> Optional[int]:
+def get_pos_int_env_var(varname: str) -> int | None:
     """
     If the specified environment variable is set to a positive base-10 integer string
     value, return it (as an integer). Otherwise, log a relevant warning message and return None.
@@ -67,7 +66,7 @@ def get_pos_int_env_var_or_default(env_var_name: str, default_value: int) -> int
     LOGGER.debug("Using default value (%d) for %s", default_value, env_var_name)
     return default_value
 
-def get_pos_float_env_var(varname: str) -> Optional[float]:
+def get_pos_float_env_var(varname: str) -> float | None:
     """
     If the specified environment variable is set to a positive base-10 float string
     value, return it (as a float). Otherwise, log a relevant warning message and return None.

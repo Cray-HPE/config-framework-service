@@ -24,7 +24,7 @@
 # Cray-provided controllers for the Configuration Framework Service
 
 import logging
-from typing import Literal, Optional
+from typing import Literal
 
 import redis
 
@@ -45,7 +45,7 @@ def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
     # Because this is a health check endpoint, we do not want to generate a
     # database error resulting in a generic 503, instead of a more nuanced
     # response.
-    db_status: Optional[str] = None
+    db_status: str | None = None
     status_code: int = 200
     try:
         options.update_server_log_level()

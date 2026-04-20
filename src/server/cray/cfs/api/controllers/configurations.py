@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Literal, NewType, Optional
+from typing import Literal, NewType
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -423,7 +423,7 @@ def _patch_configuration_v3(configuration_id: str,
 def _check_tenant_patch_config(v3_config_data: V3ConfigurationData,
                                _: JsonDict,
                                *,
-                               tenant: Optional[str]) -> V3ConfigurationData:
+                               tenant: str | None) -> V3ConfigurationData:
     """
     The second argument is not used, and is only present to be compatible with
     the expected interface for a patching function.
@@ -457,7 +457,7 @@ class ConfigInUseError(Exception):
 def _delete_configuration(
     configuration_id: str,
     *,
-    requesting_tenant: Optional[str] = None
+    requesting_tenant: str | None = None
 ) -> DeleteConfigurationResponse:
     """
     Return a 400 error if the configuration is in use.
@@ -488,7 +488,7 @@ def _config_deletion_checker(
     v3_config_data: V3ConfigurationData,
     *,
     configuration_id: str,
-    requesting_tenant: Optional[str]
+    requesting_tenant: str | None
 ) -> Literal[True]:
     """
     If there is a requesting tenant, and this configuration belongs to a different tenant,
@@ -643,9 +643,9 @@ class Configurations:
         # Some callers call the get_config method without checking if the configuration name is
         # set. If it is not set, calling the database will always just return None, so we can
         # save ourselves the network traffic of a database call here.
-        self.configs: dict[Optional[str], Optional[V3ConfigurationData]] = { "": None, None: None }
+        self.configs: dict[str | None, V3ConfigurationData | None] = { "": None, None: None }
 
-    def get_config(self, key: str) -> Optional[V3ConfigurationData]:
+    def get_config(self, key: str) -> V3ConfigurationData | None:
         if key not in self.configs:
             try:
                 self.configs[key] = DB.get(key)

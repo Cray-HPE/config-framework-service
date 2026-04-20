@@ -26,7 +26,7 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 import logging
-from typing import final, Literal, NewType, Optional, TypedDict
+from typing import final, Literal, NewType, TypedDict
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -252,12 +252,12 @@ def get_components_data(id_list=None, status_list=None, enabled=None, config_nam
 
 
 def _component_filter(component_data: V3ComponentData,
-                      config_details: Optional[bool],
+                      config_details: bool | None,
                       configs: configurations.Configurations,
                       id_list: list[str],
                       status_list: list[V3FilterStatus],
-                      enabled: Optional[bool],
-                      config_name: Optional[str],
+                      enabled: bool | None,
+                      config_name: str | None,
                       tag_list: list[str]) -> bool:
     # Before bothering to set status, check the filters which do not require it.
     if id_list and not component_data.get("id") in id_list:
@@ -746,7 +746,7 @@ def _set_last_updated[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
 
 def _set_status(v3_data: V3ComponentData,
                 configs: configurations.Configurations,
-                config_details: Optional[bool]) -> V3ComponentData:
+                config_details: bool | None) -> V3ComponentData:
     if 'desired_config' in v3_data:
         v3_data['configuration_status'] = STATUS[_get_status(v3_data, configs, config_details)]
     else:
@@ -756,7 +756,7 @@ def _set_status(v3_data: V3ComponentData,
 
 def _get_status(v3_data: V3ComponentData,
                 configs: configurations.Configurations,
-                config_details: Optional[bool]) -> StatusInt:
+                config_details: bool | None) -> StatusInt:
     """
     Returns the configuration status of a component
 
@@ -842,7 +842,7 @@ def _get_current_state(v3_data: V3ComponentData) -> list[V3ComponentStateLayer]:
 
 def _get_desired_state(
     v3_data: V3ComponentData,
-    configs: Optional[configurations.Configurations]=None
+    configs: configurations.Configurations | None = None
 ) -> configurations.V3ConfigurationData:
     if not configs:
         configs = configurations.Configurations()

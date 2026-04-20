@@ -28,7 +28,7 @@ from functools import partial
 import logging
 import re
 import shlex
-from typing import final, Literal, NewType, Optional, TypedDict
+from typing import final, Literal, NewType, TypedDict
 from uuid import UUID
 
 import connexion
@@ -353,13 +353,13 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v2(age: Optional[str] = None,
-                       min_age: Optional[str] = None,
-                       max_age: Optional[str] = None,
-                       status: Optional[str] = None,
-                       name_contains: Optional[str] = None,
-                       succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> V2DeleteSessionsResponse:
+def delete_sessions_v2(age: str | None = None,
+                       min_age: str | None = None,
+                       max_age: str | None = None,
+                       status: str | None = None,
+                       name_contains: str | None = None,
+                       succeeded: str | None = None,
+                       tags: str | None = None) -> V2DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -399,13 +399,13 @@ def delete_sessions_v2(age: Optional[str] = None,
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
-def delete_sessions_v3(age: Optional[str] = None,
-                       min_age: Optional[str] = None,
-                       max_age: Optional[str] = None,
-                       status: Optional[str] = None,
-                       name_contains: Optional[str] = None,
-                       succeeded: Optional[str] = None,
-                       tags: Optional[str] = None) -> V3DeleteSessionsResponse:
+def delete_sessions_v3(age: str | None = None,
+                       min_age: str | None = None,
+                       max_age: str | None = None,
+                       status: str | None = None,
+                       name_contains: str | None = None,
+                       succeeded: str | None = None,
+                       tags: str | None = None) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.
@@ -432,13 +432,13 @@ def delete_sessions_v3(age: Optional[str] = None,
                           succeeded=succeeded, tags=tags)
 
 
-def delete_sessions(age: Optional[str],
-                    min_age: Optional[str],
-                    max_age: Optional[str],
-                    status: Optional[str],
-                    name_contains: Optional[str],
-                    succeeded: Optional[str],
-                    tags: Optional[str]) -> V3DeleteSessionsResponse:
+def delete_sessions(age: str | None,
+                    min_age: str | None,
+                    max_age: str | None,
+                    status: str | None,
+                    name_contains: str | None,
+                    succeeded: str | None,
+                    tags: str | None) -> V3DeleteSessionsResponse:
     """Delete Config Framework Sessions
 
     :param age: An age filter in the form 1d.

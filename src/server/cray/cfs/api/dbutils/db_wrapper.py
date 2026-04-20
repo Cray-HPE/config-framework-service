@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,6 @@ import copy
 import itertools
 import logging
 import time
-from typing import Optional
 
 import redis
 from redis.maint_notifications import MaintNotificationsConfig
@@ -111,7 +110,7 @@ class DBWrapper:
         return DBTooBusyError(self.db_name)
 
     @convert_db_watch_errors
-    def get(self, key: DbKey) -> Optional[DbEntry]:
+    def get(self, key: DbKey) -> DbEntry | None:
         """
         Get the data for the given key from the database, and return it.
         Raises DBNoEntryError if the entry does not exist.
@@ -138,7 +137,7 @@ class DBWrapper:
             raise self.no_entry_exception(key)
         return data
 
-    def get_keys(self, *, start_after_key: Optional[str] = None) -> list[str]:
+    def get_keys(self, *, start_after_key: str | None = None) -> list[str]:
         """
         Returns a sorted list of all keys (as str) in the database.
         If start_after_key is specified, only keys lexically after the
@@ -159,7 +158,7 @@ class DBWrapper:
         # Return the list starting after that index
         return sorted_keys[i+1:]
 
-    def iter_values(self, *, start_after_key: Optional[str] = None) -> Generator[DbEntry, None, None]:
+    def iter_values(self, *, start_after_key: str | None = None) -> Generator[DbEntry, None, None]:
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
@@ -181,8 +180,8 @@ class DBWrapper:
         self,
         *,
         limit: int = 0,
-        after_id: Optional[str] = None,
-        data_filters: Optional[Iterable[DataFilter]] = None
+        after_id: str | None = None,
+        data_filters: Iterable[DataFilter] | None = None
     ) -> tuple[list[DbEntry], bool]:
         """Get an array of data for all keys."""
 
@@ -236,9 +235,9 @@ class DBWrapper:
         *,
         key: DbKey,
         patch_data: DbEntry,
-        update_handler: Optional[UpdateHandler],
+        update_handler: UpdateHandler | None,
         patch_handler: PatchHandler,
-        default_entry: Optional[DbEntry]
+        default_entry: DbEntry | None
     ) -> DbEntry:
         """
         Helper function for patch, which tries to apply the patch inside a Redis pipeline.
@@ -322,9 +321,9 @@ class DBWrapper:
         key: DbKey,
         patch_data: DbEntry,
         *,
-        update_handler: Optional[UpdateHandler] = None,
+        update_handler: UpdateHandler | None = None,
         patch_handler: PatchHandler = patch_dict,
-        default_entry: Optional[DbEntry] = None
+        default_entry: DbEntry | None = None
     ) -> DbEntry:
         """
         Patch data in the database.
@@ -379,7 +378,7 @@ class DBWrapper:
         keys: Collection[str],
         data_filter: DataFilter,
         patch: JsonDict,
-        update_handler: Optional[UpdateHandler],
+        update_handler: UpdateHandler | None,
         patch_handler: PatchHandler,
         keys_done: set[str],
         patched_data_map: MutableMapping[str, DbEntry]
@@ -508,7 +507,7 @@ class DBWrapper:
         data_filter: DataFilter,
         patch: JsonDict,
         *,
-        update_handler: Optional[UpdateHandler] = None,
+        update_handler: UpdateHandler | None = None,
         patch_handler: PatchHandler = patch_dict
     ) -> list[DbEntry]:
         """
@@ -603,7 +602,7 @@ class DBWrapper:
         data_filter: DataFilter,
         patch: JsonDict,
         *,
-        update_handler: Optional[UpdateHandler] = None,
+        update_handler: UpdateHandler | None = None,
         patch_handler: PatchHandler = patch_dict
     ) -> list[str]:
         """
@@ -753,7 +752,7 @@ class DBWrapper:
         pipe: redis.client.Pipeline,
         *,
         key_patch_tuples: Sequence[tuple[str, DbEntry]],
-        update_handler: Optional[UpdateHandler],
+        update_handler: UpdateHandler | None,
         patch_handler: PatchHandler
     ) -> list[tuple[str, DbEntry]]:
         """
@@ -854,7 +853,7 @@ class DBWrapper:
         self,
         key_patch_tuples: Sequence[tuple[str, JsonDict]],
         *,
-        update_handler: Optional[UpdateHandler] = None,
+        update_handler: UpdateHandler | None = None,
         patch_handler: PatchHandler = patch_dict
     ) -> list[tuple[str, DbEntry]]:
         """
@@ -1135,7 +1134,7 @@ class DBWrapper:
         self,
         data_filter: DataFilter,
         *,
-        deletion_handler: Optional[DeletionHandler] = None
+        deletion_handler: DeletionHandler | None = None
     ) -> list[str]:
         """
         Delete multiple resources in the database.

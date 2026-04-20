@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 import os
-import typing
 
 import hvac
 
@@ -40,12 +39,12 @@ def get_client() -> hvac.Client:
     return client
 
 
-def put_secret(secret_path: str, secret_data: typing.Dict[str, str]) -> None:
+def put_secret(secret_path: str, secret_data: dict[str, str]) -> None:
     client = get_client()
     client.secrets.kv.v2.create_or_update_secret(path=secret_path, secret=secret_data)
 
 
-def get_secret(secret_path: str) -> typing.Dict[str, str]:
+def get_secret(secret_path: str) -> dict[str, str]:
     client = get_client()
     secret = client.secrets.kv.read_secret_version(secret_path)
     return secret["data"]["data"]

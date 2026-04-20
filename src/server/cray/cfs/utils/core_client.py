@@ -22,10 +22,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+from collections.abc import Iterator
 from contextlib import nullcontext
 from functools import partial
 import traceback
-from typing import Iterator, Optional
 
 import requests
 import requests_retry_session as rrs
@@ -44,9 +44,9 @@ retry_session_manager = partial(rrs.retry_session_manager,
 
 
 def retry_session(
-    session: Optional[requests.Session] = None,
-    protocol: Optional[str] = None,
-    adapter_kwargs: Optional[rrs.RequestsRetryAdapterArgs] = None
+    session: requests.Session | None = None,
+    protocol: str | None = None,
+    adapter_kwargs: rrs.RequestsRetryAdapterArgs | None = None
 ) -> Iterator[requests.Session]:
     if session is not None:
         return nullcontext(session)
@@ -57,10 +57,9 @@ def retry_session(
 
 
 def retry_session_get(*get_args,
-                      session: Optional[requests.Session] = None,
-                      protocol: Optional[str] = None,
-                      adapter_kwargs: Optional[
-                          rrs.RequestsRetryAdapterArgs] = None,
+                      session: requests.Session | None = None,
+                      protocol: str | None = None,
+                      adapter_kwargs: rrs.RequestsRetryAdapterArgs | None = None,
                       **get_kwargs) -> Iterator[requests.Response]:
     with retry_session(session=session,
                        protocol=protocol,
