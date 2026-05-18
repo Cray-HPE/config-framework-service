@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import traceback
 import requests
 import requests_retry_session as rrs
 from functools import partial
@@ -65,11 +64,3 @@ def retry_session_get(*get_args,
                        protocol=protocol,
                        adapter_kwargs=adapter_kwargs) as _session:
         return _session.get(*get_args, **get_kwargs)
-
-
-def exc_type_msg(exc: Exception) -> str:
-    """
-    Given an exception, returns a string of its type and its text
-    (e.g. TypeError: 'int' object is not subscriptable)
-    """
-    return ''.join(traceback.format_exception_only(type(exc), exc))

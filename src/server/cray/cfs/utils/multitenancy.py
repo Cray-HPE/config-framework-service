@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,10 +29,11 @@ from typing import Optional
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 import requests
 from requests.exceptions import HTTPError
 
-from cray.cfs.utils.core_client import exc_type_msg, PROTOCOL, retry_session_get
+from cray.cfs.utils.core_client import PROTOCOL, retry_session_get
 
 
 LOGGER = logging.getLogger('cfs.api.utils.multitenancy')
