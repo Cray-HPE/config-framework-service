@@ -80,7 +80,7 @@ def create_session_v2():  # noqa: E501
     LOGGER.debug("POST /v2/sessions invoked create_session")
     try:
         data = connexion.request.get_json()
-        LOGGER.debug("Create content: ", data)
+        LOGGER.debug("Create session: %s", data)
         v2_session_create = V2SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
         # This is a workaround for the addition of the configuration name max length in v3
         # The configuration name is restored later
@@ -135,7 +135,9 @@ def create_session_v2():  # noqa: E501
     LOGGER.debug("create_session_v2: Writing new session '%s' to database", session_name)
     response_data = DB.put(session_name, session_data)
     LOGGER.debug("create_session_v2: DB put complete for '%s'", session_name)
-    return convert_session_to_v2(response_data), 200
+    resp_body = convert_session_to_v2(response_data)
+    LOGGER.debug("create_session_v2: Sending 200 response with body: %s", resp_body)
+    return resp_body, 200
 
 
 @dbutils.redis_error_handler
@@ -151,7 +153,7 @@ def create_session_v3():  # noqa: E501
     LOGGER.debug("POST /v3/sessions invoked create_session")
     try:
         data = connexion.request.get_json()
-        LOGGER.debug("Create content: ", data)
+        LOGGER.debug("Create session: %s", data)
         session_create = V3SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
     except Exception as err:
         return connexion.problem(
@@ -198,6 +200,7 @@ def create_session_v3():  # noqa: E501
     response_data = DB.put(session_name, data)
     LOGGER.debug("create_session_v3: DB put complete for '%s'", session_name)
     _set_link(response_data)
+    LOGGER.debug("create_session_v3: Sending 201 response with body: %s", response_data)
     return response_data, 201
 
 
@@ -257,6 +260,7 @@ def delete_session_v2(session_name):  # noqa: E501
     DB.delete(session_name)
     LOGGER.debug("delete_session_v2: Deleted '%s' in database", session_name)
     _kafka.produce(event_type='DELETE', data=session)
+    LOGGER.debug("delete_session_v2: Kafka DELETE event sent for '%s'", session_name)
     return None, 204
 
 
@@ -282,6 +286,7 @@ def delete_session_v3(session_name):  # noqa: E501
     DB.delete(session_name)
     LOGGER.debug("delete_session_v3: Deleted '%s' in database", session_name)
     _kafka.produce(event_type='DELETE', data=session)
+    LOGGER.debug("delete_session_v3: Kafka DELETE event sent for '%s'", session_name)
     return None, 204
 
 
@@ -519,6 +524,8 @@ def patch_session_v2(session_name):
             status=400, title="Bad Request",
             detail=str(err))
 
+    LOGGER.debug("patch_session_v2(%s): data=%s", session_name, data)
+
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -529,7 +536,9 @@ def patch_session_v2(session_name):
     # a way for an admin to bypass the restrictions, if for some reason it is ever
     # needed.
     response_data = _patch_session(session_name, data, job_update_restrictions=False)
-    return convert_session_to_v2(response_data), 200
+    resp_body = convert_session_to_v2(response_data)
+    LOGGER.debug("patch_session_v2(%s): Returning 200 with body: %s", session_name, resp_body)
+    return resp_body, 200
 
 
 @dbutils.redis_error_handler
@@ -554,6 +563,8 @@ def patch_session_v3(session_name):
             status=400, title="Bad Request",
             detail=str(err))
 
+    LOGGER.debug("patch_session_v3(%s): data=%s", session_name, data)
+
     if session_name not in DB:
         return connexion.problem(
             status=404, title="Session not found.",
@@ -565,6 +576,7 @@ def patch_session_v3(session_name):
         return connexion.problem(
             status=409, title="Session patch conflict.",
             detail=f"Session {session_name} could not be patched: {err}")
+    LOGGER.debug("patch_session_v3(%s): Returning 200 with body: %s", session_name, response_data)
     return response_data, 200
 
 
@@ -615,7 +627,10 @@ def _patch_session(session_name, new_data, job_update_restrictions: bool):
                     session[key] = value
             else:
                 session[key] = value
-    return DB.put(session_name, data)
+    LOGGER.debug("_patch_session(%s): Writing new data to DB: %s", session_name, data)
+    db_resp = DB.put(session_name, data)
+    LOGGER.debug("_patch_session(%s): Returning %s", session_name, db_resp)
+    return db_resp
 
 
 def _enforce_job_update_restrictions(session_status_session_data,
