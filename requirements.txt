@@ -3,6 +3,7 @@
 -c constraints.txt
 -r lib/server/requirements.txt
 
+csm-utils
 kubernetes
 requests
 redis[hiredis]
