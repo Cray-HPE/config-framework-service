@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - CAST-39551: Added additional debug logging statements around session creation, patching, and deletion.
 
+### Fixed
+- Added missing import statement to `src/server/cray/cfs/utils/core_client.py`
+
 ## [1.30.0] - 03/12/2026
 
 ### Added

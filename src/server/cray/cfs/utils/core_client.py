@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2025-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,12 +22,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import traceback
-import requests
-import requests_retry_session as rrs
+from contextlib import nullcontext
 from functools import partial
+import traceback
 from typing import Iterator, Optional
 
+import requests
+import requests_retry_session as rrs
 
 PROTOCOL = 'http'
 DEFAULT_RETRY_ADAPTER_ARGS = rrs.RequestsRetryAdapterArgs(
