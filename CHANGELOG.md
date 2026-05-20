@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Added missing import statement to `src/server/cray/cfs/utils/core_client.py`
+
 ## [1.29.3] - 12/18/2025
 
 ### Fixed
