@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.1] - 05/20/2026
+
 ### Added
 - CAST-39551: Added additional debug logging statements around session creation, patching, and deletion.
 
