@@ -22,4 +22,9 @@ ignore:
         reason: 'Not currently exploitable except possibly by admins, impractical to fix'
         expires: 2142-01-01T00:00:00.000Z
         created: 2026-03-11T18:10:13.783Z
+  SNYK-PYTHON-URLLIB3-16642024:
+    - '*':
+        reason: 'Not currently exploitable except possibly by admins, impractical to fix'
+        expires: 2142-01-01T00:00:00.000Z
+        created: 2026-05-20T12:20:11.000Z
 patch: {}
