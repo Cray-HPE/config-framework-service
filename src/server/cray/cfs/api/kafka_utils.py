@@ -42,23 +42,24 @@ try:
 except ConfigException:  # pragma: no cover
     config.load_kube_config()  # Development
 
-DEFAULT_KAFKA_TIMEOUT=1
-DEFAULT_LOCK_TIMEOUT=5
+DEFAULT_KAFKA_FLUSH_TIMEOUT=3
+# Close timeout should be > flush timeout, because
+# a close implicitly include a flush
+DEFAULT_KAFKA_CLOSE_TIMEOUT=6
+DEFAULT_LOCK_TIMEOUT=10
 DEFAULT_INIT_TIMEOUT=30
 
 _api_client = client.ApiClient()
 k8ssvcs = client.CoreV1Api(_api_client)
 KAFKA_PORT = '9092'
-KAFKA_TIMEOUT = get_pos_float_env_var_or_default('KAFKA_PRODUCER_TIMEOUT',
-                                                 DEFAULT_KAFKA_TIMEOUT)
 
-# Allow a different close timeout value to be specified, defaulting to the general Kafka timeout
+# Allow a different close timeout value to be specified
 KAFKA_CLOSE_TIMEOUT = get_pos_float_env_var_or_default('KAFKA_PRODUCER_CLOSE_TIMEOUT',
-                                                       KAFKA_TIMEOUT)
+                                                       DEFAULT_KAFKA_CLOSE_TIMEOUT)
 
-# Allow a different flush timeout value to be specified, defaulting to the general Kafka timeout
+# Allow a different flush timeout value to be specified
 KAFKA_FLUSH_TIMEOUT = get_pos_float_env_var_or_default('KAFKA_PRODUCER_FLUSH_TIMEOUT',
-                                                       KAFKA_TIMEOUT)
+                                                       DEFAULT_KAFKA_FLUSH_TIMEOUT)
 
 LOCK_TIMEOUT = get_pos_float_env_var_or_default('KAFKA_PRODUCER_LOCK_TIMEOUT',
                                                 DEFAULT_LOCK_TIMEOUT)
@@ -160,7 +161,7 @@ class ProducerWrapper:
     def __init__(self, topic=None):
         self._lock = rwlock.RWLockWrite()
         self.topic = topic
-        self.producer: KafkaProducer|None = None
+        self.producer = None
         self.close_attempted = False
         self._init_producer()
         assert isinstance(self.producer, KafkaProducer)
@@ -261,7 +262,7 @@ class ProducerWrapper:
                 if time_left <= 0:
                     raise ProducerInitTimeoutError() from e
                 # Retry after 5 seconds, or until our retry time has expired, whichever is shorter
-                time.sleep(min(5, time_left))
+                time.sleep(min(1, time_left))
 
         # Set close_attempted to False for this new producer
         self.close_attempted = False

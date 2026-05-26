@@ -44,8 +44,8 @@ def get_healthz():
     # Because this is a health check endpoint, we do not want to generate a
     # database error resulting in a generic 503, instead of a more nuanced
     # response.
-    db_status: str|None = None
-    status_code: int = 200
+    db_status = None
+    status_code = 200
     try:
         options.update_server_log_level()
     except redis.exceptions.ConnectionError as err:
