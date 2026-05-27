@@ -75,17 +75,18 @@ def get_configurations_v3(in_use=None, limit=1, after_id=""):
 
 @options.defaults(limit="default_page_size")
 def _get_configurations_data(in_use=None, limit=1, after_id=""):
+    data_filters = []
     # CASMCMS-9197: Only specify a filter if we are actually filtering
     if in_use is not None:
-        configuration_filter = partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list())
-    else:
-        configuration_filter = None
-    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filter=configuration_filter)
+        data_filters.append(partial(_configuration_filter, in_use=in_use, in_use_list=_get_in_use_list()))
+    configuration_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id, data_filters=data_filters)
     return configuration_data_page, next_page_exists
 
 
 def _configuration_filter(configuration_data: dict, in_use: bool, in_use_list: Container[str]) -> bool:
     """
+    The purpose of this function is to filter CFS configurations that are referenced by any defined component.
+
     If in_use is true:
         Returns True if the name of the specified configuration is in in_use_list,
         Returns False otherwise
