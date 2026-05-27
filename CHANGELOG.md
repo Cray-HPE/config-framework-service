@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- CASMCMS-9263: Make database scanning more performant
+- CASMCMS-9573: Refactor dbutils into multiple files
+
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
 - Added missing spaces in two error messages.
@@ -20,9 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - CASMCMS-9564: Create `DBNoEntryError` and `DBTooBusyError` exceptions
     - CASMCMS-9554: Update DBWrapper `delete`/`get_delete` calls to use `DBNoEntryError`
     - CASMCMS-9568: Update DBWrapper `get` calls to use `DBNoEntryError`
-
-### Changed
-- CASMCMS-9263: Make database scanning more performant
 
 ## [1.23.8] - 05/18/2026
 ### Added
