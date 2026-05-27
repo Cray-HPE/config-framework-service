@@ -132,8 +132,8 @@ DeleteComponentResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse
 V2PatchComponentsResponse: TypeAlias = Union[tuple[list[V2ComponentData], Literal[200]], CxResponse]
 V3PatchComponentsResponse: TypeAlias = Union[tuple[ComponentIdListDict, Literal[200]], CxResponse]
 
-type V2PatchComponentResponse = tuple[V2ComponentData, Literal[200]] | CxResponse
-type V3PatchComponentResponse = tuple[V3ComponentData, Literal[200]] | CxResponse
+V2PatchComponentResponse: TypeAlias = Union[tuple[V2ComponentData, Literal[200]], CxResponse]
+V3PatchComponentResponse: TypeAlias = Union[tuple[V3ComponentData, Literal[200]], CxResponse]
 
 @dbutils.redis_error_handler
 @options.refresh_options_update_loglevel
