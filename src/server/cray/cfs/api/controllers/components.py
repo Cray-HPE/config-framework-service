@@ -443,7 +443,7 @@ def patch_v3_components_list(v3_patch_list: list[V3ComponentPatch]) -> V3PatchCo
 
 def _patch_v3_components_list(
     v3_patch_list: list[V3ComponentPatch]
-) -> list[tuple[str, V3ComponentData]] | CxResponse:
+) -> Union[list[tuple[str, V3ComponentData]], CxResponse]:
     id_patch_tuples: list[tuple[str, V3ComponentPatch]] = []
     try:
         while v3_patch_list:
