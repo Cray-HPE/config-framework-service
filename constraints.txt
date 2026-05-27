@@ -28,6 +28,7 @@ kafka-python>=2.0,<2.1
 kubernetes>=24.2,<24.3
 lockfile>=0.12.2,<0.13
 MarkupSafe>=2.1.5,<2.2
+more-itertools>=10.8,<10.9
 msgpack>=1.0.2,<1.1
 oauthlib>=3.2.2,<3.3
 openapi-spec-validator>=0.2,<0.3
