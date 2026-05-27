@@ -26,7 +26,7 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 import logging
-from typing import final, Literal, NewType, Optional, TypedDict, Union
+from typing import final, Literal, NewType, Optional, TypedDict, TypeVar, Union
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
@@ -643,7 +643,10 @@ def _delete_component(component_id: str) -> DeleteComponentResponse:
             detail=f"Component {component_id} could not be found")
 
 
-def _set_auto_fields[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
+T = TypeVar("T", V3ComponentData, V3ComponentPatch)
+
+
+def _set_auto_fields(v3_data: T) -> T:
     v3_data = _set_last_updated(v3_data)
     if 'error_count' in v3_data:
         return v3_data
@@ -652,7 +655,7 @@ def _set_auto_fields[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
     return v3_data
 
 
-def _set_last_updated[T: (V3ComponentData, V3ComponentPatch)](v3_data: T) -> T:
+def _set_last_updated(v3_data: T) -> T:
     if isinstance(v3_data.get('state'), list):
         for layer in v3_data['state']:
             if 'last_updated' not in layer:
