@@ -28,6 +28,7 @@ import threading
 from typing import overload, Literal, NewType, TypeVar, Union
 
 import connexion
+from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.dbutils import JsonData, JsonDict
