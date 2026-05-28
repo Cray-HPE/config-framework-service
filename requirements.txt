@@ -8,6 +8,7 @@ kafka-python
 ujson
 hvac
 readerwriterlock
+typing-extensions
 
 # The purpose of this file is to contain python runtime requirements
 # for controller code, e.g., code authored by developers, as opposed to
