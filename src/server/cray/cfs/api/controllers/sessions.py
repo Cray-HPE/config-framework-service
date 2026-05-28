@@ -120,6 +120,7 @@ def _scan_for_tardy_sessions() -> NoReturn:
         """
         if _kafka_resend_filter(data):
             # This session is in pending state and its job field is not set
+            LOGGER.info("Sending Kafka CREATE event for tardy session: %s", data)
             KAFKA.produce(event_type='CREATE', data=data)
         return False
     while True:
