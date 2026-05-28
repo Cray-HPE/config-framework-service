@@ -126,12 +126,8 @@ class DBWrapper:
         Get the data for the given key from the database, and delete it from the DB.
         Returns the data. Raises DBNoEntryError if the entry does not exist.
         """
-        datastr = self.client.getdel(key)
-        if not datastr:
-            raise self.no_entry_exception(key)
-        data = json.loads(datastr)
-        if data is None:
-            raise self.no_entry_exception(key)
+        data = self.get(key)
+        self.client.delete(key)
         return data
 
     def get_keys(self, *, start_after_key: Optional[str] = None) -> list[str]:
