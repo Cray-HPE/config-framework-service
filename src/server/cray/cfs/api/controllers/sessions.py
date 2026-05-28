@@ -26,9 +26,12 @@ import argparse
 import datetime
 from functools import partial
 import logging
+import random
 import re
 import shlex
-from typing import final, Literal, NewType, Optional, TypedDict, Union
+import time
+import threading
+from typing import final, Literal, NewType, NoReturn, Optional, TypedDict, Union
 from uuid import UUID
 
 import connexion
@@ -93,12 +96,44 @@ V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200
 V2PatchSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
 V3PatchSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
 
-def _init(topic='cfs-session-events'):
+
+def _scan_for_tardy_sessions() -> NoReturn:
+    """
+    Periodically check for any sessions which are in pending state
+    without a Kubernetes job assigned (for longer than we expect them to be)
+    """
+    _kafka_resend_filter = _get_session_filter(
+        age=None,
+        min_age="20s",
+        max_age="300s",
+        status="pending",
+        name_contains=None,
+        succeeded=None,
+        tag_list=None,
+        job_set=False
+    )
+    def _kf(data) -> Literal[False]:
+        """
+        Fake session filter which never matches, but which sends Kafka session
+        create events for pending sessions which started at least 20 seconds ago,
+        but no more than 5 minutes ago
+        """
+        if _kafka_resend_filter(data):
+            # This session is in pending state and its job field is not set
+            KAFKA.produce(event_type='CREATE', data=data)
+        return False
+    while True:
+        time.sleep(10 + 5*random.random())
+        DB.get_all(data_filters=[_kf])
+
+
+def _init(topic='cfs-session-events') -> None:
     """ Initialize the kafka producer information """
     global KAFKA
     LOGGER.debug("_init: Initializing ProducerWrapper")
     KAFKA = kafka_utils.ProducerWrapper(topic)
     LOGGER.debug("_init: ProducerWrapper initialized")
+    threading.Thread(target=_scan_for_tardy_sessions, daemon=True).start()
 
 
 @dbutils.redis_error_handler
@@ -840,7 +875,7 @@ def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeed
     return session_data_page, next_page_exists
 
 
-def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list):
+def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list, job_set=None):
     min_start = None
     max_start = None
     if age:
@@ -863,20 +898,20 @@ def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
             raise ParsingException(e) from e
     session_filter = partial(_session_filter, min_start=min_start, max_start=max_start,
                              status=status, name_contains=name_contains,
-                             succeeded=succeeded, tag_list=tag_list)
+                             succeeded=succeeded, tag_list=tag_list, job_set=job_set)
     return session_filter
 
 
 def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded,
-                    tag_list):
-    if any([min_start, max_start, status, name_contains, succeeded, tag_list]):
-        return _matches_filter(session_data, min_start, max_start, status, name_contains,
-                               succeeded, tag_list)
-    # No filter is being used so all components are valid
-    return True
+                    tag_list, job_set):
+    if all(x is None for x in [min_start, max_start, status, name_contains, succeeded, tag_list, job_set]):
+        # No filter is being used so all components are valid
+        return True
+    return _matches_filter(session_data, min_start, max_start, status, name_contains,
+                           succeeded, tag_list, job_set)
 
 
-def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags):
+def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags, job_set):
     session_name = data['name']
     if name_contains and name_contains not in session_name:
         return False
@@ -895,6 +930,10 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
         return False
+    if job_set is not None:
+        job_is_set = bool(session_status.get('job'))
+        if job_set != job_is_set:
+            return False
     return True
 
 
