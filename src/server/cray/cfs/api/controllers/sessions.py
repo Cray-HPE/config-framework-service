@@ -34,7 +34,6 @@ from uuid import UUID
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 import dateutil
-from kafka.errors import KafkaTimeoutError
 from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils, kafka_utils
@@ -280,26 +279,7 @@ def _finish_session_create(data):
     3. Write the session to the database
     """
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    try:
-        KAFKA.produce(event_type='CREATE', data=data)
-    except kafka_utils.LockTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Timeout taking KafkaProducer lock"
-        )
-    except kafka_utils.ProducerInitTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Timeout initializing KafkaProducer"
-        )
-    except KafkaTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Kafka timeout error"
-        )
+    KAFKA.produce(event_type='CREATE', data=data)
     session_name = data['name']
     LOGGER.debug("_finish_session_create: Writing new session '%s' to database", session_name)
     response_data = DB.put(session_name, data)

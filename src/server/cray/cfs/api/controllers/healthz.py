@@ -85,8 +85,8 @@ def _get_db_status() -> str:
 def _get_kafka_status() -> str:
     available = False
     try:
-        if KAFKA.producer.metrics():
-            available = True
+        KAFKA.flush()
+        available = True
     except Exception as e:
         LOGGER.error("%s: %s", type(e).__name__, e)
 

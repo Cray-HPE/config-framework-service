@@ -23,7 +23,6 @@ itsdangerous>=2.1.2,<2.2
 Jinja2>=3.0.3,<3.1
 jsonschema>=4.23,<4.24
 jsonschema-specifications>=2025.9.1,<2025.9.2
-kafka-python>=2.0,<2.1
 # CSM 1.6 moved to Kubernetes 1.24, so use client v24.x to ensure compatability
 kubernetes>=24.2,<24.3
 lockfile>=0.12.2,<0.13
@@ -40,7 +39,6 @@ pyasn1-modules>=0.4.2,<0.5
 pyparsing>=2.4.7,<2.5
 python-dateutil>=2.6,<2.7
 PyYAML>=6.0.1,<6.1
-readerwriterlock>=1.0,<1.1
 redis>=5.0,<5.1
 referencing>=0.36.2,<0.37
 requests>=2.31,<2.32

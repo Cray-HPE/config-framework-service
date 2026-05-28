@@ -4,11 +4,9 @@
 kubernetes
 requests
 redis
-kafka-python
 ujson
 hvac
 more-itertools
-readerwriterlock
 typing-extensions
 confluent-kafka
 
