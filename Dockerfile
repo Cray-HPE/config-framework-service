@@ -34,25 +34,50 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -c config/autogen-server.json
 
 # Base image
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 as base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 as alpinebase
 WORKDIR /app
-COPY --from=codegen /app .
-COPY constraints.txt requirements.txt ./
-# The openapi-generator creates a requirements file that specifies exactly Flask==2.1.1
-# However, using Flask 2.2.5 is also compatible, and resolves a CVE.
-# Accordingly, we relax their requirements file.
-RUN cat lib/server/requirements.txt && \
-    sed -i 's/Flask == 2\(.*\)$/Flask >= 2\1\nFlask < 3/' lib/server/requirements.txt && \
-    cat lib/server/requirements.txt && \
-    apk add --upgrade --no-cache apk-tools &&  \
+COPY constraints.txt ./
+RUN apk add --upgrade --no-cache apk-tools && \
 	apk update && \
-	apk add --no-cache gcc python3-dev py3-pip musl-dev libffi-dev openssl-dev git && \
+    apk add --no-cache gcc python3-dev py3-pip musl-dev openssl-dev && \
 	apk -U upgrade --no-cache && \
     pip3 list --format freeze && \
     pip3 install --no-cache-dir -U pip && \
-    pip3 list --format freeze && \
-    pip3 install --no-cache-dir -r requirements.txt && \
     pip3 list --format freeze
+
+# Build confluent-kafka
+FROM alpinebase as ckafka
+WORKDIR /wheels
+RUN apk add --no-cache \
+        g++ \
+        make \
+        librdkafka-dev \
+        zlib-dev && \
+    apk -U upgrade --no-cache && \
+    CKVERSION=$(apk info -e librdkafka-dev -v | cut -d- -f3) && \
+    pip3 wheel --no-binary :all: confluent-kafka=="$CKVERSION" -c /app/constraints.txt -w /wheels
+
+# Base image
+FROM alpinebase as base
+WORKDIR /app
+COPY --from=ckafka /wheels /wheels
+COPY --from=codegen /app .
+COPY requirements.txt ./
+# The openapi-generator creates a requirements file that specifies exactly Flask==2.1.1
+# However, using Flask 2.2.5 is also compatible, and resolves a CVE.
+# Accordingly, we relax their requirements file.
+#
+# Use --find-links and --prefer-binary flags with pip3 to make sure it uses
+# the wheel we built for confluent-kafka
+RUN cat lib/server/requirements.txt && \
+    sed -i 's/Flask == 2\(.*\)$/Flask >= 2\1\nFlask < 3/' lib/server/requirements.txt && \
+    cat lib/server/requirements.txt && \
+	apk add --no-cache librdkafka libffi-dev git && \
+	apk -U upgrade --no-cache && \
+    pip3 list --format freeze && \
+    pip3 install --no-cache-dir --find-links=/wheels --prefer-binary -r requirements.txt && \
+    pip3 list --format freeze && \
+    rm -rf /wheels
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
 COPY src/server/cray/cfs/api/dbutils lib/server/cray/cfs/api/dbutils
 COPY src/server/cray/cfs/api/__main__.py \
