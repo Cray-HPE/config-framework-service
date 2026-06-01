@@ -104,8 +104,8 @@ def _scan_for_tardy_sessions() -> NoReturn:
     """
     _kafka_resend_filter = _get_session_filter(
         age=None,
-        min_age="20s",
-        max_age="300s",
+        min_age="1m",
+        max_age="4m",
         status="pending",
         name_contains=None,
         succeeded=None,
@@ -115,8 +115,8 @@ def _scan_for_tardy_sessions() -> NoReturn:
     def _kf(data) -> Literal[False]:
         """
         Fake session filter which never matches, but which sends Kafka session
-        create events for pending sessions which started at least 20 seconds ago,
-        but no more than 5 minutes ago
+        create events for pending sessions which started at least 1 minute ago,
+        but no more than 4 minutes ago
         """
         if _kafka_resend_filter(data):
             # This session is in pending state and its job field is not set
@@ -124,7 +124,8 @@ def _scan_for_tardy_sessions() -> NoReturn:
             KAFKA.produce(event_type='CREATE', data=data)
         return False
     while True:
-        time.sleep(10 + 5*random.random())
+        time.sleep(30 + 5*random.random())
+        options.update_server_log_level()
         DB.get_all(data_filters=[_kf])
 
 
@@ -882,18 +883,21 @@ def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
     if age:
         try:
             max_start = _age_to_timestamp(age)
+            LOGGER.debug("max_start=%s", max_start)
         except Exception as e:
             LOGGER.warning('Unable to parse age: %s', age)
             raise ParsingException(e) from e
     if min_age:
         try:
             max_start = _age_to_timestamp(min_age)
+            LOGGER.debug("max_start=%s", max_start)
         except Exception as e:
             LOGGER.warning('Unable to parse min_age: %s', min_age)
             raise ParsingException(e) from e
     if max_age:
         try:
             min_start = _age_to_timestamp(max_age)
+            LOGGER.debug("min_start=%s", min_start)
         except Exception as e:
             LOGGER.warning('Unable to parse max_age: %s', max_age)
             raise ParsingException(e) from e
@@ -918,6 +922,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     session_status = data.get('status', {}).get('session', {})
     if status and status != session_status.get('status'):
+        LOGGER.debug("Session status is not '%s': %s", status, data)
         return False
     if succeeded and succeeded != session_status.get('succeeded'):
         return False
@@ -926,14 +931,17 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
     if start_time:
         session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
     if min_start and (not session_start or session_start < min_start):
+        LOGGER.debug("Session start time before '%s': %s", min_start, data)
         return False
     if max_start and (not session_start or session_start > max_start):
+        LOGGER.debug("Session start time after '%s': %s", max_start, data)
         return False
     if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
         return False
     if job_set is not None:
         job_is_set = bool(session_status.get('job'))
         if job_set != job_is_set:
+            LOGGER.debug("Session job set is not '%s': %s", job_set, data)
             return False
     return True
 
