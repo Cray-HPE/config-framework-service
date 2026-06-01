@@ -49,9 +49,8 @@ class ProducerWrapper:
         kafka = get_kafka_bootstrap_server()
         LOGGER.debug("Initializing Kafka Producer, bootstrap_servers %s", kafka)
         self.producer = KafkaProducer(
-            bootstrap_servers=kafka,
+            bootstrap_servers=[kafka],
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-            acks='all',  # roughly equivalent to idempotence durability
         )
         LOGGER.info(
             "Kafka Producer initialized with topic=%s bootstrap_servers=%s",
