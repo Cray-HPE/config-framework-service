@@ -56,6 +56,7 @@ class ProducerWrapper:
             "Kafka Producer initialized with topic=%s bootstrap_servers=%s",
             topic, kafka
         )
+        LOGGER.info("producer.bootstrap_connected(): %s", producer.bootstrap_connected())
         self._flush_thread = threading.Thread(
             target=self._flush_loop,
             daemon=True
