@@ -39,8 +39,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 def create_app():
-    sessions._init()
     options._init()
+    sessions._init()
 
     LOGGER.info("Starting Configuration Framework Service API server")
     app = connexion.App(__name__, specification_dir='./openapi/')

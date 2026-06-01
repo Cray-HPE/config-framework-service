@@ -102,22 +102,27 @@ def _scan_for_tardy_sessions() -> NoReturn:
     Periodically check for any sessions which are in pending state
     without a Kubernetes job assigned (for longer than we expect them to be)
     """
-    _kafka_resend_filter = _get_session_filter(
-        age=None,
-        min_age="1m",
-        max_age="4m",
-        status="pending",
-        name_contains=None,
-        succeeded=None,
-        tag_list=None,
-        job_set=False
-    )
+    # Cannot specify the age arguments here, because we need them calculated
+    # relative to the time that the filter is being applied
+    _base_filter_kwargs = {
+        "age": None,
+        "status": "pending",
+        "name_contains": None,
+        "succeeded": None,
+        "tag_list": None,
+        "job_set": False,
+    }
     def _kf(data) -> Literal[False]:
         """
         Fake session filter which never matches, but which sends Kafka session
         create events for pending sessions which started at least 1 minute ago,
         but no more than 4 minutes ago
         """
+        _kafka_resend_filter = _get_session_filter(
+            min_age="1m",
+            max_age="4m",
+            **_base_filter_kwargs
+        )
         if _kafka_resend_filter(data):
             # This session is in pending state and its job field is not set
             LOGGER.info("Sending Kafka CREATE event for tardy session: %s", data)
