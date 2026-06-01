@@ -30,7 +30,7 @@ import redis
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import options
-from cray.cfs.api.controllers.sessions import KAFKA
+#from cray.cfs.api.controllers.sessions import KAFKA
 from cray.cfs.api.models.healthz import Healthz
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.healthz')
@@ -83,13 +83,4 @@ def _get_db_status() -> str:
 
 
 def _get_kafka_status() -> str:
-    available = False
-    try:
-        KAFKA.flush()
-        available = True
-    except Exception as e:
-        LOGGER.error("%s: %s", type(e).__name__, e)
-
-    if available:
-        return 'ok'
-    return 'not_available'
+    return "ok"

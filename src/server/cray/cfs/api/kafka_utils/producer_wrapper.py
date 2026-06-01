@@ -29,6 +29,7 @@ from typing import NoReturn, Optional
 
 from kafka import KafkaProducer
 from kafka.admin import KafkaAdminClient
+from kafka.errors import KafkaTimeoutError
 import ujson as json
 
 from cray.cfs.api.dbutils import JsonData, JsonDict
@@ -39,68 +40,23 @@ from .k8s import get_kafka_bootstrap_server
 LOGGER = logging.getLogger(__name__)
 
 
-class ProducerWrapper:
-    """
-    A wrapper around a Kafka connection.
-    In this case, it is only concerned with sending events, not receiving them.
-    """
-
-    def __init__(self, topic: Optional[str]=None) -> None:
-        self.topic = topic
+def send_event(topic, event_type, data, first_attempt=True, kafka=None):
+    if kafka is None:
         kafka = get_kafka_bootstrap_server()
-        LOGGER.debug("Initializing Kafka Producer, bootstrap_servers %s", kafka)
-        self.producer = KafkaProducer(
-            bootstrap_servers=kafka,
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
-        LOGGER.info(
-            "Kafka Producer initialized with topic=%s bootstrap_servers=%s",
-            topic, kafka
-        )
-        LOGGER.info("producer.bootstrap_connected(): %s", self.producer.bootstrap_connected())
-        LOGGER.info("producer.config: %s", self.producer.config)
-        self.admin = KafkaAdminClient(bootstrap_servers=kafka)
-        LOGGER.info("topics=%s", self.admin.list_topics())
-        self._flush_thread = threading.Thread(
-            target=self._flush_loop,
-            daemon=True
-        )
-        self._flush_thread.start()
-
-    def _flush_loop(self) -> NoReturn:
-        """
-        Loop forever calling self.flush() every 5 seconds
-        """
-        while True:
-            time.sleep(5)
-            self.flush()
-
-    @staticmethod
-    def _value(data: JsonData, event_type: str) -> JsonDict:
-        """
-        Create the event dictionary.
-        """
-        return {
-            'type': event_type,
-            'data': data,
-            'sent': datetime.datetime.now().isoformat(timespec='seconds'),
-        }
-
-    def produce(
-        self,
-        data: JsonData,
-        event_type: str,
-        topic: Optional[str]=None
-    ) -> None:
-        LOGGER.debug("produce: event_type=%s, data=%s, topic=%s", event_type, data, topic)
-        if not topic:
-            topic = self.topic
-        value = self._value(data, event_type)
-        LOGGER.debug("produce: Calling producer.send(%s, value=%s)", topic, value)
-        self.producer.send(topic, value=value)
-        LOGGER.debug("produce: Done")
-
-    def flush(self, timeout: int=KAFKA_FLUSH_TIMEOUT) -> None:
-        LOGGER.debug("produce: Calling producer.flush(timeout=%d)", timeout)
-        self.producer.flush(timeout=timeout)
-        LOGGER.debug("produce: producer.flush(timeout=%d) completed", timeout)
+    producer = KafkaProducer(
+        bootstrap_servers=kafka,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        max_block_ms=5000,
+    )
+    event_data = {
+        'type': event_type,
+        'data': data,
+        'sent': datetime.datetime.now().isoformat(timespec='seconds'),
+    }
+    try:
+        producer.send(topic, value=event_data)
+        producer.flush(timeout=5)
+    except KafkaTimeoutError:
+        if first_attempt:
+            return send_event(topic, event_type, data, first_attempt=False, kafka=kafka)
+        raise

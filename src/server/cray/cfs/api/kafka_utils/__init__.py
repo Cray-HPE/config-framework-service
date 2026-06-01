@@ -22,4 +22,4 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from .producer_wrapper import ProducerWrapper
+from .producer_wrapper import send_event

@@ -51,9 +51,6 @@ LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
 CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
-KAFKA = None
-
-
 class JobFieldAlreadySet(Exception):
     """
     CASMCMS-9627: Raised when attempting to patch a status.session.job field when it is already set
@@ -96,6 +93,7 @@ V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200
 V2PatchSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
 V3PatchSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
 
+send_event = partial(kafka_utils.send_event, topic='cfs-session-events')
 
 def _scan_for_tardy_sessions() -> NoReturn:
     """
@@ -126,7 +124,7 @@ def _scan_for_tardy_sessions() -> NoReturn:
         if _kafka_resend_filter(data):
             # This session is in pending state and its job field is not set
             LOGGER.info("Sending Kafka CREATE event for tardy session: %s", data)
-            KAFKA.produce(event_type='CREATE', data=data)
+            send_event(event_type='CREATE', data=data)
         return False
     while True:
         time.sleep(30 + 5*random.random())
@@ -136,10 +134,6 @@ def _scan_for_tardy_sessions() -> NoReturn:
 
 def _init(topic='cfs-session-events') -> None:
     """ Initialize the kafka producer information """
-    global KAFKA
-    LOGGER.debug("_init: Initializing ProducerWrapper")
-    KAFKA = kafka_utils.ProducerWrapper(topic)
-    LOGGER.debug("_init: ProducerWrapper initialized")
     threading.Thread(target=_scan_for_tardy_sessions, daemon=True).start()
 
 
@@ -321,7 +315,7 @@ def _finish_session_create(data):
     3. Write the session to the database
     """
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    KAFKA.produce(event_type='CREATE', data=data)
+    send_event(event_type='CREATE', data=data)
     session_name = data['name']
     LOGGER.debug("_finish_session_create: Writing new session '%s' to database", session_name)
     response_data = DB.put(session_name, data)
@@ -372,7 +366,7 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
     LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
-    KAFKA.produce(event_type='DELETE', data=session)
+    send_event(event_type='DELETE', data=session)
     LOGGER.debug("_delete_session: Kafka DELETE event sent for '%s'", session_name)
     return None, 204
 
@@ -505,7 +499,7 @@ def delete_sessions(age: Optional[str],
             status=400,
             title='Error parsing age field'
         )
-    deletion_handler = partial(KAFKA.produce, event_type='DELETE')
+    deletion_handler = partial(send_event, event_type='DELETE')
     session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
     response = {"session_ids": session_ids}
     return response, 200
