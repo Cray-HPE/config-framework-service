@@ -70,10 +70,10 @@ class ProducerWrapper:
             self.producer.poll(0.1)
 
     @staticmethod
-    def _value(data: JsonData, event_type: str) -> str:
+    def _value(data: JsonData, event_type: str) -> bytes:
         """
         Create the event dictionary.
-        Return a utf-8 JSON string representation of the event
+        Return a utf-8 encoded JSON representation of the event
         """
         event = {
             'type': event_type,
