@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+import datetime
 import logging
 import threading
 from typing import NoReturn, Optional
@@ -77,7 +78,8 @@ class ProducerWrapper:
         """
         event = {
             'type': event_type,
-            'data': data
+            'data': data,
+            'sent': datetime.datetime.now().isoformat(timespec='seconds'),
         }
         return json.dumps(event).encode('utf-8')
 
