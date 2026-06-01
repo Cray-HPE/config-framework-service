@@ -28,6 +28,7 @@ import time
 from typing import NoReturn, Optional
 
 from kafka import KafkaProducer
+from kafka.admin import KafkaAdminClient
 import ujson as json
 
 from cray.cfs.api.dbutils import JsonData, JsonDict
@@ -49,7 +50,7 @@ class ProducerWrapper:
         kafka = get_kafka_bootstrap_server()
         LOGGER.debug("Initializing Kafka Producer, bootstrap_servers %s", kafka)
         self.producer = KafkaProducer(
-            bootstrap_servers=[kafka],
+            bootstrap_servers=kafka,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
         LOGGER.info(
@@ -58,6 +59,8 @@ class ProducerWrapper:
         )
         LOGGER.info("producer.bootstrap_connected(): %s", self.producer.bootstrap_connected())
         LOGGER.info("producer.config: %s", self.producer.config)
+        self.admin = KafkaAdminClient(bootstrap_servers=kafka)
+        LOGGER.info("topics=%s", self.admin.list_topics())
         self._flush_thread = threading.Thread(
             target=self._flush_loop,
             daemon=True
