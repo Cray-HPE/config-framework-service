@@ -24,12 +24,13 @@
 import datetime
 import logging
 import threading
+import time
 from typing import NoReturn, Optional
 
-from confluent_kafka import Producer
+from kafka import KafkaProducer
 import ujson as json
 
-from cray.cfs.api.dbutils import JsonData
+from cray.cfs.api.dbutils import JsonData, JsonDict
 
 from .defs import KAFKA_FLUSH_TIMEOUT
 from .k8s import get_kafka_bootstrap_server
@@ -46,42 +47,40 @@ class ProducerWrapper:
     def __init__(self, topic: Optional[str]=None) -> None:
         self.topic = topic
         kafka = get_kafka_bootstrap_server()
-        LOGGER.debug("Initializing Kafka Producer, bootstrap.servers %s", kafka)
-        self.producer = Producer({
-            "bootstrap.servers": kafka,
-            "enable.idempotence": True,
-        })
-        LOGGER.info(
-            "Kafka Producer initialized with topic=%s bootstrap.servers=%s",
-            topic,
-            kafka
+        LOGGER.debug("Initializing Kafka Producer, bootstrap_servers %s", kafka)
+        self.producer = KafkaProducer(
+            bootstrap_servers=kafka,
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            acks='all',  # roughly equivalent to idempotence durability
         )
-        self._poll_thread = threading.Thread(
-            target=self._poll_loop,
+        LOGGER.info(
+            "Kafka Producer initialized with topic=%s bootstrap_servers=%s",
+            topic, kafka
+        )
+        self._flush_thread = threading.Thread(
+            target=self._flush_loop,
             daemon=True
         )
-        self._poll_thread.start()
-        LOGGER.debug("Background polling thread started")
+        self._flush_thread.start()
 
-    def _poll_loop(self) -> NoReturn:
+    def _flush_loop(self) -> NoReturn:
         """
-        Loop forever calling producer.poll(0.1)
+        Loop forever calling self.flush() every 5 seconds
         """
         while True:
-            self.producer.poll(0.1)
+            time.sleep(5)
+            self.flush()
 
     @staticmethod
-    def _value(data: JsonData, event_type: str) -> bytes:
+    def _value(data: JsonData, event_type: str) -> JsonDict:
         """
         Create the event dictionary.
-        Return a utf-8 encoded JSON representation of the event
         """
-        event = {
+        return {
             'type': event_type,
             'data': data,
             'sent': datetime.datetime.now().isoformat(timespec='seconds'),
         }
-        return json.dumps(event).encode('utf-8')
 
     def produce(
         self,
@@ -94,7 +93,7 @@ class ProducerWrapper:
             topic = self.topic
         value = self._value(data, event_type)
         LOGGER.debug("produce: Calling producer.send(%s, value=%s)", topic, value)
-        self.producer.produce(topic, value=value)
+        self.producer.send(topic, value=value)
         LOGGER.debug("produce: Done")
 
     def flush(self, timeout: int=KAFKA_FLUSH_TIMEOUT) -> None:
