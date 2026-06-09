@@ -77,9 +77,9 @@ COPY src/server/cray/cfs/api/__main__.py \
 COPY src/server/cray/cfs/utils           lib/server/cray/cfs/utils
 
 # Run pylint
-FROM base as pylint
+FROM base AS pylint
 WORKDIR /app
-ENV PYTHONPATH "/app/lib/server"
+ENV PYTHONPATH="/app/lib/server"
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     cat .pylintrc && \
     pip3 install --no-cache-dir pylint -c constraints.txt && \
@@ -92,7 +92,7 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
 
 # Application Image
 FROM base AS application
-ENV PYTHONPATH "/app/lib/server"
+ENV PYTHONPATH="/app/lib/server"
 WORKDIR /app/
 EXPOSE 9000
 RUN apk add --no-cache uwsgi-python3
