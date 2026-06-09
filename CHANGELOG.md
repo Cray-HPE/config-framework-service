@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
           running (and starting it if it is not), and likewise for the tardy session scanner
           thread.
 - Options patch endpoints now do gets instead of patches if the patch is empty
+- Make more extensive use of `csm_utils.logging.exc_type_msg` for describing exceptions
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe

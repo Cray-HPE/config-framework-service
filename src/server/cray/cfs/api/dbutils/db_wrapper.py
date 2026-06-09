@@ -28,6 +28,7 @@ import logging
 import time
 from typing import Optional, Union
 
+from csm_utils.logging import exc_type_msg
 import more_itertools
 import redis
 import ujson as json
@@ -91,7 +92,7 @@ class DBWrapper:
             return redis.Redis(host=DB_HOST, port=DB_PORT, db=self.db_id)
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
-                         self.db_id, err)
+                         self.db_id, exc_type_msg(err))
             raise
 
     def no_entry_exception(self, key: DbKey) -> DBNoEntryError:

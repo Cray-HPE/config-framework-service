@@ -145,7 +145,7 @@ def create_session_v2():  # noqa: E501
         session_create = V3SessionCreate.from_dict(v2_session_create.to_dict())
     except Exception as err:
         return connexion.problem(
-            detail=err,
+            detail=exc_type_msg(err),
             status=400,
             title="Bad Request"
         )
@@ -211,7 +211,7 @@ def create_session_v3():  # noqa: E501
         session_create = V3SessionCreate.from_dict(connexion.request.get_json())  # noqa: E501
     except Exception as err:
         return connexion.problem(
-            detail=err,
+            detail=exc_type_msg(err),
             status=400,
             title="Bad Request"
         )
@@ -472,14 +472,14 @@ def delete_sessions(age: Optional[str],
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     try:
         session_filter = _get_session_filter(age=age, min_age=min_age, max_age=max_age,
                                              status=status, name_contains=name_contains,
                                              succeeded=succeeded, tag_list=tag_list)
     except ParsingException as err:
         return connexion.problem(
-            detail=str(err),
+            detail=exc_type_msg(err),
             status=400,
             title='Error parsing age field'
         )
@@ -550,7 +550,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     sessions_data, next_page_exists = _get_filtered_sessions(age, min_age, max_age, status,
                                                              name_contains, succeeded, tag_list)
     if next_page_exists:
@@ -580,7 +580,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     sessions_data, next_page_exists = _get_filtered_sessions(age, min_age, max_age, status,
                                                              name_contains, succeeded, tag_list,
                                                              limit=limit, after_id=after_id)
@@ -610,7 +610,7 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     LOGGER.debug("patch_session_v2(%s): data=%s", session_name, v2_patch_data)
     v3_patch_data = dbutils.convert_data_from_v2(v2_patch_data, V2Session)
@@ -650,7 +650,7 @@ def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     except Exception as err:
         return connexion.problem(
             status=400, title="Bad Request",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     LOGGER.debug("patch_session_v3(%s): data=%s", session_name, v3_patch_data)
     patch_handler = partial(_patch_session, job_update_restrictions=True)
@@ -840,9 +840,9 @@ def _validate_ansible_passthrough(passthrough):
     passthrough_arguments = shlex.split(passthrough, posix=False)
     try:
         parser.parse_args(passthrough_arguments)
-    except Exception as e:
+    except Exception as err:
         return connexion.problem(
-            detail=f"Error validating ansible-passthrough: {e}",
+            detail=f"Error validating ansible-passthrough: {exc_type_msg(err)}",
             status=400,
             title='Bad Request'
         )
@@ -896,21 +896,21 @@ def _get_session_filter(
     if age:
         try:
             max_start = _age_to_timestamp(age)
-        except Exception as e:
+        except Exception as err:
             LOGGER.warning('Unable to parse age: %s', age)
-            raise ParsingException(e) from e
+            raise ParsingException(err) from err
     if min_age:
         try:
             max_start = _age_to_timestamp(min_age)
-        except Exception as e:
+        except Exception as err:
             LOGGER.warning('Unable to parse min_age: %s', min_age)
-            raise ParsingException(e) from e
+            raise ParsingException(err) from err
     if max_age:
         try:
             min_start = _age_to_timestamp(max_age)
-        except Exception as e:
+        except Exception as err:
             LOGGER.warning('Unable to parse max_age: %s', max_age)
-            raise ParsingException(e) from e
+            raise ParsingException(err) from err
 
     return partial(
         _matches_filter,

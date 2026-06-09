@@ -26,6 +26,7 @@
 import logging
 from typing import Literal
 
+from csm_utils.logging import exc_type_msg
 import redis
 
 from cray.cfs.api import dbutils
@@ -51,13 +52,13 @@ def get_healthz() -> tuple[Healthz, Literal[200, 503]]:
     try:
         options.update_server_log_level()
     except redis.exceptions.ConnectionError as err:
-        LOGGER.error(err)
+        LOGGER.error(exc_type_msg(err))
         db_status = 'not_available'
     except Exception as err:
         # Because this could mean a non-DB error, we don't
         # update the db_status field. But we do want to return
         # a 503, to reflect that SOMETHING is wrong.
-        LOGGER.error(err)
+        LOGGER.error(exc_type_msg(err))
         status_code = 503
 
     # If we already have detected a database error, no need to check again
@@ -79,7 +80,7 @@ def _get_db_status() -> str:
         if DB.info():
             return 'ok'
     except Exception as err:
-        LOGGER.error(err)
+        LOGGER.error(exc_type_msg(err))
     return 'not_available'
 
 
@@ -87,7 +88,7 @@ def _get_kafka_status() -> str:
     try:
         if ProducerWrapper(KAFKA_TOPIC).healthy():
             return 'ok'
-    except Exception as e:
-        LOGGER.error("%s: %s", type(e).__name__, e)
+    except Exception as err:
+        LOGGER.error(exc_type_msg(err))
 
     return 'not_available'

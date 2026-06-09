@@ -29,6 +29,7 @@ from typing import overload, Literal, NewType, TypeVar, Union
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 
 from cray.cfs.api import dbutils
 
@@ -170,7 +171,7 @@ def patch_options_v2():
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     if not v2_patch:
         # If the patch is empty, just return the current options
         return get_options_data_v2(), 200
@@ -189,7 +190,7 @@ def patch_options_v3():
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     if not v3_patch:
         # If the patch is empty, just return the current options
         return get_options_data(), 200
@@ -239,13 +240,13 @@ class Options:
             self.refresh()
         try:
             return data_type(self.options[key])
-        except KeyError as e:
+        except KeyError:
             if default is not None:
                 LOGGER.warning(
                     'Option %s has not been initialized.  Defaulting to %s', key, default)
                 return default
             LOGGER.error('Option %s has not been initialized.', key)
-            raise e
+            raise
 
     @property
     def batcher_check_interval(self):
