@@ -263,7 +263,7 @@ def _component_filter(component_data: V3ComponentData,
                       config_name: Optional[str],
                       tag_list: list[str]) -> bool:
     # Before bothering to set status, check the filters which do not require it.
-    if id_list and not component_data.get("id") in id_list:
+    if id_list and component_data.get("id") not in id_list:
         return False
     if enabled is not None and component_data.get('enabled') != enabled:
         return False
@@ -273,7 +273,7 @@ def _component_filter(component_data: V3ComponentData,
         return False
     _set_status(component_data, configs, config_details) # This sets the status both for filtering
                                                          # and for the response data
-    if status_list and not component_data.get('configuration_status') in status_list:
+    if status_list and component_data.get('configuration_status') not in status_list:
         return False
     return True
 
