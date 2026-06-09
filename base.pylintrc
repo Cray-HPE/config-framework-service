@@ -1,0 +1,5 @@
+# This is the sub of a pylintrc file used to run pylint during Docker builds
+# The ignore-paths values are filled in during the Docker build
+[MASTER]
+extension-pkg-allow-list=ujson
+ignore-paths=
