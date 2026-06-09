@@ -32,6 +32,7 @@ import uuid
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils
@@ -139,7 +140,7 @@ def post_source_v3():
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     # CASMCMS-9196: connexion does not fill in default values for parameters in the request
     # body. So here we set the default value for authentication_method, if needed. Note that
@@ -182,7 +183,7 @@ def patch_source_v3(source_id):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     error = _validate_source(data)
     if error:
@@ -210,7 +211,7 @@ def restore_source_v3(source_id):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     data = _set_auto_fields(data)
     data["name"] = source_id
