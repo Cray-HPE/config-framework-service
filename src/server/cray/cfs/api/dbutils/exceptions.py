@@ -59,4 +59,4 @@ class DBTooBusyError(DBError):
     keys.
     """
     def __str__(self) -> str:
-        return f"Could not complete '{self.db_name}' database operation within {DB_BUSY_SECONDS} seconds"
+        return f"Could not complete '{self.db_name}' DB operation within {DB_BUSY_SECONDS} seconds"

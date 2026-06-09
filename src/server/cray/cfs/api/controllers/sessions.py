@@ -204,7 +204,10 @@ def create_session_v3():  # noqa: E501
             title="Conflicting session name"
         )
 
-    if session_create.configuration_name not in CONFIG_DB and not session_create.configuration_name.startswith("debug_"):  # noqa: E501
+    if (
+        session_create.configuration_name not in CONFIG_DB and
+        not session_create.configuration_name.startswith("debug_")  # noqa: E501
+    ):
         return connexion.problem(
             detail=f"No configurations exist named {session_create.configuration_name}",
             status=400,
@@ -537,7 +540,8 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")  # noqa: E501
+            detail="The response size exceeds the default_page_size. "
+                   "Use the v3 API to page through the results.")  # noqa: E501
     return [convert_session_to_v2(session) for session in sessions_data], 200
 
 
@@ -741,9 +745,10 @@ def _validate_session_target(target):
     if target.definition in ('repo', 'dynamic'):
         if target.groups:
             return connexion.problem(
-                detail=f"'{target.definition}' target definitions must not contain groups specifications.",  # noqa: E501
                 status=status,
-                title=title
+                title=title,
+                detail=f"'{target.definition}' target definitions must not "
+                       "contain groups specifications."  # noqa: E501
             )
     elif target.definition in ('spec', 'image'):
         if not target.groups:
@@ -785,7 +790,8 @@ def _validate_session_target(target):
                 return connexion.problem(
                     status=status,
                     title=title,
-                    detail=f"The following Image target group member(s) are not valid UUIDs: {naughty_list}."  # noqa: E501
+                    detail="The following Image target group members are not "
+                           f"valid UUIDs: {naughty_list}."  # noqa: E501
                 )
     else:
         # Model validation will handle this case
