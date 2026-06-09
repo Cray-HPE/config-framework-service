@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         - A new function that runs is one that ensures the background Kafka message thread is
           running (and starting it if it is not), and likewise for the tardy session scanner
           thread.
+- Options patch endpoints now do gets instead of patches if the patch is empty
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
