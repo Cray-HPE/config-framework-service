@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Generate API
-FROM openapitools/openapi-generator-cli:v7.8.0 as codegen
+FROM openapitools/openapi-generator-cli:v7.8.0 AS codegen
 WORKDIR /app
 COPY api/openapi.yaml api/openapi.yaml
 COPY config/autogen-server.json config/autogen-server.json
@@ -38,7 +38,7 @@ COPY base.pylintrc ./.pylintrc
 RUN find lib -type f -name \*.py | sed 's/^\(.*[.]py\)$/    ^\1,/' | tee -a .pylintrc
 
 # Base image
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 as base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 AS base
 WORKDIR /app
 COPY --from=codegen /app .
 COPY constraints.txt requirements.txt ./
@@ -71,9 +71,9 @@ COPY src/server/cray/cfs/api/__main__.py \
      lib/server/cray/cfs/api/
 
 # Run pylint
-FROM base as pylint
+FROM base AS pylint
 WORKDIR /app
-ENV PYTHONPATH "/app/lib/server"
+ENV PYTHONPATH="/app/lib/server"
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     cat .pylintrc && \
     pip3 install --no-cache-dir pylint -c constraints.txt && \
@@ -85,8 +85,8 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pylint lib | tee /app/pylint.txt
 
 # Application Image
-FROM base as application
-ENV PYTHONPATH "/app/lib/server"
+FROM base AS application
+ENV PYTHONPATH="/app/lib/server"
 WORKDIR /app/
 EXPOSE 9000
 RUN apk add --no-cache uwsgi-python3
