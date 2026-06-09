@@ -119,9 +119,7 @@ def _cleanup_old_options(options_data: JsonDict,
 def get_options_v2():
     """Used by the GET /options API operation"""
     LOGGER.debug("GET /v2/options invoked get_options_v2")
-    data = get_options_data()
-    response = convert_options_to_v2(data)
-    return response, 200
+    return get_options_data_v2(), 200
 
 
 @dbutils.redis_error_handler
@@ -143,6 +141,11 @@ def get_options_data():
     are already present in the DB
     """
     return patch_options_db({}, patch_handler=_set_defaults)
+
+
+def get_options_data_v2():
+    data = get_options_data()
+    return convert_options_to_v2(data)
 
 
 def _set_defaults(options_data: V3OptionsData, _: JsonDict) -> V3OptionsData:
@@ -168,6 +171,9 @@ def patch_options_v2():
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
+    if not v2_patch:
+        # If the patch is empty, just return the current options
+        return get_options_data_v2(), 200
     v3_patch = convert_options_from_v2(v2_patch)
     new_v3_data = _patch_options(v3_patch)
     return convert_options_to_v2(new_v3_data), 200
@@ -184,6 +190,9 @@ def patch_options_v3():
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
             detail=str(err))
+    if not v3_patch:
+        # If the patch is empty, just return the current options
+        return get_options_data(), 200
     return _patch_options(v3_patch), 200
 
 
