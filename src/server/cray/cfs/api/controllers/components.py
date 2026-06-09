@@ -30,6 +30,7 @@ from typing import final, Literal, NewType, Optional, TypedDict
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
@@ -150,14 +151,14 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the ids provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if status:
         try:
             status_list = status.split(',')
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the status provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
@@ -166,7 +167,7 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     components_data, next_page_exists = get_components_data(
                                             id_list=id_list, status_list=status_list,
                                             enabled=enabled, config_name=config_name,
@@ -195,14 +196,14 @@ def get_components_v3(ids="", status="", enabled=None, config_name="", state_det
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the ids provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if status:
         try:
             status_list = status.split(',')
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the status provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if tags:
         try:
             tag_list = [tuple(tag.split('=')) for tag in tags.split(',')]
@@ -211,7 +212,7 @@ def get_components_v3(ids="", status="", enabled=None, config_name="", state_det
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     components_data, next_page_exists = get_components_data(
                                             id_list=id_list, status_list=status_list,
                                             enabled=enabled, config_name=config_name,
@@ -290,7 +291,7 @@ def put_components_v2():
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     response = []
     for component_id, component_data in components:
         component_data = convert_component_to_v3(component_data)
@@ -314,7 +315,7 @@ def put_components_v3():
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     component_ids = []
     for component_id, component_data in components:
         component_data = _set_auto_fields(component_data)
@@ -349,7 +350,7 @@ def patch_v2_components_list(v2_patch_list: list[V2ComponentPatch]) -> V2PatchCo
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     v3_patch_list_result = _patch_v3_components_list(v3_patch_list)
     if not isinstance(v3_patch_list_result, list):
@@ -376,14 +377,14 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the ids provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if filters.get("status", None):
         try:
             status_list = filters.get("status", None).split(',')
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the status provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if filters.get("tags", None):
         try:
             tag_list = [tuple(tag.split('=')) for tag in filters.get("tags", None).split(',')]
@@ -392,7 +393,7 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
 
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=False, configs=configs,
@@ -461,7 +462,7 @@ def _patch_v3_components_list(
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     try:
         return DB.patch_list(id_patch_tuples,
@@ -485,14 +486,14 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the ids provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if filters.get("status", None):
         try:
             status_list = filters.get("status", None).split(',')
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the status provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
     if filters.get("tags", None):
         try:
             tag_list = [tuple(tag.split('=')) for tag in filters.get("tags", None).split(',')]
@@ -501,7 +502,7 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
         except Exception as err:
             return connexion.problem(
                 status=400, title="Error parsing the tags provided.",
-                detail=str(err))
+                detail=exc_type_msg(err))
 
     configs = configurations.Configurations()
     component_filter = partial(_component_filter, config_details=False, configs=configs,
@@ -575,7 +576,7 @@ def put_component_v2(component_id: str):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     data = convert_component_to_v3(data)
     data = _set_auto_fields(data)
     response_data = DB.put(component_id, data)
@@ -592,7 +593,7 @@ def put_component_v3(component_id: str):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     data["id"] = component_id
     data = _set_auto_fields(data)
     return DB.put(component_id, data), 200
@@ -608,7 +609,7 @@ def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     v3_patch = convert_component_patch_to_v3(v2_patch)
     v3_patch_response = _patch_component_v3(component_id, v3_patch)
     if not isinstance(v3_patch_response, tuple):
@@ -633,7 +634,7 @@ def patch_component_v3(component_id: str) -> V3PatchComponentResponse:
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
     return _patch_component_v3(component_id, v3_patch)
 
 

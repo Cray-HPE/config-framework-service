@@ -33,6 +33,7 @@ from typing import Literal, NewType, Optional
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.dbutils import JsonDict, PatchHandler
@@ -234,7 +235,7 @@ def put_configuration_v2(configuration_id):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     for layer in iter_layers(data, include_additional_inventory=True):
         if 'branch' in layer and 'commit' in layer:
@@ -244,10 +245,10 @@ def put_configuration_v2(configuration_id):
 
     try:
         data = _set_auto_fields(data)
-    except BranchConversionException as e:
+    except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(e))
+            detail=exc_type_msg(err))
 
     layer_keys = set()
     for layer in iter_layers(data, include_additional_inventory=False):
@@ -274,7 +275,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
     except Exception as err:
         return connexion.problem(
             status=400, title="Error parsing the data provided.",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     # If the put request comes from a specific tenant, make note of it in the record -- we're
     # going to use it in subsequent data puts and permission checks.
@@ -326,10 +327,10 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
     try:
         data = _set_auto_fields(data)
-    except BranchConversionException as e:
+    except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(e))
+            detail=exc_type_msg(err))
 
     layer_keys = set()
     for layer in iter_layers(data, include_additional_inventory=False):
@@ -416,7 +417,7 @@ def _patch_configuration_v3(configuration_id: str,
     except BranchConversionException as err:
         return connexion.problem(
             status=400, title="Error converting branch name to commit",
-            detail=str(err))
+            detail=exc_type_msg(err))
 
     return patched_v3_configuration_data, 200
 
@@ -516,12 +517,12 @@ def _set_auto_fields(data):
     data = _set_last_updated(data)
     try:
         data = _convert_branches_to_commits(data)
-    except BranchConversionException as e:
-        LOGGER.error("Error converting branch name to commit: %s", e)
+    except BranchConversionException as err:
+        LOGGER.error("Error converting branch name to commit: %s", exc_type_msg(err))
         raise
-    except Exception as e:
-        LOGGER.exception("Unexpected error converting branch name to commit: %s", e)
-        raise BranchConversionException(e) from e
+    except Exception as err:
+        LOGGER.exception("Unexpected error converting branch name to commit: %s", exc_type_msg(err))
+        raise BranchConversionException(err) from err
     return data
 
 
@@ -568,8 +569,8 @@ def _get_commit_id(repo_url, branch, source=None):
         repo_dir = os.path.join(tmp_dir, repo_name)
         try:
             username, password = _get_git_credentials(source)
-        except Exception as e:
-            LOGGER.error("Error retrieving git credentials: %s", e)
+        except Exception as err:
+            LOGGER.error("Error retrieving git credentials: %s", exc_type_msg(err))
             raise
         ssl_info = _get_ssl_info(source, tmp_dir)
         creds_url = ''.join([split_url[0], '//', username, ':', password, '@', split_url[2]])
@@ -593,9 +594,9 @@ def _get_commit_id(repo_url, branch, source=None):
             subprocess.check_call(checkout_command, cwd=repo_dir,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             output = subprocess.check_output(parse_command, cwd=repo_dir)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as err:
             raise BranchConversionException(
-                f"Failed interacting with the specified clone_url: {e}") from e
+                f"Failed interacting with the specified clone_url: {exc_type_msg(err)}") from err
     commit = output.decode("utf-8").strip()
     LOGGER.info('Translated git branch %s to commit %s', branch, commit)
     return commit
@@ -610,14 +611,14 @@ def _get_git_credentials(source=None):
     secret_name = source_credentials["secret_name"]
     try:
         secret = get_vault_secret(secret_name)
-    except Exception as e:
-        raise BranchConversionException(f"Error loading Vault secret: {e}") from e
+    except Exception as err:
+        raise BranchConversionException(f"Error loading Vault secret: {exc_type_msg(err)}") from err
     try:
         username = secret["username"]
         password = secret["password"]
-    except Exception as e:
+    except Exception as err:
         raise BranchConversionException(
-            f"Error reading username and password from secret: {e}") from e
+            f"Error reading username and password from secret: {exc_type_msg(err)}") from err
     return username, password
 
 

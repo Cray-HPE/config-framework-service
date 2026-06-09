@@ -183,8 +183,8 @@ class ProducerWrapper:
     def _reinit_producer(self) -> None:
         try:
             self._close()
-        except KafkaTimeoutError as e:
-            LOGGER.warning('Unable to close current Kafka producer: %s: %s', type(e).__name__, e)
+        except KafkaTimeoutError as err:
+            LOGGER.warning('Unable to close current Kafka producer: %s', exc_type_msg(err))
 
         self.producer = self._init_producer()
 
@@ -201,8 +201,8 @@ class ProducerWrapper:
                 producer = KafkaProducer(**init_kwargs)
                 LOGGER.debug('_init_producer: KafkaProducer successfully initialized')
                 return producer
-            except Exception as e:
-                LOGGER.error('Error initializing Kafka producer: %s: %s', type(e).__name__, e)
+            except Exception as err:
+                LOGGER.error('Error initializing Kafka producer: %s', exc_type_msg(err))
                 time_left = timeout_time - time.monotonic()
                 if time_left <= 0:
                     raise

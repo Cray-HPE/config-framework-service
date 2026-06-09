@@ -33,6 +33,7 @@ from typing import Concatenate, Protocol
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 import redis
 
 from .exceptions import DBTooBusyError
@@ -51,13 +52,13 @@ def redis_error_handler[**P, R](func: Callable[P, R]) -> Callable[P, R|CxRespons
         try:
             return func(*args, **kwargs)
         except redis.exceptions.ConnectionError as err:
-            LOGGER.error('Unable to connect to the Redis database: %s', err)
+            LOGGER.error('Unable to connect to the Redis database: %s', exc_type_msg(err))
             return connexion.problem(
                 status=503,
                 title='Unable to connect to the Redis database',
                 detail=str(err))
         except DBTooBusyError as err:
-            LOGGER.error('Database busy: %s', err)
+            LOGGER.error('Database busy: %s', exc_type_msg(err))
             return connexion.problem(
                 status=503,
                 title='Database busy',

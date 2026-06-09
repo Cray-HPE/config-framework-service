@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@ import logging
 import time
 from typing import Optional
 
+from csm_utils.logging import exc_type_msg
 import redis
 from redis.maint_notifications import MaintNotificationsConfig
 import ujson as json
@@ -95,7 +96,7 @@ class DBWrapper:
                                maint_notifications_config=MaintNotificationsConfig(enabled=False))
         except Exception as err:
             LOGGER.error("Failed to connect to database %s : %s",
-                         self.db_id, err)
+                         self.db_id, exc_type_msg(err))
             raise
 
     def no_entry_exception(self, key: DbKey) -> DBNoEntryError:

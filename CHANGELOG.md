@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         - A new function that runs is one that ensures the background Kafka message thread is
           running (and starting it if it is not).
 - Options patch endpoints now do gets instead of patches if the patch is empty
+- Make more extensive use of `csm_utils.logging.exc_type_msg` for describing exceptions
 
 ### Dependencies
 - CAST-39551: Updated `kafka-python` from 2.0 to 2.3
