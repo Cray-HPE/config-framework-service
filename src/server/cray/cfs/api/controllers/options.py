@@ -315,14 +315,18 @@ def update_server_log_level() -> Options:
     options.refresh()
     desired_level_str = options.logging_level.upper()
     desired_level_int = logging.getLevelName(desired_level_str)
-    current_level_int = LOGGER.getEffectiveLevel()
-    if current_level_int == desired_level_int:
+    if LOGGER.getEffectiveLevel() == desired_level_int:
         # No update needed
         return options
     # Take a lock to prevent multiple threads from doing this
     with LogLevelUpdateLock:
-        if current_level_int != desired_level_int:
-            do_update_log_level(current_level_int, desired_level_int, desired_level_str)
+        # Get the current log level again, since it may have been changed
+        # by another thread
+        current_level_int = LOGGER.getEffectiveLevel()
+        if current_level_int == desired_level_int:
+            # No update needed
+            return options
+        do_update_log_level(current_level_int, desired_level_int, desired_level_str)
     return options
 
 

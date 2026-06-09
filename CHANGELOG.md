@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
           thread.
 - Options patch endpoints now do gets instead of patches if the patch is empty
 - Make more extensive use of `csm_utils.logging.exc_type_msg` for describing exceptions
+- Re-check current log level after taking log update lock, before doing update
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
