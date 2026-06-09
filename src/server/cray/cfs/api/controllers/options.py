@@ -22,7 +22,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from collections.abc import Callable
 import functools
 import logging
 import threading
@@ -34,7 +33,7 @@ from csm_utils.logging import exc_type_msg
 
 from cray.cfs.api import dbutils
 
-from cray.cfs.api.dbutils import JsonData, JsonDict
+from cray.cfs.api.dbutils import JsonDict
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
 from cray.cfs.api.server_entrypoint import server_entrypoint, RunPriority
