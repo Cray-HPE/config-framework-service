@@ -302,9 +302,12 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
 
-    # The second argument to the lambda function is not used, but is present so that
-    # patch_handler matches the expected function signature for a patch function.
-    patch_handler: PatchHandler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
+    def patch_handler(v3_config_data, _):
+        """
+        The second argument is not used, but is present so that patch_handler
+        matches the expected function signature for a patch function.
+        """
+        return _set_auto_fields(v3_config_data)
 
     v3_patch_response = _patch_configuration_v3(configuration_id, patch_handler)
     if not isinstance(v3_patch_response, tuple):
@@ -333,9 +336,12 @@ def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationRespons
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
 
-    # The second argument to the lambda function is not used, but is present so that
-    # patch_handler matches the expected function signature for a patch function.
-    patch_handler: PatchHandler = lambda v3_config_data, _: _set_auto_fields(v3_config_data)
+    def patch_handler(v3_config_data, _):
+        """
+        The second argument is not used, but is present so that patch_handler
+        matches the expected function signature for a patch function.
+        """
+        return _set_auto_fields(v3_config_data)
 
     return _patch_configuration_v3(configuration_id, patch_handler)
 
