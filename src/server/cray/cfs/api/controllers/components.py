@@ -176,7 +176,8 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
     if next_page_exists:
         return connexion.problem(
             status=400, title="The response size is too large",
-            detail="The response size exceeds the default_page_size.  Use the v3 API to page through the results.")
+            detail="The response size exceeds the default_page_size. "
+                   "Use the v3 API to page through the results.")
     response = [convert_component_to_v2(component) for component in components_data]
     return response, 200
 

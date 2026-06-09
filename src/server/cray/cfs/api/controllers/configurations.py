@@ -54,15 +54,30 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 V2ConfigurationData = NewType("V2ConfigurationData", dbutils.JsonDict)
 V3ConfigurationData = NewType("V3ConfigurationData", dbutils.JsonDict)
 
-V2GetConfigurationResponse: TypeAlias = Union[tuple[V2ConfigurationData, Literal[200]], CxResponse]
-V3GetConfigurationResponse: TypeAlias = Union[tuple[V3ConfigurationData, Literal[200]], CxResponse]
+V2GetConfigurationResponse: TypeAlias = Union[
+                                            tuple[V2ConfigurationData, Literal[200]],
+                                            CxResponse
+                                        ]
+V3GetConfigurationResponse: TypeAlias = Union[
+                                            tuple[V3ConfigurationData, Literal[200]],
+                                            CxResponse
+                                        ]
 
 # Even though it does not conform to convention, successful patch requests return 200 status
-V2PatchConfigurationResponse: TypeAlias = Union[tuple[V2ConfigurationData, Literal[200]], CxResponse]
-V3PatchConfigurationResponse: TypeAlias = Union[tuple[V3ConfigurationData, Literal[200]], CxResponse]
+V2PatchConfigurationResponse: TypeAlias = Union[
+                                            tuple[V2ConfigurationData, Literal[200]],
+                                            CxResponse
+                                          ]
+V3PatchConfigurationResponse: TypeAlias = Union[
+                                            tuple[V3ConfigurationData, Literal[200]],
+                                            CxResponse
+                                          ]
 
 # The response format for the delete configuration endpoint is the same for v2 and v3
-DeleteConfigurationResponse: TypeAlias = Union[tuple[None, Literal[204]], CxResponse]
+DeleteConfigurationResponse: TypeAlias = Union[
+                                            tuple[None, Literal[204]],
+                                            CxResponse
+                                         ]
 
 @dbutils.redis_error_handler
 @server_entrypoint
@@ -303,8 +318,9 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
     #
     # After the previous conditional statement, we know that v3_patch_response is a tuple.
     # which means it should be tuple[V3ConfigurationData, Literal[200]]
-    # If that is not the case, something has gone very wrong, so we will add a couple of guardrail asserts -- first
-    # to verify the tuple has exactly 2 elements, and next to verify that the second element of the tuple is 200.
+    # If that is not the case, something has gone very wrong, so we will add a couple of guardrail
+    # asserts -- first to verify the tuple has exactly 2 elements, and next to verify that the
+    # second element of the tuple is 200.
     assert len(v3_patch_response) == 2, f"Response from _patch_configuration_v3 has unexpected format: {v3_patch_response}"
     patched_v3_configuration_data, status_code = v3_patch_response
     assert status_code == 200, f"Response from _patch_configuration_v3 has unexpected status code: {v3_patch_response}"

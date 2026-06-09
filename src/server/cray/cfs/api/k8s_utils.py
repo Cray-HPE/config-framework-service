@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -40,7 +40,11 @@ def get_ara_ui_url():
     global ARA_UI_URL
     if not ARA_UI_URL:
         try:
-            data = k8scustom.get_namespaced_custom_object("networking.istio.io", "v1beta1", "services", "virtualservices", "cfs-ara-external")
+            data = k8scustom.get_namespaced_custom_object("networking.istio.io",
+                                                          "v1beta1",
+                                                          "services",
+                                                          "virtualservices",
+                                                          "cfs-ara-external")
             ARA_UI_URL = data["spec"]["hosts"][0]
         except:
             pass
