@@ -46,7 +46,7 @@ def get_ara_ui_url():
                                                           "virtualservices",
                                                           "cfs-ara-external")
             ARA_UI_URL = data["spec"]["hosts"][0]
-        except:
+        except Exception:
             pass
     return ARA_UI_URL
 
