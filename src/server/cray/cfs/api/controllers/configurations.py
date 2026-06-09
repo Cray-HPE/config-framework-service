@@ -392,7 +392,6 @@ def _delete_configuration(
 
 
 def _config_deletion_checker(
-    v3_config_data: V3ConfigurationData,
     *,
     configuration_id: str
 ) -> Literal[True]:
