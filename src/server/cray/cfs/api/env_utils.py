@@ -67,14 +67,23 @@ def get_pos_int_env_var_or_default(env_var_name: str, default_value: int) -> int
     LOGGER.debug("Using default value (%d) for %s", default_value, env_var_name)
     return default_value
 
+def get_env_var(varname: str) -> Optional[str]:
+    """
+    If the specified environment variable is set, return it (as a str).
+    Otherwise, log a relevant warning message and return None.
+    """
+    env_value = os.environ.get(varname)
+    if env_value is None:
+        LOGGER.debug("%s environment variable not set", varname)
+    return env_value
+
 def get_pos_float_env_var(varname: str) -> Optional[float]:
     """
     If the specified environment variable is set to a positive base-10 float string
     value, return it (as a float). Otherwise, log a relevant warning message and return None.
     """
-    env_value = os.environ.get(varname)
+    env_value = get_env_var(varname)
     if env_value is None:
-        LOGGER.debug("%s environment variable not set", varname)
         return None
     try:
         env_value_float = float(env_value)
@@ -89,6 +98,17 @@ def get_pos_float_env_var(varname: str) -> Optional[float]:
         "%s environment variable not a positive base 10 number: %f", varname, env_value_float
     )
     return None
+
+def get_env_var_or_default(env_var_name: str, default_value: str) -> str:
+    """
+    If the specified environment variable is set to a non-empty string, return it.
+    Otherwise return the default value.
+    """
+    value_from_env = get_env_var(env_var_name)
+    if value_from_env:
+        return value_from_env
+    LOGGER.debug("Using default value (%s) for %s", default_value, env_var_name)
+    return default_value
 
 def get_pos_float_env_var_or_default(env_var_name: str, default_value: float) -> float:
     """

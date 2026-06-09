@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,8 +30,8 @@ from typing import Literal
 import yaml
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import options
 from cray.cfs.api.models.version import Version
+from cray.cfs.api.server_entrypoint import server_entrypoint
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
 
@@ -60,7 +60,7 @@ def _get_version() -> GetVersionsResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_version():
     """Used by the GET / API operation"""
     LOGGER.debug("GET /versions invoked get_versions")
@@ -68,7 +68,7 @@ def get_version():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions() -> GetVersionsResponse:
     """Used by the GET /versions API operation"""
     LOGGER.debug("GET /versions invoked get_versions")
@@ -76,7 +76,7 @@ def get_versions() -> GetVersionsResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions_v2() -> GetVersionsResponse:
     """Used by the GET /v2 API operation"""
     LOGGER.debug("GET /v2 invoked get_versions_v2")
@@ -84,7 +84,7 @@ def get_versions_v2() -> GetVersionsResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions_v3() -> GetVersionsResponse:
     """Used by the GET /v3 API operation"""
     LOGGER.debug("GET /v3 invoked get_versions_v3")

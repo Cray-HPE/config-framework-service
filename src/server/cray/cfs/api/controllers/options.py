@@ -32,9 +32,11 @@ import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
+
 from cray.cfs.api.dbutils import JsonData, JsonDict
 from cray.cfs.api.models.v2_options import V2Options
 from cray.cfs.api.models.v3_options import V3Options
+from cray.cfs.api.server_entrypoint import server_entrypoint, RunPriority
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.options')
 DB = dbutils.get_wrapper(db='options')
@@ -66,6 +68,7 @@ V3OptionsPatch = NewType("V3OptionsPatch", JsonDict)
 type V2PatchOptionsResponse = tuple[V2OptionsData, Literal[200]] | CxResponse
 type V3PatchOptionsResponse = tuple[V3OptionsData, Literal[200]] | CxResponse
 
+OPTIONS_LOGLVL_UPDATE_PRI: RunPriority = 10
 
 def _init():
     """
@@ -112,24 +115,8 @@ def _cleanup_old_options(options_data: JsonDict,
     return clean_data
 
 
-def refresh_options_update_loglevel[**P, R](func: Callable[P, R]) -> Callable[P, R]:
-    """
-    This is a decorator to put around all API controller functions (so that it runs on
-    all entrypoints into the server, other than initial startup). It simply calls
-    update_server_log_level() before calling the function. It does not change the
-    signature of the function.
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        update_server_log_level()
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
 @dbutils.redis_error_handler
-@refresh_options_update_loglevel
+@server_entrypoint
 def get_options_v2():
     """Used by the GET /options API operation"""
     LOGGER.debug("GET /v2/options invoked get_options_v2")
@@ -139,7 +126,7 @@ def get_options_v2():
 
 
 @dbutils.redis_error_handler
-@refresh_options_update_loglevel
+@server_entrypoint
 def get_options_v3():
     """Used by the GET /options API operation"""
     LOGGER.debug("GET /v3/options invoked get_options_v3")
@@ -172,7 +159,7 @@ def _set_defaults(options_data: V3OptionsData, _: JsonDict) -> V3OptionsData:
 
 
 @dbutils.redis_error_handler
-@refresh_options_update_loglevel
+@server_entrypoint
 def patch_options_v2() -> V2PatchOptionsResponse:
     """Used by the PATCH /options API operation"""
     LOGGER.debug("PATCH /v2/options invoked patch_options_v2")
@@ -188,7 +175,7 @@ def patch_options_v2() -> V2PatchOptionsResponse:
 
 
 @dbutils.redis_error_handler
-@refresh_options_update_loglevel
+@server_entrypoint
 def patch_options_v3() -> V3PatchOptionsResponse:
     """Used by the PATCH /options API operation"""
     LOGGER.debug("PATCH /v3/options invoked patch_options_v3")
@@ -307,7 +294,8 @@ def do_update_log_level(current_level_int: int, new_level_int: int, new_level_st
 
 def update_server_log_level() -> Options:
     """
-    Refresh CFS options and update the log level for this process, if needed.
+    Refresh CFS options.
+    Update the log level for this process, if needed.
     Returns the refreshed options data, in case the caller wants it.
     """
     options = Options()
@@ -352,10 +340,13 @@ def defaults(**default_kwargs):
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             options = Options()
-            options.refresh()
+            # No need to refresh options, because this wrapper should always run after
+            # the update_server_log_level wrapper, and it refreshes the options
             for key, value in default_kwargs.items():
                 if key not in kwargs:
                     kwargs[key] = getattr(options, value)
             return f(*args, **kwargs)
         return wrapped_f
     return wrap
+
+server_entrypoint.add(update_server_log_level, OPTIONS_LOGLVL_UPDATE_PRI)

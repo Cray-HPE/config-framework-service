@@ -35,8 +35,10 @@ from connexion.lifecycle import ConnexionResponse as CxResponse
 
 from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
+from cray.cfs.api.server_entrypoint import server_entrypoint
 from cray.cfs.api.vault_utils import delete_secret as delete_vault_secret
 from cray.cfs.api.vault_utils import put_secret as put_vault_secret
+
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sources')
 DB = dbutils.get_wrapper(db='sources')
@@ -48,7 +50,7 @@ type DeleteSourceResponse = tuple[None, Literal[204]] | CxResponse
 type GetSourceResponse = tuple[SourceData, Literal[200]] | CxResponse
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 @options.defaults(limit="default_page_size")
 def get_sources_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /sources API operation"""
@@ -112,7 +114,7 @@ def _iter_configurations_data():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_source_v3(source_id: str) -> GetSourceResponse:
     """Used by the GET /sources/{source_id} API operation"""
     LOGGER.debug("GET /v3/sources/%s invoked get_source_v3", source_id)
@@ -127,7 +129,7 @@ def get_source_v3(source_id: str) -> GetSourceResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def post_source_v3():
     """Used by the POST /sources/ API operation"""
     LOGGER.debug("POST /v3/sources invoked post_source_v3")
@@ -165,7 +167,7 @@ def post_source_v3():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_source_v3(source_id):
     """Used by the PATCH /sources/{source_id} API operation"""
     LOGGER.debug("PATCH /v3/sources/%s invoked patch_source_v3", source_id)
@@ -197,7 +199,7 @@ def patch_source_v3(source_id):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def restore_source_v3(source_id):
     """Used by the POST /sources/{source_id} API operation"""
     LOGGER.debug("POST /v3/sources/%s invoked restore_source_v3", source_id)
@@ -264,7 +266,7 @@ def _clean_credentials_data(data):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_source_v3(source_id: str) -> DeleteSourceResponse:
     """Used by the DELETE /sources/{source_id} API operation"""
     LOGGER.debug("DELETE /v3/sources/%s invoked delete_source_v3", source_id)

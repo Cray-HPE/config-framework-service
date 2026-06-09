@@ -61,13 +61,14 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
 COPY src/server/cray/cfs/__init__.py     lib/server/cray/cfs
 COPY src/server/cray/cfs/api/controllers lib/server/cray/cfs/api/controllers
 COPY src/server/cray/cfs/api/dbutils lib/server/cray/cfs/api/dbutils
+COPY src/server/cray/cfs/api/kafka_utils lib/server/cray/cfs/api/kafka_utils
 COPY src/server/cray/cfs/api/__main__.py \
      src/server/cray/cfs/api/__init__.py \
      src/server/cray/cfs/api/env_utils.py \
-     src/server/cray/cfs/api/kafka_utils.py \
      src/server/cray/cfs/api/k8s_utils.py \
      src/server/cray/cfs/api/vault_utils.py \
      src/server/cray/cfs/api/migrations.py \
+     src/server/cray/cfs/api/server_entrypoint.py \
      lib/server/cray/cfs/api/
 COPY src/server/cray/cfs/utils           lib/server/cray/cfs/utils
 

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -39,6 +39,7 @@ from cray.cfs.api.dbutils import JsonDict, PatchHandler
 from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
+from cray.cfs.api.server_entrypoint import server_entrypoint
 from cray.cfs.api.vault_utils import get_secret as get_vault_secret
 from cray.cfs.utils.multitenancy import (
                                             get_tenant_from_header,
@@ -46,6 +47,7 @@ from cray.cfs.utils.multitenancy import (
                                             ImmutableTenantNameField,
                                             TenantForbiddenOperation
                                         )
+
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.configurations')
 DB = dbutils.get_wrapper(db='configurations')
@@ -81,7 +83,7 @@ def _matches_filter(data, tenant):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_configurations_v2(in_use=None):
     """Used by the GET /configurations API operation"""
     LOGGER.debug("GET /v2/configurations invoked get_configurations_v2")
@@ -99,7 +101,7 @@ def get_configurations_v2(in_use=None):
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-@options.refresh_options_update_loglevel
+@server_entrypoint
 @options.defaults(limit="default_page_size")
 def get_configurations_v3(in_use=None, limit=1, after_id=""):
     """Used by the GET /configurations API operation"""
@@ -184,7 +186,7 @@ def _config_in_use(config_name: str) -> bool:
     return False
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_configuration_v2(configuration_id: str) -> V2GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /v2/configurations/%s invoked get_configuration_v2", configuration_id)
@@ -200,7 +202,7 @@ def get_configuration_v2(configuration_id: str) -> V2GetConfigurationResponse:
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_configuration_v3(configuration_id: str) -> V3GetConfigurationResponse:
     """Used by the GET /configurations/{configuration_id} API operation"""
     LOGGER.debug("GET /v3/configurations/%s invoked get_configuration_v3", configuration_id)
@@ -222,7 +224,7 @@ def get_configuration_v3(configuration_id: str) -> V3GetConfigurationResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_configuration_v2(configuration_id):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /v2/configurations/%s invoked put_configuration_v2", configuration_id)
@@ -263,7 +265,7 @@ def put_configuration_v2(configuration_id):
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_configuration_v3(configuration_id, drop_branches=False):
     """Used by the PUT /configurations/{configuration_id} API operation"""
     LOGGER.debug("PUT /v3/configurations/%s invoked put_configuration_v3", configuration_id)
@@ -353,7 +355,7 @@ def put_configuration_v3(configuration_id, drop_branches=False):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v2/configurations/%s invoked patch_configuration_v2", configuration_id)
@@ -385,7 +387,7 @@ def patch_configuration_v2(configuration_id: str) -> V2PatchConfigurationRespons
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_configuration_v3(configuration_id: str) -> V3PatchConfigurationResponse:
     """Used by the PATCH /configurations/{configuration_id} API operation"""
     LOGGER.debug("PATCH /v3/configurations/%s invoked patch_configuration_v3", configuration_id)
@@ -434,7 +436,7 @@ def _check_tenant_patch_config(v3_config_data: V3ConfigurationData,
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v2/configurations/%s invoked delete_configuration_v2", configuration_id)
@@ -443,7 +445,7 @@ def delete_configuration_v2(configuration_id: str) -> DeleteConfigurationRespons
 
 @dbutils.redis_error_handler
 @reject_invalid_tenant
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_configuration_v3(configuration_id: str) -> DeleteConfigurationResponse:
     """Used by the DELETE /configurations/{configuration_id} API operation"""
     LOGGER.debug("DELETE /v3/configurations/%s invoked delete_configuration_v3", configuration_id)

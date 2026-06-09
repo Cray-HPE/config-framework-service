@@ -35,6 +35,7 @@ from cray.cfs.api import dbutils
 from cray.cfs.api.controllers import configurations, options
 from cray.cfs.api.k8s_utils import get_ara_ui_url
 from cray.cfs.api.models.v2_component_state import V2ComponentState as V2Component
+from cray.cfs.api.server_entrypoint import server_entrypoint
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.components')
 DB = dbutils.get_wrapper(db='components')
@@ -135,7 +136,7 @@ type V2PatchComponentResponse = tuple[V2ComponentData, Literal[200]] | CxRespons
 type V3PatchComponentResponse = tuple[V3ComponentData, Literal[200]] | CxResponse
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_components_v2(ids="", status="", enabled=None, config_name="", config_details=False,
                    tags=""):
     """Used by the GET /components API operation for the v2 api"""
@@ -179,7 +180,7 @@ def get_components_v2(ids="", status="", enabled=None, config_name="", config_de
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 @options.defaults(limit="default_page_size")
 def get_components_v3(ids="", status="", enabled=None, config_name="", state_details=False,
                       config_details=False, tags="", limit=1, after_id=""):
@@ -276,7 +277,7 @@ def _component_filter(component_data: V3ComponentData,
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_components_v2():
     """Used by the PUT /components API operation"""
     LOGGER.debug("PUT /v2/components invoked put_components_v2")
@@ -300,7 +301,7 @@ def put_components_v2():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_components_v3():
     """Used by the PUT /components API operation"""
     LOGGER.debug("PUT /v3/components invoked put_components_v3")
@@ -324,7 +325,7 @@ def put_components_v3():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_components_v2() -> V2PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v2/components invoked patch_components_v2")
@@ -419,7 +420,7 @@ def patch_v2_components_dict(data: V2ComponentsUpdate) -> V2PatchComponentsRespo
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_components_v3() -> V3PatchComponentsResponse:
     """Used by the PATCH /components API operation"""
     LOGGER.debug("PATCH /v3/components invoked patch_components_v3")
@@ -524,7 +525,7 @@ def patch_v3_components_dict(data: V3ComponentsUpdate) -> V3PatchComponentsRespo
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_component_v2(component_id: str, config_details: bool=False) -> V2GetComponentResponse:
     """Used by the GET /components/{component_id} API operation"""
     LOGGER.debug("GET /v2/components/%s invoked get_component_v2", component_id)
@@ -542,7 +543,7 @@ def get_component_v2(component_id: str, config_details: bool=False) -> V2GetComp
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_component_v3(component_id: str,
                      state_details: bool=False,
                      config_details: bool=False) -> V3GetComponentResponse:
@@ -565,7 +566,7 @@ def get_component_v3(component_id: str,
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_component_v2(component_id: str):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /v2/components/%s invoked put_component_v2", component_id)
@@ -582,7 +583,7 @@ def put_component_v2(component_id: str):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def put_component_v3(component_id: str):
     """Used by the PUT /components/{component_id} API operation"""
     LOGGER.debug("PUT /v3/components/%s invoked put_component_v3", component_id)
@@ -598,7 +599,7 @@ def put_component_v3(component_id: str):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v2/components/%s invoked patch_component_v2", component_id)
@@ -623,7 +624,7 @@ def patch_component_v2(component_id: str) -> V2PatchComponentResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_component_v3(component_id: str) -> V3PatchComponentResponse:
     """Used by the PATCH /components/{component_id} API operation"""
     LOGGER.debug("PATCH /v3/components/%s invoked patch_component_v3", component_id)
@@ -650,7 +651,7 @@ def _patch_component_v3(component_id: str, v3_patch: V3ComponentPatch) -> V3Patc
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_component_v2(component_id: str) -> DeleteComponentResponse:
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /v2/components/%s invoked delete_component_v2", component_id)
@@ -658,7 +659,7 @@ def delete_component_v2(component_id: str) -> DeleteComponentResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_component_v3(component_id: str) -> DeleteComponentResponse:
     """Used by the DELETE /components/{component_id} API operation"""
     LOGGER.debug("DELETE /v3/components/%s invoked delete_component_v3", component_id)
