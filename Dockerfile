@@ -32,6 +32,10 @@ RUN /usr/local/bin/docker-entrypoint.sh generate \
     -g python-flask \
     -o lib/server \
     -c config/autogen-server.json
+COPY base.pylintrc ./.pylintrc
+# Record the Python files that we generated, so we can omit them from
+# our later pylint scan
+RUN find lib -type f -name \*.py | sed 's/^\(.*[.]py\)$/    ^\1,/' | tee -a .pylintrc
 
 # Base image
 FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.22 AS base
@@ -72,6 +76,20 @@ COPY src/server/cray/cfs/api/__main__.py \
      lib/server/cray/cfs/api/
 COPY src/server/cray/cfs/utils           lib/server/cray/cfs/utils
 
+# Run pylint
+FROM base as pylint
+WORKDIR /app
+ENV PYTHONPATH "/app/lib/server"
+RUN --mount=type=secret,id=netrc,target=/root/.netrc \
+    cat .pylintrc && \
+    pip3 install --no-cache-dir pylint -c constraints.txt && \
+    pip3 list --format freeze && \
+    # First run pylint with errors only, and fail if it fails
+    pylint --errors-only lib && \
+    # Intentionally using the RC of tee rather than pylint, so we
+    # do not cause the build to fail based on the full pylint result
+    pylint lib | tee /app/pylint.txt
+
 # Application Image
 FROM base AS application
 ENV PYTHONPATH "/app/lib/server"
@@ -79,5 +97,6 @@ WORKDIR /app/
 EXPOSE 9000
 RUN apk add --no-cache uwsgi-python3
 COPY config/uwsgi.ini ./
+COPY --from=pylint /app/pylint.txt /app/
 USER nobody:nobody
 ENTRYPOINT ["uwsgi", "--ini", "/app/uwsgi.ini"]

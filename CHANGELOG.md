@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added `urllib3` vulnerability (https://snyk.io/vuln/SNYK-PYTHON-URLLIB3-16642024)
   to list of known issues that are not practical to fix for CFS.
+- Run pylint during Docker image build
 
 ### Changed
 - CAST-39551: Kafka overhaul
