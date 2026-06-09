@@ -37,7 +37,7 @@ from csm_utils.logging import exc_type_msg
 from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.dbutils import JsonDict, PatchHandler
+from cray.cfs.api.dbutils import PatchHandler
 from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
