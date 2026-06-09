@@ -238,5 +238,7 @@ class ProducerWrapper:
             )
         )
         LOGGER.debug('_send: Callback added')
-        future.add_errback(lambda exc: LOGGER.exception("Kafka send (%s) failed: %s", send_kwargs, exc))
+        future.add_errback(
+            lambda exc: LOGGER.exception("Kafka send (%s) failed: %s", send_kwargs, exc)
+        )
         LOGGER.debug('_send: Errback added')

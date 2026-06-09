@@ -235,7 +235,8 @@ def _validate_source(source):
         return None
     return connexion.problem(
         status=400, title="Invalid credentials",
-        detail="Both username and password must be provided for password authentication credentials")
+        detail="Both username and password must be provided for "
+               "password authentication credentials")
 
 
 def _update_credentials_secret(source):
@@ -247,7 +248,11 @@ def _update_credentials_secret(source):
         secret_name = f"cfs-source-credentials-{uuid.uuid4()}"
         source["credentials"]["secret_name"] = secret_name
     authentication_method = source_credentials.get("authentication_method")
-    if authentication_method == "password" and source_credentials.get("username") and source_credentials.get("password"):
+    if (
+        authentication_method == "password" and
+        source_credentials.get("username") and
+        source_credentials.get("password")
+    ):
         secret_data = {"username": source_credentials["username"],
                        "password": source_credentials["password"]}
         put_vault_secret(secret_name, secret_data)

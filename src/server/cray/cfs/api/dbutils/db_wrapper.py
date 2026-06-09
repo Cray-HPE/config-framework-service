@@ -160,7 +160,11 @@ class DBWrapper:
         # Return the list starting after that index
         return sorted_keys[i+1:]
 
-    def iter_values(self, *, start_after_key: Optional[str] = None) -> Generator[DbEntry, None, None]:
+    def iter_values(
+        self,
+        *,
+        start_after_key: Optional[str] = None
+    ) -> Generator[DbEntry, None, None]:
         """
         Iterate through every item in the database. Parse each item as JSON and yield it.
         If start_after_key is specified, skip any keys that are lexically <= the specified key.
@@ -696,7 +700,8 @@ class DBWrapper:
                     # that were applied successfully in this batch.
 
                     # Update patched_ids from this batch
-                    # This appends the keys of batch_patched_data_map to the end of the patched_ids list.
+                    # This appends the keys of batch_patched_data_map to the end of the
+                    # patched_ids list.
                     patched_ids.extend(batch_patched_data_map)
                     # Clear the patched_data_map, since we have extracted the IDs from it
                     batch_patched_data_map.clear()
