@@ -1,6 +1,10 @@
+--trusted-host artifactory.algol60.net
+--extra-index-url http://artifactory.algol60.net/artifactory/csm-python-modules/simple
 -c constraints.txt
 -r lib/server/requirements.txt
 
+cachetools
+csm-utils
 kubernetes
 requests
 redis
@@ -8,7 +12,6 @@ kafka-python
 ujson
 hvac
 more-itertools
-readerwriterlock
 typing-extensions
 
 # The purpose of this file is to contain python runtime requirements

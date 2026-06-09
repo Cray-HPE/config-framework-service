@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - CASMCMS-9538: Logging messages now include process ID, thread ID, file name, line number, and function name.
 - CASMCMS-9573: Refactor dbutils into multiple files
+- CAST-39551: Kafka overhaul
+    - Updated `kafka-python` from 2.0 to 2.3
+    - Refactored `kafka_utils.py` into multi-file module
+    - CFS endpoints now add Kafka messages to an internal queue, rather than sending them.
+      A separate thread is now responsible for reading from the queue and sending the messages.
+        - This prevents API call timeouts caused by Kafka retries.
+        - This separate thread is now the only thread which interacts with the KafkaProducer,
+          removing the need for any locking concerns around its initialization.
+    - Instead of every endpoint being wrapped by `@options.refresh_options_update_loglevel`,
+      they are now wrapped by `@server_entrypoint`.
+        - This is a generic registry that calls multiple functions before the API endpoint runs.
+        - One of the functions that runs is the options refresh and log level update.
+        - A new function that runs is one that ensures the background Kafka message thread is
+          running (and starting it if it is not).
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
@@ -51,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the patch succeeds but does not actually change the entry.
 - CASMCMS-9610: Fix exception raised when performing bulk patch operation
 - CASMTRIAGE-8951: `DBWrapper._patch_list`: Fix bug in logic that constructs the map of actually-changed data
+
+### Dependencies
+- CAST-39551: Updated `kafka-python` from 2.0 to 2.3
 
 ## [1.23.8] - 05/18/2026
 ### Added
