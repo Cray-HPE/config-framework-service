@@ -29,8 +29,8 @@ import logging
 import yaml
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.controllers import options
 from cray.cfs.api.models.version import Version
+from cray.cfs.api.server_entrypoint import server_entrypoint
 
 LOGGER = logging.getLogger('cray.cfs.api.controllers.versions')
 
@@ -54,7 +54,7 @@ def _get_version():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_version():
     """Used by the GET / API operation"""
     LOGGER.debug("GET /versions invoked get_versions")
@@ -62,7 +62,7 @@ def get_version():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions():
     """Used by the GET /versions API operation"""
     LOGGER.debug("GET /versions invoked get_versions")
@@ -70,7 +70,7 @@ def get_versions():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions_v2():
     """Used by the GET /v2 API operation"""
     LOGGER.debug("GET /v2 invoked get_versions_v2")
@@ -78,7 +78,7 @@ def get_versions_v2():
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_versions_v3():
     """Used by the GET /v3 API operation"""
     LOGGER.debug("GET /v3 invoked get_versions_v3")

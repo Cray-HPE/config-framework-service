@@ -28,13 +28,14 @@ from functools import partial
 import logging
 import re
 import shlex
+import threading
 from typing import final, Literal, NewType, Optional, TypedDict, Union
 from uuid import UUID
 
 import connexion
 from connexion.lifecycle import ConnexionResponse as CxResponse
+from csm_utils.logging import exc_type_msg
 import dateutil
-from kafka.errors import KafkaTimeoutError
 from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils, kafka_utils
@@ -44,12 +45,20 @@ from cray.cfs.api.models.v2_session import V2Session  # noqa: E501
 from cray.cfs.api.models.v2_session_create import V2SessionCreate  # noqa: E501
 from cray.cfs.api.models.v3_session_create import V3SessionCreate  # noqa: E501
 from cray.cfs.api.models.v3_session_data import V3SessionData as V3Session  # noqa: E501
+from cray.cfs.api.server_entrypoint import server_entrypoint, RunPriority
 
+
+KAFKA_TOPIC = 'cfs-session-events'
 LOGGER = logging.getLogger('cray.cfs.api.controllers.sessions')
 DB = dbutils.get_wrapper(db='sessions')
 CONFIG_DB = dbutils.get_wrapper(db='configurations')
 
-KAFKA = None
+# Add a function to run before API calls are handled, which (if needed) starts the
+# thread that starts and monitors our Kafka flush thread.
+# This should run AFTER the log level has been updated (but we don't care when after)
+START_SUPERVISOR_PRI: RunPriority = options.OPTIONS_LOGLVL_UPDATE_PRI + 10
+start_kafka_supervisor = partial(kafka_utils.start_supervisor, topic=KAFKA_TOPIC)
+server_entrypoint.add(start_kafka_supervisor, START_SUPERVISOR_PRI)
 
 
 class JobFieldAlreadySet(Exception):
@@ -94,16 +103,9 @@ V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200
 V2PatchSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
 V3PatchSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
 
-def _init(topic='cfs-session-events'):
-    """ Initialize the kafka producer information """
-    global KAFKA
-    LOGGER.debug("_init: Initializing ProducerWrapper")
-    KAFKA = kafka_utils.ProducerWrapper(topic)
-    LOGGER.debug("_init: ProducerWrapper initialized")
-
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def create_session_v2():  # noqa: E501
     """Create a Config Framework Session
 
@@ -175,7 +177,7 @@ def create_session_v2():  # noqa: E501
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def create_session_v3():  # noqa: E501
     """Create a Config Framework Session
 
@@ -280,26 +282,7 @@ def _finish_session_create(data):
     3. Write the session to the database
     """
     data['status']['session']['start_time'] = datetime.datetime.now().isoformat(timespec='seconds')
-    try:
-        KAFKA.produce(event_type='CREATE', data=data)
-    except kafka_utils.LockTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Timeout taking KafkaProducer lock"
-        )
-    except kafka_utils.ProducerInitTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Timeout initializing KafkaProducer"
-        )
-    except KafkaTimeoutError as err:
-        return connexion.problem(
-            detail=str(err),
-            status=503,
-            title="Kafka timeout error"
-        )
+    _kafka_create_event(data)
     session_name = data['name']
     LOGGER.debug("_finish_session_create: Writing new session '%s' to database", session_name)
     response_data = DB.put(session_name, data)
@@ -308,7 +291,7 @@ def _finish_session_create(data):
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_session_v2(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
@@ -322,7 +305,7 @@ def delete_session_v2(session_name: str) -> DeleteSessionResponse:  # noqa: E501
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_session_v3(session_name: str) -> DeleteSessionResponse:  # noqa: E501
     """Delete Config Framework Session
 
@@ -350,13 +333,12 @@ def _delete_session(session_name: str) -> DeleteSessionResponse:
             status=404, title="Session not found.",
             detail=f"Session {session_name} could not be found")
     LOGGER.debug("_delete_session: Deleted '%s' in database", session_name)
-    KAFKA.produce(event_type='DELETE', data=session)
-    LOGGER.debug("_delete_session: Kafka DELETE event sent for '%s'", session_name)
+    _kafka_delete_event(session)
     return None, 204
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_sessions_v2(age: Optional[str] = None,
                        min_age: Optional[str] = None,
                        max_age: Optional[str] = None,
@@ -402,7 +384,7 @@ def delete_sessions_v2(age: Optional[str] = None,
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def delete_sessions_v3(age: Optional[str] = None,
                        min_age: Optional[str] = None,
                        max_age: Optional[str] = None,
@@ -483,14 +465,14 @@ def delete_sessions(age: Optional[str],
             status=400,
             title='Error parsing age field'
         )
-    deletion_handler = partial(KAFKA.produce, event_type='DELETE')
-    session_ids = DB.delete_all(session_filter, deletion_handler=deletion_handler)
+
+    session_ids = DB.delete_all(session_filter, deletion_handler=_kafka_delete_event)
     response = {"session_ids": session_ids}
     return response, 200
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_session_v2(session_name: str) -> V2GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
 
@@ -511,7 +493,7 @@ def get_session_v2(session_name: str) -> V2GetSessionResponse:  # noqa: E501
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_session_v3(session_name: str) -> V3GetSessionResponse:  # noqa: E501
     """Config Framework Session Details
 
@@ -533,7 +515,7 @@ def get_session_v3(session_name: str) -> V3GetSessionResponse:  # noqa: E501
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None):  # noqa: E501
     """List Config Framework Sessions
@@ -561,7 +543,7 @@ def get_sessions_v2(age=None, min_age=None, max_age=None, status=None, name_cont
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 @options.defaults(limit="default_page_size")
 def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_contains=None,
                     succeeded=None, tags=None, limit=1, after_id=""):  # noqa: E501
@@ -595,7 +577,7 @@ def get_sessions_v3(age=None, min_age=None, max_age=None, status=None, name_cont
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
     """Update a Config Framework Session
 
@@ -632,7 +614,7 @@ def patch_session_v2(session_name: str) -> V2PatchSessionResponse:
 
 
 @dbutils.redis_error_handler
-@options.refresh_options_update_loglevel
+@server_entrypoint
 def patch_session_v3(session_name: str) -> V3PatchSessionResponse:
     """Update a Config Framework Session
 
@@ -943,6 +925,15 @@ def convert_session_to_v3(data: V2SessionData) -> V3SessionData:
     data = dbutils.convert_data_from_v2(data, V2Session)
     return data
 
+
+def _add_kafka_event(data: dict, event_type: str) -> None:
+    LOGGER.debug("_add_kafka_event: Queueing Kafka %s event for '%s'",
+                 event_type, data)
+    kafka_utils.add_event(event_type=event_type, data=data)
+    LOGGER.debug("_add_kafka_event: Done")
+
+_kafka_create_event = partial(_add_kafka_event, event_type='CREATE')
+_kafka_delete_event = partial(_add_kafka_event, event_type='DELETE')
 
 class ParsingException(Exception):
     pass
