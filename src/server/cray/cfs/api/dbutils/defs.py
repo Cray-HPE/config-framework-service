@@ -42,7 +42,8 @@ DATABASES: Final[tuple[DatabaseNames]] = (
     "sessions",
     "components",
     "configurations",
-    "sources")  # Index is the db id.
+    "sources",
+    "locks")  # Index is the db id.
 CFS_DB_SERVICE_NAME: Final[str] = "cray-cfs-api-db"
 CFS_DB_SERVICE_NS: Final[str] = "services"
 

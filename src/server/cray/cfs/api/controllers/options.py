@@ -261,6 +261,10 @@ class Options:
         return self.get_option('batch_window', int, default=60)
 
     @property
+    def batcher_pending_timeout(self):
+        return self.get_option('batcher_pending_timeout', int, default=300)
+
+    @property
     def default_ansible_config(self):
         return self.get_option('default_ansible_config', str, default='cfs-default-ansible-cfg')
 
