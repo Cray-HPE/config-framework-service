@@ -17,12 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         - This prevents API call timeouts caused by Kafka retries.
         - This separate thread is now the only thread which interacts with the KafkaProducer,
           removing the need for any locking concerns around its initialization.
+    - A new thread runs periodically to check for any sessions that have been pending for
+      longer than usual with no Kubernetes job having been set. Such sessions may indicate
+      that the Kafka CREATE message was not received by operator. The thread re-sends
+      the CREATE message for the session (since we have hardened CFS to prevent this from
+      causing problems).
     - Instead of every endpoint being wrapped by `@options.refresh_options_update_loglevel`,
       they are now wrapped by `@server_entrypoint`.
         - This is a generic registry that calls multiple functions before the API endpoint runs.
         - One of the functions that runs is the options refresh and log level update.
         - A new function that runs is one that ensures the background Kafka message thread is
-          running (and starting it if it is not).
+          running (and starting it if it is not), and likewise for the tardy session scanner
+          thread.
 
 ### Fixed
 - CASMCMS-9633: Add reader/writer lock to Kafka ProducerWrapper class in order to make it thread safe
