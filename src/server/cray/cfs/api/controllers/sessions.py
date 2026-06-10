@@ -905,16 +905,18 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     if succeeded and succeeded != session_status.get('succeeded'):
         return False
-    start_time = session_status['start_time']
-    session_start = None
-    if start_time:
-        session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
-    if min_start and (not session_start or session_start < min_start):
-        return False
-    if max_start and (not session_start or session_start > max_start):
-        return False
     if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
         return False
+    # Only do the time calculations if needed
+    if min_start or max_start:
+        start_time = session_status['start_time']
+        session_start = None
+        if start_time:
+            session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
+        if min_start and (not session_start or session_start < min_start):
+            return False
+        if max_start and (not session_start or session_start > max_start):
+            return False
     return True
 
 
