@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Options patch endpoints now do gets instead of patches if the patch is empty
 - Make more extensive use of `csm_utils.logging.exc_type_msg` for describing exceptions
 - Re-check current log level after taking log update lock, before doing update
+- Refactor `sessions.py` into a multi-file module
 
 ### Dependencies
 - CAST-39551: Updated `kafka-python` from 2.0 to 2.3

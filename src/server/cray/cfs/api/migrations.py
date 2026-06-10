@@ -24,18 +24,26 @@
 import logging
 import os
 
-from cray.cfs.api.controllers.components import convert_component_to_v2, convert_component_to_v3
+from cray.cfs.api.controllers.components import (
+    convert_component_to_v2,
+    convert_component_to_v3,
+)
 from cray.cfs.api.controllers.components import DB as COMPONENTS_DB
 from cray.cfs.api.controllers.configurations import (
-                                                        convert_configuration_to_v2,
-                                                        convert_configuration_to_v3
-                                                    )
+    convert_configuration_to_v2,
+    convert_configuration_to_v3,
+)
 from cray.cfs.api.controllers.configurations import DB as CONFIGURATIONS_DB
-from cray.cfs.api.controllers.sessions import convert_session_to_v2, convert_session_to_v3
-from cray.cfs.api.controllers.sessions import DB as SESSIONS_DB
-from cray.cfs.api.controllers.options import convert_options_to_v2
+from cray.cfs.api.controllers.sessions import (
+    convert_session_to_v2,
+    convert_session_to_v3,
+    SESSIONS_DB,
+)
+from cray.cfs.api.controllers.options import (
+    cleanup_old_options,
+    convert_options_to_v2,
+)
 from cray.cfs.api.controllers.options import DB as OPTIONS_DB
-from cray.cfs.api.controllers.options import cleanup_old_options
 
 
 log_level = os.environ.get('STARTING_LOG_LEVEL', 'INFO')
