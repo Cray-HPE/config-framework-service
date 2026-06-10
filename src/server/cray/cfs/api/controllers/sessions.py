@@ -23,6 +23,7 @@
 #
 
 import argparse
+from collections.abc import Callable
 import datetime
 from functools import partial
 import logging
@@ -93,6 +94,10 @@ V3DeleteSessionsResponse: TypeAlias = Union[tuple[SessionIdListDict, Literal[200
 # Although it does not conform to convention, the successful patch requests return 200 status
 V2PatchSessionResponse: TypeAlias = Union[tuple[V2SessionData, Literal[200]], CxResponse]
 V3PatchSessionResponse: TypeAlias = Union[tuple[V3SessionData, Literal[200]], CxResponse]
+
+TagList: TypeAlias = list[tuple[str, str]]
+
+V3SessionFilter: TypeAlias = Callable[[V3SessionData], bool]
 
 def _init(topic='cfs-session-events'):
     """ Initialize the kafka producer information """
@@ -377,9 +382,9 @@ def delete_sessions_v2(age: Optional[str] = None,
     :param name_contains: A filter on session names
     :type name_contains: str
     :param succeeded: A filter on session success
-    :type succeeded: bool
+    :type succeeded: str
     :param tags: A filter on session tags
-    :type tags: bool
+    :type tags: str
 
     :rtype: None
     """
@@ -423,9 +428,9 @@ def delete_sessions_v3(age: Optional[str] = None,
     :param name_contains: A filter on session names
     :type name_contains: str
     :param succeeded: A filter on session success
-    :type succeeded: bool
+    :type succeeded: str
     :param tags: A filter on session tags
-    :type tags: bool
+    :type tags: str
 
     :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
     Otherwise returns a connexion.problem object
@@ -456,9 +461,9 @@ def delete_sessions(age: Optional[str],
     :param name_contains: A filter on session names
     :type name_contains: str
     :param succeeded: A filter on session success
-    :type succeeded: bool
+    :type succeeded: str
     :param tags: A filter on session tags
-    :type tags: bool
+    :type tags: str
 
     :rtype: dict { "session_ids": [ "list", "of", "session", "ids" ] } (if successful)
     Otherwise returns a connexion.problem object
@@ -850,17 +855,47 @@ def _validate_ansible_passthrough(passthrough):
 
 
 @options.defaults(limit="default_page_size")
-def _get_filtered_sessions(age, min_age, max_age, status, name_contains, succeeded, tag_list,
-                           limit=1, after_id=""):
+def _get_filtered_sessions(
+    age: Optional[str],
+    min_age: Optional[str],
+    max_age: Optional[str],
+    status: Optional[str],
+    name_contains: Optional[str],
+    succeeded: Optional[str],
+    tag_list: Optional[TagList],
+    limit: int = 1,
+    after_id: Optional[str] = ""
+):
     filters = []
-    filters.append(_get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
-                                       tag_list))
-    session_data_page, next_page_exists = DB.get_all(limit=limit, after_id=after_id,
+    filters.append(
+        _get_session_filter(
+            age=age,
+            min_age=min_age,
+            max_age=max_age,
+            status=status,
+            name_contains=name_contains,
+            succeeded=succeeded,
+            tag_list=tag_list,
+        )
+    )
+    session_data_page, next_page_exists = DB.get_all(limit=limit,
+                                                     after_id=after_id,
                                                      data_filters=filters)
     return session_data_page, next_page_exists
 
 
-def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded, tag_list):
+def _get_session_filter(
+    age: Optional[str],
+    min_age: Optional[str],
+    max_age: Optional[str],
+    status: Optional[str],
+    name_contains: Optional[str],
+    succeeded: Optional[str],
+    tag_list: Optional[TagList],
+) -> V3SessionFilter:
+    if not any([age, min_age, max_age, status, name_contains, succeeded, tag_list]):
+        # No filter is being used so all components are valid
+        return lambda _: True
     min_start = None
     max_start = None
     if age:
@@ -881,22 +916,27 @@ def _get_session_filter(age, min_age, max_age, status, name_contains, succeeded,
         except Exception as e:
             LOGGER.warning('Unable to parse max_age: %s', max_age)
             raise ParsingException(e) from e
-    session_filter = partial(_session_filter, min_start=min_start, max_start=max_start,
-                             status=status, name_contains=name_contains,
-                             succeeded=succeeded, tag_list=tag_list)
-    return session_filter
+
+    return partial(
+        _matches_filter,
+        min_start=min_start,
+        max_start=max_start,
+        status=status,
+        name_contains=name_contains,
+        succeeded=succeeded,
+        tag_list=tag_list,
+    )
 
 
-def _session_filter(session_data, min_start, max_start, status, name_contains, succeeded,
-                    tag_list):
-    if any([min_start, max_start, status, name_contains, succeeded, tag_list]):
-        return _matches_filter(session_data, min_start, max_start, status, name_contains,
-                               succeeded, tag_list)
-    # No filter is being used so all components are valid
-    return True
-
-
-def _matches_filter(data, min_start, max_start, status, name_contains, succeeded, tags):
+def _matches_filter(
+    data: V3SessionData,
+    min_start: Optional[datetime.datetime],
+    max_start: Optional[datetime.datetime],
+    status: Optional[str],
+    name_contains: Optional[str],
+    succeeded: Optional[str],
+    tag_list: Optional[TagList],
+) -> bool:
     session_name = data['name']
     if name_contains and name_contains not in session_name:
         return False
@@ -905,7 +945,7 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         return False
     if succeeded and succeeded != session_status.get('succeeded'):
         return False
-    if tags and any(data.get('tags', {}).get(k) != v for k, v in tags):
+    if tag_list and any(data.get('tags', {}).get(k) != v for k, v in tag_list):
         return False
     # Only do the time calculations if needed
     if min_start or max_start:
@@ -913,14 +953,16 @@ def _matches_filter(data, min_start, max_start, status, name_contains, succeeded
         session_start = None
         if start_time:
             session_start = dateutil.parser.parse(start_time).replace(tzinfo=None)
-        if min_start and (not session_start or session_start < min_start):
+        if not session_start:
             return False
-        if max_start and (not session_start or session_start > max_start):
+        if min_start and session_start < min_start:
+            return False
+        if max_start and session_start > max_start:
             return False
     return True
 
 
-def _age_to_timestamp(age):
+def _age_to_timestamp(age: str) -> datetime.datetime:
     delta = {}
     for interval in ['weeks', 'days', 'hours', 'minutes']:
         result = re.search(rf'(\d+)\w*{interval[0]}', age, re.IGNORECASE)
