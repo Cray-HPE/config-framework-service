@@ -27,6 +27,7 @@ from collections.abc import Callable
 import datetime
 from functools import partial
 import logging
+import os
 import random
 import re
 import shlex
@@ -1018,8 +1019,9 @@ _tardy_scan_supervisor_thread_lock = threading.Lock()
 @final
 class TardyLockDbEntry(TypedDict):
     hostname: str
+    pid: int
+    tid: int
     start_time: str
-
 
 def _tardy_scanner() -> NoReturn:
     """
@@ -1027,7 +1029,12 @@ def _tardy_scanner() -> NoReturn:
     """
     while True:
         now = datetime.datetime.now()
-        lock_entry = TardyLockDbEntry(hostname=HOSTNAME, start_time=now.isoformat())
+        lock_entry = TardyLockDbEntry(
+                        hostname=HOSTNAME,
+                        pid=os.getpid(),
+                        tid=threading.get_ident(),
+                        start_time=now.isoformat(),
+        )
         patched_entry = LOCK_DB.patch(
                             key=TARDY_SCAN_LOCK_DB_KEY,
                             patch_data=lock_entry,
