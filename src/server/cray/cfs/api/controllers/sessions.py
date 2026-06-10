@@ -1004,7 +1004,6 @@ def _add_kafka_event(data: dict, event_type: str) -> None:
 _kafka_create_event = partial(_add_kafka_event, event_type='CREATE')
 _kafka_delete_event = partial(_add_kafka_event, event_type='DELETE')
 
-# To prevent collisions with actual 
 TARDY_SCAN_LOCK_DB_KEY = "tardy_pending_session_scan"
 TARDY_SCAN_INTERVAL_SECONDS = 60
 TARDY_SCAN_INTERVAL = datetime.timedelta(seconds=TARDY_SCAN_INTERVAL_SECONDS)
