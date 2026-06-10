@@ -12,6 +12,7 @@ kafka-python
 ujson
 hvac
 more-itertools
+python-dateutil
 typing-extensions
 
 # The purpose of this file is to contain python runtime requirements
