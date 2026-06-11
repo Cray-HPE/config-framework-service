@@ -178,8 +178,8 @@ def _do_tardy_session_scan() -> None:
         # No session age window, so nothing to do
         return
     now = datetime.datetime.now()
-    min_start = now - datetime.timedelta(seconds=min_age_seconds)
-    max_start = now - datetime.timedelta(seconds=max_age_seconds)
+    min_start = now - datetime.timedelta(seconds=max_age_seconds)
+    max_start = now - datetime.timedelta(seconds=min_age_seconds)
     _filter = partial(_tardy_filter, min_start=min_start, max_start=max_start)
     # Scan all sessions using this filter
     SESSIONS_DB.get_all(limit=0, data_filters=[_filter])
