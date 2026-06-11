@@ -73,12 +73,11 @@ def _tardy_scanner() -> NoReturn:
     Every 15 seconds, check to see when the last scan was run.
     """
     while True:
-        now = datetime.datetime.now()
         lock_entry = TardyLockDbEntry(
                         hostname=HOSTNAME,
                         pid=os.getpid(),
                         tid=threading.get_ident(),
-                        start_time=now.isoformat(),
+                        start_time=datetime.datetime.now().isoformat(),
                      )
         patched_entry = LOCK_DB.patch(
                             key=TARDY_SCAN_LOCK_DB_KEY,
@@ -86,6 +85,7 @@ def _tardy_scanner() -> NoReturn:
                             patch_handler=_lock_db_patch_handler,
                             default_entry=lock_entry,
                         )
+        LOGGER.debug("_tardy_scanner: patched_entry=%s, lock_entry=%s", patched_entry, lock_entry)
         if patched_entry == lock_entry:
             # This means we should scan
             _do_tardy_session_scan()
@@ -169,6 +169,7 @@ def _tardy_filter(
 
 
 def _do_tardy_session_scan() -> None:
+    LOGGER.debug("_do_tardy_session_scan: Starting")
     opts = options.Options()
     min_age_seconds = 45
     # Regardless of what the batcher pending timeout is set to,
