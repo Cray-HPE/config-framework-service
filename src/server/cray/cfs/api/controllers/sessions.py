@@ -1115,6 +1115,8 @@ def _tardy_filter(
         # started within our tardy window. So, re-send its Kafka create event
         LOGGER.info("Re-sending Kafka CREATE event for tardy session %s", data)
         _kafka_create_event(data)
+    else:
+        LOGGER.debug("Does not match tardy filter (min_start=%s, max_start=%s): %s", min_start, max_start, data)
     # Regardless, return False
     return False
 
