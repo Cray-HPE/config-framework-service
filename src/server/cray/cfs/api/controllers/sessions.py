@@ -257,6 +257,8 @@ def create_session_v3():  # noqa: E501
         return response_data
 
     _set_link(response_data)
+    LOGGER.debug("create_session_v3: sleep 120")
+    time.sleep(120)
     LOGGER.debug("create_session_v3: Sending 201 response with body: %s", response_data)
     return response_data, 201
 
