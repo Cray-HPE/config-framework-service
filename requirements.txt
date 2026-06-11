@@ -5,16 +5,16 @@
 
 cachetools
 csm-utils
-kubernetes
-requests
-redis
-kafka-python
-ujson
 hvac
+kafka-python
+kubernetes
 more-itertools
 python-dateutil
-typing-extensions
 PyYAML
+redis
+requests
+typing-extensions
+ujson
 
 # The purpose of this file is to contain python runtime requirements
 # for controller code, e.g., code authored by developers, as opposed to
