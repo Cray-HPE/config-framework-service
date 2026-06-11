@@ -13,6 +13,7 @@ ujson
 hvac
 requests-retry-session
 python-dateutil
+PyYAML
 
 # The purpose of this file is to contain python runtime requirements
 # for controller code, e.g., code authored by developers, as opposed to
