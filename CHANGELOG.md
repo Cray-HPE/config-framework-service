@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.10] - 09/16/2026
+
 ### Fixed
 - CAST-40657: Fix incorrect function signature of
   `cray.cfs.api.controllers.configurations._config_deletion_checker()`, in order to prevent
