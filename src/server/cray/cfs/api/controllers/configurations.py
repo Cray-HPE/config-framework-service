@@ -37,7 +37,7 @@ from csm_utils.logging import exc_type_msg
 from typing_extensions import TypeAlias
 
 from cray.cfs.api import dbutils
-from cray.cfs.api.dbutils import PatchHandler
+from cray.cfs.api.dbutils import EntryChecker, PatchHandler
 from cray.cfs.api.controllers import components, options, sources
 from cray.cfs.api.k8s_utils import get_configmap as get_kubernetes_configmap
 from cray.cfs.api.models.v2_configuration import V2Configuration # noqa: E501
@@ -394,8 +394,8 @@ def _delete_configuration(
     Otherwise, try to delete it from the database. Return 404 error if it is not in the DB.
     Otherwise, return None, 204
     """
-    deletion_checker = partial(_config_deletion_checker,
-                               configuration_id=configuration_id)
+    deletion_checker: EntryChecker = partial(_config_deletion_checker,
+                                             configuration_id=configuration_id)
 
     try:
         db_response = DB.conditional_delete(configuration_id, deletion_checker=deletion_checker)
@@ -414,12 +414,15 @@ def _delete_configuration(
 
 
 def _config_deletion_checker(
+    _: V3ConfigurationData,
     *,
     configuration_id: str
 ) -> Literal[True]:
     """
     If this configuration is in use, raise a ConfigInUseError exception.
     Otherwise, return True.
+    The positional argument (a configuration data object) is not used by this function,
+    but it is required for DB EntryChecker functions
     """
     if _config_in_use(configuration_id):
         raise ConfigInUseError()
